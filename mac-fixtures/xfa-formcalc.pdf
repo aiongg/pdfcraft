@@ -1,0 +1,53 @@
+%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /NeedsRendering true /AcroForm << /XFA 5 0 R /Fields [] >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 6 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 45 >>
+stream
+BT /F1 12 Tf 72 700 Td (Please wait...) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Length 911 >>
+stream
+<?xml version="1.0" encoding="UTF-8"?>
+<xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">
+<template xmlns="http://www.xfa.org/schema/xfa-template/3.3/">
+<subform name="form" layout="tb">
+ <pageSet><pageArea name="front"><contentArea x="0.5in" y="0.5in" w="7.5in" h="10in"/><medium short="8.5in" long="11in"/></pageArea></pageSet>
+ <subform name="page1" layout="tb">
+  <field name="strResult" w="4in" h="0.3in" access="readOnly"><ui><textEdit/></ui><caption placement="left" reserve="1.8in"><value><text>Str(2.5, 3, 0)</text></value></caption>
+   <calculate><script>Str(2.5, 3, 0)</script></calculate></field>
+  <field name="formatResult" w="4in" h="0.3in" access="readOnly"><ui><textEdit/></ui><caption placement="left" reserve="1.8in"><value><text>Format("9.99", 0.125)</text></value></caption>
+   <calculate><script>Format("9.99", 0.125)</script></calculate></field>
+ </subform>
+</subform>
+</template>
+</xdp:xdp>
+
+endstream
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000117 00000 n 
+0000000174 00000 n 
+0000000300 00000 n 
+0000000395 00000 n 
+0000001357 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1454
+%%EOF
