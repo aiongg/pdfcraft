@@ -176,7 +176,7 @@ pub fn remote_document_path_is_absolute(raw: &str) -> bool {
 /// Resolve a PDF remote-Go-To file specification to a local path without opening it.
 /// Relative paths are based on the source document, which should be an absolute path; an
 /// in-memory source has no fallback to CWD. URLs (including `file:`), network and device paths are
-/// refused ([`craft_docpath::resolve`]).
+/// refused ([`craft_docpath::resolve_absolute`]).
 pub fn resolve_remote_document_path(source: Option<&Path>, raw: &str) -> Result<PathBuf, RemoteDocumentPathError> {
     if raw.is_empty() || raw.trim().is_empty() {
         return Err(RemoteDocumentPathError::Empty);
@@ -197,12 +197,11 @@ pub fn resolve_remote_document_path(source: Option<&Path>, raw: &str) -> Result<
             return Err(RemoteDocumentPathError::NotLocal(craft_docpath::Refused::Url));
         }
     }
-    let path = craft_docpath::resolve(raw, source).map_err(RemoteDocumentPathError::NotLocal)?;
-    // A relative result would be read against the working directory.
-    if !path.is_absolute() {
-        return Err(RemoteDocumentPathError::MissingSourcePath);
-    }
-    Ok(path)
+    craft_docpath::resolve_absolute(raw, source).map_err(|r| match r {
+        // A path that resolves but not to an absolute one is relative to a source without a usable path.
+        craft_docpath::Refused::Invalid if craft_docpath::resolve(raw, source).is_ok() => RemoteDocumentPathError::MissingSourcePath,
+        r => RemoteDocumentPathError::NotLocal(r),
+    })
 }
 
 /// Largest linked PDF a GoToR link may open (1 GiB, the largest size the large-file work measures).
@@ -520,6 +519,8 @@ mod tests {
             assert!(matches!(resolve(Some(source), url), Err(E::NotLocal(_))), "{url}");
         }
         assert_eq!(resolve(Some(source), "folder/hidden\u{200B}.pdf"), Err(E::Hidden));
+        #[cfg(windows)]
+        assert_eq!(resolve(Some(source), "folder/a:b.pdf"), Err(E::NotLocal(craft_docpath::Refused::Invalid)));
         assert_eq!(resolve(Some(source), &"a".repeat(super::MAX_REMOTE_DOCUMENT_PATH_BYTES + 1)), Err(E::TooLong));
     }
 
