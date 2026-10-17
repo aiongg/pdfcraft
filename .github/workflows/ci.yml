@@ -32,6 +32,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Git dependencies come from storytold
+        if: runner.os == 'Linux'
+        run: |
+          if grep -E '^source = "git\+' Cargo.lock | grep -v '"git+https://github.com/storytold/'; then
+            echo "Cargo.lock has a git dependency outside github.com/storytold"; exit 1
+          fi
+
       # The optional craft-fonts build input (Japanese fonts), so the Japanese font tests run on
       # Linux; Windows tests the build without it. See craftrules standards/fonts.md.
       - name: Check out craft-fonts (Linux)
