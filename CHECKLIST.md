@@ -1,4 +1,4 @@
-# PdfCraft Mac test — `next` a18aa1414
+# PdfCraft Mac test — `next` ed1ab63cd
 
 Report results by number ("1–9 pass, 14 skipped, 21 fails: …"). Test the first section first: those are the changes most likely to lose work or crash.
 
@@ -7,7 +7,7 @@ Report results by number ("1–9 pass, 14 skipped, 21 fails: …"). Test the fir
 ```
 In ~/aiongg/pdfcraft, build the PdfCraft test app from the fork's `next` branch. Don't launch the app.
 1. git remote get-url aiongg >/dev/null 2>&1 || git remote add aiongg https://github.com/aiongg/pdfcraft.git
-2. git fetch aiongg next && git checkout -B next aiongg/next && git reset --hard aiongg/next; confirm HEAD is a18aa1414.
+2. git fetch aiongg next && git checkout -B next aiongg/next && git reset --hard aiongg/next; confirm HEAD is ed1ab63cd.
 3. packaging/macos/package.sh --arch aarch64
    (if ~/aiongg/craft-fonts exists, run it as CRAFT_FONTS_DIR=$HOME/aiongg/craft-fonts packaging/macos/package.sh --arch aarch64)
 4. mkdir -p ~/aiongg/pdfcraft-test && /bin/cp -Rf target/macos-package/PdfCraft.app ~/aiongg/pdfcraft-test/
