@@ -18,7 +18,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  git-sources:
+    name: Git dependencies come from storytold
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check Cargo.lock
+        run: |
+          if grep -E '^source = "git\+' Cargo.lock | grep -v '"git+https://github.com/storytold/'; then
+            echo "Cargo.lock has a git dependency outside github.com/storytold"; exit 1
+          fi
+
   release:
+    needs: git-sources
     # Intentionally tracked at @main (not SHA-pinned) so org-wide CI improvements, security fixes, and build optimizations propagate without PR churn across all craftapp repos.
     uses: storytold/craft-common-actions/.github/workflows/release.yml@main
     with:
