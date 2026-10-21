@@ -184,6 +184,8 @@ fn encrypted_documents_are_autosaved_encrypted_and_recovered_with_the_password()
     h.get_by_label_contains("password-protected");
     h.get_by_label("Recover").click();
     support::wait_until(&mut h, "recovery password prompt", |app| app.password_prompt.is_some());
+    // A new modal is invisible, and so absent from the accessibility tree, on its first frame.
+    h.run_steps(1);
     let field = h.get_by_role(Role::PasswordInput);
     field.focus();
     field.type_text("pw");
@@ -328,6 +330,8 @@ fn an_encrypted_snapshot_without_metadata_still_requires_its_password() {
     let mut h = harness(s.clone());
     h.get_by_label("Recover").click();
     support::wait_until(&mut h, "orphan recovery password prompt", |app| app.password_prompt.is_some());
+    // A new modal is invisible, and so absent from the accessibility tree, on its first frame.
+    h.run_steps(1);
     assert!(h.state().views.is_empty());
     let field = h.get_by_role(Role::PasswordInput);
     field.focus();

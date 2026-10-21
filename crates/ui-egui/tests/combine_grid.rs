@@ -702,7 +702,8 @@ fn a_locked_card_offers_unlock_on_a_right_click() {
     h.run_steps(2);
     // The menu's item comes after the toolbar's button of the same name.
     h.get_all_by_label("Unlock…").last().unwrap().click();
-    h.run_steps(2);
+    // A new modal is invisible, and so absent from the accessibility tree, on its first frame.
+    h.run_steps(3);
     h.get_by_label("Unlock secret.pdf");
     assert_eq!(h.state().combine_selection(), [1], "the card right-clicked is the one unlocked");
 }
@@ -1569,15 +1570,15 @@ fn a_page_cards_magnifier_opens_the_preview_on_that_page() {
     expand(&mut h, "b.pdf");
     hover_card(&mut h, &page_card(4, "b.pdf"));
     h.get_by_label("Preview").click();
-    h.run_steps(2);
+    h.run_steps(3);
     assert_eq!(h.state().combine_preview().map(|p| (p.0, p.1)), Some(("b.pdf".to_string(), 3)));
     h.get_by_label("Page 3 of 3");
-    // A page card's own actions: Collapse, Remove page, Preview (its file can't be removed from
-    // it); nothing is selected yet, so no "Remove b.pdf" anywhere.
-    h.get_by_label("Remove page");
     h.key_press(Key::Escape);
     h.run_steps(2);
+    // A page card's own actions: Collapse, Remove page, Preview (its file can't be removed from
+    // it); nothing is selected yet, so no "Remove b.pdf" anywhere.
     hover_card(&mut h, &page_card(4, "b.pdf"));
+    h.get_by_label("Remove page");
     h.get_by_label("Collapse");
     assert!(h.query_by_label("Remove b.pdf").is_none());
     // Space on a page card that has the keyboard: that page too.

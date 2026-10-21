@@ -523,6 +523,8 @@ fn quit_shortcut_requires_exact_modifiers_and_preserves_unsaved_work() {
             let closes = h.output().viewport_output.values().any(|v| v.commands.contains(&egui::ViewportCommand::Close));
             assert_eq!(closes, should_close, "{os:?}, extra={extra:?}, dirty={dirty}");
             if dirty {
+                // The confirmation is invisible, and so absent from the accessibility tree, on its first frame.
+                h.step();
                 h.get_by_label("Cancel").click();
                 h.run_steps(2);
                 assert_eq!(h.state().views.len(), 1);
