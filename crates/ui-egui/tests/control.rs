@@ -839,7 +839,10 @@ fn preferences_menu_and_shortcut_allow_switching_interface_languages() {
     h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     ok(&mut h, &c, "ui.set", json!({ "key": "language", "value": "ja" }));
     ok(&mut h, &c, "ui.click", json!({ "label": "メニュー" }));
-    ok(&mut h, &c, "ui.click", json!({ "label": "編集" }));
+    // The Edit submenu shares its label with the toolbar's Edit tab, a toggle.
+    let edit = ok(&mut h, &c, "ui.inspect", json!({ "query": "編集" }));
+    let submenu = edit["widgets"].as_array().unwrap().iter().find(|w| w["label"] == "編集" && w["toggled"].is_null()).expect("Edit submenu");
+    ok(&mut h, &c, "ui.click", json!({ "id": submenu["id"] }));
     let menu = ok(&mut h, &c, "ui.inspect", json!({ "query": "環境設定…" }));
     let prefs = menu["widgets"].as_array().unwrap().iter().find(|w| w["clickable"] == true).expect("Preferences menu item");
     ok(&mut h, &c, "ui.click", json!({ "id": prefs["id"] }));
