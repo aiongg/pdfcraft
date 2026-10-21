@@ -271,8 +271,8 @@ fn printers_listed_in_the_background_preselect_the_default_unless_one_was_picked
     h.state_mut().printer_source = Some(Arc::new(move || {
         let _open = wait.lock();
         vec![
-            Printer { name: "Office".into(), default: false, two_sided: None },
-            Printer { name: "Front Desk".into(), default: true, two_sided: None },
+            Printer { name: "Office".into(), description: String::new(), default: false, two_sided: None },
+            Printer { name: "Front Desk".into(), description: String::new(), default: true, two_sided: None },
         ]
     }));
     assert!(h.state_mut().execute("print.dialog"));
@@ -364,8 +364,8 @@ fn a_printer_without_two_sided_printing_points_to_its_properties() {
     let mut h = harness();
     h.state_mut().printer_source = Some(std::sync::Arc::new(|| {
         vec![
-            Printer { name: "Office PCL".into(), default: true, two_sided: Some(true) },
-            Printer { name: "Office PS".into(), default: false, two_sided: Some(false) },
+            Printer { name: "Office PCL".into(), description: String::new(), default: true, two_sided: Some(true) },
+            Printer { name: "Office PS".into(), description: String::new(), default: false, two_sided: Some(false) },
         ]
     }));
     assert!(h.state_mut().execute("print.dialog"));
