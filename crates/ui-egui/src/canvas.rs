@@ -2356,13 +2356,25 @@ const SUPPRESS_TAIL_SECS: f64 = 0.05;
 
 // The viewer moves between docking and the central panel as modes change; keep its scroll
 // identity tied to the document instead of either parent UI.
+//
+// `placed`: the view sets its own offset this frame, already clamped to this frame's content.
+// egui checks an offset against the previous frame's content size, so after a zoom or a resize
+// a valid offset can look like overscroll; with rubber-banding on, the area springs back from it
+// and coasts away from the place asked for. That frame has no rubber band.
 fn page_scroll<R>(
     ui: &mut egui::Ui,
     scroll: egui::ScrollArea,
+    placed: bool,
     id: egui::Id,
     draw: impl FnOnce(&mut egui::Ui, egui::Rect) -> R,
 ) -> egui::scroll_area::ScrollAreaOutput<R> {
-    ui.scope_builder(egui::UiBuilder::new().scope_id(id), |ui| scroll.show_viewport(ui, draw)).inner
+    ui.scope_builder(egui::UiBuilder::new().scope_id(id), |ui| {
+        if placed {
+            ui.spacing_mut().scroll.kinetic.rubber_band = false;
+        }
+        scroll.show_viewport(ui, draw)
+    })
+    .inner
 }
 
 pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
@@ -2664,11 +2676,14 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // Every scroll here asks for no animation. An animated area would still queue a zero-length
     // offset target for the next frame, which overwrites the jump a page turn just set.
     scroll = scroll.animated(false);
+    // Whether this frame places the view itself (see `page_scroll`).
+    let mut placed = false;
     // A newly opened document starts at the top. eframe saves egui's memory with the settings
     // and document ids start again at 1 every launch, so the offset stored under this id can be
     // where an earlier session left another document.
     if !std::mem::replace(&mut view.shown, true) {
         scroll = scroll.scroll_offset(Vec2::ZERO);
+        placed = true;
     }
     // The Hand tool pans here, before the pages are laid out, so the page moves with the pointer
     // in the frame the pointer moves (#924). Scrolling by the drag from inside the area moved the
@@ -2688,15 +2703,19 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         // frame and spring back. `max` is never NaN or below zero, so the clamp can't panic.
         let max = vec2((content_w - avail.width()).max(0.0), (content_h - avail.height()).max(0.0));
         scroll = scroll.scroll_offset((view.last_scroll - moved).clamp(Vec2::ZERO, max));
+        placed = true;
     }
     if let Some(v) = view.sync_scroll.take() {
         scroll = scroll.scroll_offset(v);
+        placed = true;
     }
     if let Some((page, fx, fy, rel)) = view.zoom_anchor.take() {
         let r = rects[page.min(rects.len() - 1)];
         let point = pos2(r.left() + fx * r.width(), r.top() - y_shift + fy * r.height());
         scroll = scroll.scroll_offset(anchored_scroll(point, rel, vec2(content_w, content_h), avail.size()));
+        placed = true;
     } else if let Some((page, frac)) = view.goto.take() {
+        placed = true;
         let page = page.min(rects.len() - 1);
         let r = rects[page];
         // Clamped here: egui clamps only after drawing, so a page that fits was drawn MARGIN - GAP
@@ -2820,6 +2839,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
     // A destination's position (bookmarks, links) refines `goto`: its point at the window's
     // top-left, or the centre of a /FitR rectangle at the window's centre.
     if let Some((page, fx, fy, rel)) = view.goto_point.take() {
+        placed |= fx.is_some() || fy.is_some();
         let r = rects[page.min(rects.len() - 1)];
         // Within the content, so an unreachable point never shows a frame scrolled past the end.
         let (max_x, max_y) = ((content_w - avail.width()).max(0.0), (content_h - avail.height()).max(0.0));
@@ -2831,7 +2851,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
         }
     }
     let selection_wheel = view.selection_drag && navigation_enabled && unobstructed && !single_paging && ui.rect_contains_pointer(avail);
-    let out = page_scroll(ui, scroll, egui::Id::unique(("page-view-scope", view.id)), |ui, viewport| {
+    let out = page_scroll(ui, scroll, placed, egui::Id::unique(("page-view-scope", view.id)), |ui, viewport| {
         // egui's drag responses accept every pointer button. Keep a wheel gesture from also
         // selecting text, drawing a mark, or panning with the Hand tool.
         if middle_gesture {
