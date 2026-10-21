@@ -317,8 +317,8 @@ fn a_pane_closed_in_read_mode_stays_closed_when_leaving_it() {
     assert!(h.state().comments_panel_closed);
 }
 
-/// A right-to-left file name opens, lays out and paints; the tab's accessible name keeps the
-/// logical text (only the painted label is put in visual order).
+/// A right-to-left file name opens, lays out and paints; the tab's accessible name is the
+/// logical text.
 #[test]
 fn a_tab_with_an_arabic_file_name_keeps_its_logical_accessible_name() {
     let name = "واحد اثنين.pdf";

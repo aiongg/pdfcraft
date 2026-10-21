@@ -44,8 +44,7 @@ pub struct LangInfo {
     /// Plural form index for a count (English: 0 = one, 1 = other; Japanese: always 0). A catalog's
     /// `@plural` entries list one form per index.
     pub plural: fn(u64) -> usize,
-    /// The language is written right to left. egui lays text out left to right, so the catalog's
-    /// translations are put into display order when it loads ([`crate::bidi::display_rtl`]).
+    /// The language is written right to left. Translations stay in logical order; egui lays them out.
     pub rtl: bool,
     catalog: OnceLock<Catalog>,
 }
@@ -220,12 +219,9 @@ impl LangInfo {
 
     fn catalog(&self) -> &Catalog {
         self.catalog.get_or_init(|| {
-            let (mut catalog, errors) = Catalog::parse(self.source, self.plural_forms());
+            let (catalog, errors) = Catalog::parse(self.source, self.plural_forms());
             for error in errors {
                 log::warn!("{} interface catalog: {error}; that entry shows in English", self.code);
-            }
-            if self.rtl {
-                catalog.map_translations(crate::bidi::display_rtl);
             }
             catalog
         })
@@ -277,8 +273,7 @@ impl Lang {
         self.0.name
     }
 
-    /// Whether the language is written right to left. Its translations come back from the
-    /// lookups in display order (see [`LangInfo::rtl`]).
+    /// Whether the language is written right to left.
     pub fn rtl(self) -> bool {
         self.0.rtl
     }
@@ -1014,7 +1009,7 @@ mod tests {
             for (field, label) in english.fields() {
                 assert!(has(lang, label), "{} lacks the signature label {field}: {label:?}", language.code);
                 let said = tr(lang, label);
-                if field != "signed_by" && !lang.rtl() {
+                if field != "signed_by" {
                     assert!(said.ends_with(' ') || said.ends_with('：'), "{}: the {field} label runs into its value: {said:?}", language.code);
                 }
             }
@@ -3290,10 +3285,10 @@ mod tests {
         }
         assert_eq!(first_supported("ar-MA\r\nen-US"), Some(ar));
         assert_eq!(tr(ar, "File"), "ملف");
-        assert_eq!(tr(ar, "Bookmarks"), "المرجعية الإشارات");
+        assert_eq!(tr(ar, "Bookmarks"), "الإشارات المرجعية");
         assert_eq!(tr_ctx(ar, "comment menu", "Edit"), "تحرير");
-        assert_eq!(tr_ctx(ar, "certificate", "Subject"), "الشهادة صاحب");
-        // Unknown strings and user text are never reordered by a lookup.
+        assert_eq!(tr_ctx(ar, "certificate", "Subject"), "صاحب الشهادة");
+        // Unknown strings and user text come back as they are.
         assert_eq!(tr(ar, "تقرير نهائي {n}.pdf"), "تقرير نهائي {n}.pdf");
         let mut app = crate::PdfCraftApp::default();
         app.set_option("language", "AR").unwrap();
@@ -3305,26 +3300,58 @@ mod tests {
         assert_eq!(restored.language, "ar");
     }
 
-    /// Lookups return Arabic in display order: egui draws the words left to right as given, and
-    /// joins the letters of each word itself.
+    /// Lookups return Arabic in logical (typing) order, as the catalog has it: egui lays it out,
+    /// and the window title, file dialogs and accessibility tree get it unchanged.
     #[test]
-    fn arabic_lookups_are_in_display_order() {
+    fn arabic_lookups_are_in_logical_order() {
         let ar = arabic();
-        // "حفظ باسم…" as typed; the ellipsis ends the phrase on the left.
-        assert_eq!(tr(ar, "Save as…"), "…باسم حفظ");
-        // Latin names keep their own direction inside the phrase.
-        assert_eq!(tr(ar, "About PdfCraft"), "PdfCraft حول");
-        // A caption's colon stays beside the widget on its right.
+        assert_eq!(tr(ar, "Save as…"), "حفظ باسم…");
+        assert_eq!(tr(ar, "About PdfCraft"), "حول PdfCraft");
+        // A trailing colon or space stays at the end, beside what the code appends.
         assert_eq!(tr(ar, "Name:"), "الاسم:");
-        assert_eq!(tr(ar, "Issued by: "), "عن صادرة: ");
-        // Placeholders survive and are filled in place.
-        assert_eq!(tr(ar, "Couldn't open {name}: {e}"), "{name}: {e} فتح تعذّر");
-        assert_eq!(fmt(tr(ar, "Couldn't open {name}: {e}"), &[("name", "a {e}.pdf"), ("e", "x")]), "a {e}.pdf: x فتح تعذّر");
-        assert_eq!(fmt(tr(ar, "Page {p} of {n}"), &[("p", "3"), ("n", "12")]), "12 من 3 الصفحة");
+        assert_eq!(tr(ar, "Issued by: "), "صادرة عن: ");
+        assert_eq!(fmt(tr(ar, "Couldn't open {name}: {e}"), &[("name", "a {e}.pdf"), ("e", "x")]), "تعذّر فتح a {e}.pdf: x");
+        assert_eq!(fmt(tr(ar, "Page {p} of {n}"), &[("p", "3"), ("n", "12")]), "الصفحة 3 من 12");
         set_current(ar);
-        assert_eq!(command_label("Undo Insert pages from a.pdf"), "a.pdf من صفحات إدراج عن التراجع");
-        assert_eq!(menu_label("file.saveAs", "Save as…"), "…باسم حفظ");
+        assert_eq!(command_label("Undo Insert pages from a.pdf"), "التراجع عن إدراج صفحات من a.pdf");
+        assert_eq!(menu_label("file.saveAs", "Save as…"), "حفظ باسم…");
         set_current(Lang::EN);
+    }
+
+    /// With the Arabic interface, a translated label reaches egui in logical order: the
+    /// accessibility tree gets the catalog's text, and egui's own bidi puts the first word on the
+    /// right and the ellipsis that ends the phrase on the left.
+    #[test]
+    fn arabic_label_reaches_egui_in_logical_order() {
+        use egui_kittest::kittest::Queryable as _;
+        let logical = "حفظ باسم…";
+        set_current(arabic());
+        // Fonts set in one pass take effect in the next, so the label waits for the second pass.
+        let shown = std::rc::Rc::new(std::cell::Cell::new(false));
+        let mut harness = egui_kittest::Harness::builder().with_context_setup(|ctx| ctx.set_fonts(crate::theme::font_definitions())).build_ui({
+            let shown = shown.clone();
+            move |ui| {
+                if shown.get() {
+                    ui.label(tl!("Save as…"));
+                }
+            }
+        });
+        // Without craft-fonts there is no Arabic face; tofu is laid out in the same order.
+        harness.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
+        shown.set(true);
+        harness.run();
+        set_current(Lang::EN);
+        harness.get_by_label(logical);
+        let galleys: Vec<_> =
+            harness.output().shapes.iter().filter_map(|s| if let egui::Shape::Text(t) = &s.shape { Some(t.galley.clone()) } else { None }).collect();
+        let [galley] = &galleys[..] else { panic!("one label: {galleys:?}") };
+        assert_eq!(galley.job.text, logical);
+        let glyphs: Vec<_> = galley.rows.iter().flat_map(|r| &r.glyphs).collect();
+        let xs = |word: &str| glyphs.iter().filter(|g| word.contains(g.chr)).map(|g| g.pos.x).collect::<Vec<f32>>();
+        let (first, second) = (xs("حفظ"), xs("باسم"));
+        assert!(!first.is_empty() && !second.is_empty(), "{glyphs:?}");
+        assert!(second.iter().fold(f32::MIN, |a, &b| a.max(b)) < first.iter().fold(f32::MAX, |a, &b| a.min(b)), "{first:?} {second:?}");
+        assert_eq!(glyphs.iter().min_by(|a, b| a.pos.x.total_cmp(&b.pos.x)).map(|g| g.chr), Some('…'));
     }
 
     #[test]
@@ -3336,11 +3363,11 @@ mod tests {
         assert_eq!([3, 10, 103, 110, 1003].map(form), [3; 5]);
         assert_eq!([11, 99, 111, 199, 1011].map(form), [4; 5]);
         assert_eq!([100, 101, 102, 200, 1000, u64::MAX - 13].map(form), [5; 6]);
-        assert_eq!(trn(ar, 1, "{n} page", "{n} pages"), "صفحة 1");
-        assert_eq!(trn(ar, 2, "{n} page", "{n} pages"), "صفحتان 2");
-        assert_eq!(trn(ar, 5, "{n} page", "{n} pages"), "صفحات 5");
-        assert_eq!(trn(ar, 11, "{n} field", "{n} fields"), "حقلًا 11");
-        assert_eq!(trn(ar, 100, "{n} field", "{n} fields"), "حقل 100");
+        assert_eq!(trn(ar, 1, "{n} page", "{n} pages"), "1 صفحة");
+        assert_eq!(trn(ar, 2, "{n} page", "{n} pages"), "2 صفحتان");
+        assert_eq!(trn(ar, 5, "{n} page", "{n} pages"), "5 صفحات");
+        assert_eq!(trn(ar, 11, "{n} field", "{n} fields"), "11 حقلًا");
+        assert_eq!(trn(ar, 100, "{n} field", "{n} fields"), "100 حقل");
     }
 
     /// Arabic translates every registered command, menu and All tools label.

@@ -286,93 +286,25 @@ pub fn row_text(ui: &egui::Ui, pos: egui::Pos2, text: impl Into<String>, font: e
     ui.painter().galley(rect.min, galley, color);
 }
 
-/// Text wrapped to the available width, for text people write (comments, replies). A paragraph
-/// in a right-to-left script (Persian, Arabic, Hebrew) reads right to left and sits against the
-/// right edge ([`crate::bidi::wrap`]); text without one is an ordinary wrapping label.
-/// `truncate` keeps the first line only, with an ellipsis where the text goes on.
+/// Text wrapped to the available width, for text people write (comments, replies). Text that
+/// reads right to left (Persian, Arabic, Hebrew) sits against the right edge; in text of mixed
+/// direction each paragraph starts on its own side. `truncate` keeps the first line only, with an
+/// ellipsis where the text goes on.
 pub fn wrapped_text(ui: &mut egui::Ui, text: &str, font: egui::FontId, color: Color32, truncate: bool) -> Response {
-    if !crate::bidi::has_rtl(text) {
-        let mut label = egui::Label::new(egui::RichText::new(text).font(font).color(color)).wrap();
-        if truncate {
-            label = label.truncate();
-        }
-        return ui.add(label);
+    let mut label = egui::Label::new(egui::RichText::new(text).font(font).color(color)).wrap();
+    if truncate {
+        label = label.truncate();
     }
-    let width = ui.available_width().max(1.0);
-    let lines = wrapped_lines(ui, text, &font, width, truncate);
-    let galleys: Vec<_> = lines.iter().map(|line| (line.rtl, ui.painter().layout_no_wrap(line.text.clone(), font.clone(), color))).collect();
-    let height = galleys.iter().map(|(_, g)| g.size().y).sum();
-    let (rect, resp) = ui.allocate_exact_size(vec2(width, height), Sense::hover());
-    // Painted text only: the accessibility name keeps the logical order.
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, text));
-    let mut y = rect.top();
-    for (rtl, galley) in galleys {
-        let x = if rtl { rect.right() - galley.size().x } else { rect.left() };
-        let h = galley.size().y;
-        ui.painter().galley(egui::pos2(x, y), galley, color);
-        y += h;
+    if reads_right_to_left(text) {
+        return ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| ui.add(label)).inner;
     }
-    resp
+    ui.add(label)
 }
 
-const ELLIPSIS: &str = "\u{2026}";
-
-/// Wrapped right-to-left text kept between frames. Wrapping measures many candidate lines, so
-/// re-wrapping every comment on every frame would make a panel of long comments slow; the
-/// result depends only on the text, font, width, scale and collapsed state, so it is looked up.
-#[derive(Clone, Default)]
-struct WrapCache {
-    lines: std::collections::HashMap<u64, std::sync::Arc<[crate::bidi::Line]>>,
-}
-
-/// How many wrapped texts the cache holds before it starts over (each costs its text's size).
-const WRAP_CACHE_MAX: usize = 256;
-
-/// A collapsed comment shows one line, so no more than this many characters are wrapped for it:
-/// a long comment doesn't cost a full wrap just to show its start.
-const COLLAPSED_WRAP_CHARS: usize = 1024;
-
-/// The lines `wrapped_text` paints for a right-to-left `text`, from the cache when the same text
-/// was wrapped the same way before.
-fn wrapped_lines(ui: &egui::Ui, text: &str, font: &egui::FontId, width: f32, truncate: bool) -> std::sync::Arc<[crate::bidi::Line]> {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    (text, font, width.to_bits(), ui.ctx().pixels_per_point().to_bits(), truncate).hash(&mut hasher);
-    let key = hasher.finish();
-    let cache_id = egui::Id::unique("pdfcraft-rtl-wrap-cache");
-    if let Some(hit) = ui.ctx().data_mut(|d| d.get_temp_mut_or_default::<WrapCache>(cache_id).lines.get(&key).cloned()) {
-        return hit;
-    }
-    // Collapsed: only the start is wrapped (cut at a char boundary, so the slice can't fail).
-    let (measured, cut) = match text.char_indices().nth(COLLAPSED_WRAP_CHARS) {
-        Some((at, _)) if truncate => (text.get(..at).unwrap_or(text), true),
-        _ => (text, false),
-    };
-    let measure = |f: &mut egui::epaint::text::FontsView<'_>, s: &str| f.layout_no_wrap(s.to_owned(), font.clone(), Color32::WHITE).size().x;
-    let mut lines = ui.fonts_mut(|f| {
-        let room = if truncate { width - measure(f, ELLIPSIS) } else { width };
-        crate::bidi::wrap(measured, |s| measure(f, s) <= room)
-    });
-    if truncate && (lines.len() > 1 || cut) {
-        lines.truncate(1);
-        if let Some(line) = lines.first_mut() {
-            // The ellipsis goes where the line's reading ends: the left of a right-to-left line.
-            if line.rtl {
-                line.text.insert_str(0, ELLIPSIS);
-            } else {
-                line.text.push_str(ELLIPSIS);
-            }
-        }
-    }
-    let lines: std::sync::Arc<[crate::bidi::Line]> = lines.into();
-    ui.ctx().data_mut(|d| {
-        let cache = &mut d.get_temp_mut_or_default::<WrapCache>(cache_id).lines;
-        if cache.len() >= WRAP_CACHE_MAX {
-            cache.clear();
-        }
-        cache.insert(key, lines.clone());
-    });
-    lines
+/// Whether every paragraph of `text` that has a strong character starts with a right-to-left one.
+fn reads_right_to_left(text: &str) -> bool {
+    let mut directions = text.split('\n').map(unicode_bidi::get_base_direction).filter(|d| *d != unicode_bidi::Direction::Mixed).peekable();
+    directions.peek().is_some() && directions.all(|d| d == unicode_bidi::Direction::Rtl)
 }
 
 /// Transient message at the bottom centre.
@@ -723,8 +655,8 @@ mod tests {
         assert!((again.width() - short.width()).abs() < 1.0, "long notices must not impose a permanent minimum width");
     }
 
-    /// The text shapes `wrapped_text` paints in a 120 pt wide column at x = 0.
-    fn wrapped_shapes(text: &str, truncate: bool) -> Vec<(Pos2, Rect, String)> {
+    /// The galleys `wrapped_text` paints in a 120 pt wide column at x = 0, each with its position.
+    fn wrapped_galleys(text: &str, truncate: bool) -> Vec<(Pos2, std::sync::Arc<egui::Galley>)> {
         let ctx = egui::Context::default();
         ctx.set_fonts(theme::font_definitions());
         let output = ctx.run_ui(egui::RawInput::default(), |ui| {
@@ -733,72 +665,45 @@ mod tests {
                 wrapped_text(ui, text, theme::regular(13.0), Color32::WHITE, truncate);
             });
         });
-        let shapes = output
+        let galleys = output
             .shapes
             .iter()
-            .filter_map(|shape| if let egui::Shape::Text(t) = &shape.shape { Some((t.pos, t.galley.rect, t.galley.job.text.clone())) } else { None })
+            .filter_map(|shape| if let egui::Shape::Text(t) = &shape.shape { Some((t.pos, t.galley.clone())) } else { None })
             .collect();
         output.drop_without_applying_deltas();
-        shapes
+        galleys
     }
 
-    /// Right-to-left text is wrapped once and looked up on later frames; the cache stays bounded
-    /// however many comments go by, and a collapsed comment of any length still shows one line.
-    #[test]
-    fn rtl_wrapping_is_cached_and_bounded() {
-        let ctx = egui::Context::default();
-        ctx.set_fonts(theme::font_definitions());
-        let cache_len =
-            |ctx: &egui::Context| ctx.data_mut(|d| d.get_temp_mut_or_default::<WrapCache>(egui::Id::unique("pdfcraft-rtl-wrap-cache")).lines.len());
-        let persian = "این یک نظر طولانی به زبان فارسی است که باید در چند خط شکسته شود";
-        let long = persian.repeat(2_000);
-        let mut first = None;
-        for _ in 0..3 {
-            ctx.run_ui(egui::RawInput::default(), |ui| {
-                let lines = wrapped_lines(ui, persian, &theme::regular(13.0), 120.0, false);
-                assert!(lines.len() > 1);
-                if let Some(prev) = &first {
-                    assert!(std::sync::Arc::ptr_eq(prev, &lines), "the second frame reuses the first frame's wrap");
-                }
-                first = Some(lines);
-                let collapsed = wrapped_lines(ui, &long, &theme::regular(13.0), 120.0, true);
-                assert_eq!(collapsed.len(), 1);
-                assert!(collapsed[0].text.starts_with(ELLIPSIS), "{:?}", collapsed[0].text);
-            })
-            .drop_without_applying_deltas();
-        }
-        assert_eq!(cache_len(&ctx), 2, "one entry per text and layout");
-        ctx.run_ui(egui::RawInput::default(), |ui| {
-            for i in 0..WRAP_CACHE_MAX + 50 {
-                wrapped_lines(ui, &format!("{persian} {i}"), &theme::regular(13.0), 120.0, false);
-            }
-        })
-        .drop_without_applying_deltas();
-        assert!(cache_len(&ctx) <= WRAP_CACHE_MAX, "bounded: {}", cache_len(&ctx));
+    /// Each row of a galley painted at `pos`: its left and right edge in the column, and its text.
+    fn rows(pos: Pos2, galley: &egui::Galley) -> Vec<(f32, f32, String)> {
+        galley.rows.iter().map(|r| (pos.x + r.rect().left(), pos.x + r.rect().right(), r.row.glyphs.iter().map(|g| g.chr).collect())).collect()
     }
 
+    /// Right-to-left comments are egui labels against the right edge: egui wraps them, puts the
+    /// first words on the first row, and elides a collapsed one at its left end.
     #[test]
     fn rtl_comment_wraps_against_the_right_edge() {
         let persian = "این یک نظر طولانی به زبان فارسی است که باید در چند خط شکسته شود";
-        let lines = wrapped_shapes(persian, false);
+        let [(pos, galley)] = &wrapped_galleys(persian, false)[..] else { panic!("one label") };
+        assert_eq!(galley.job.text, persian, "the logical text goes to egui");
+        let lines = rows(*pos, galley);
         assert!(lines.len() > 1, "{lines:?}");
-        let right = lines.iter().map(|(pos, rect, _)| pos.x + rect.width()).fold(0.0, f32::max);
-        for (pos, rect, text) in &lines {
-            assert!(pos.x >= -0.5 && (pos.x + rect.width() - right).abs() < 0.5, "{text:?} at {pos:?} must be right-aligned");
+        for (left, right, text) in &lines {
+            assert!(*left >= -0.5 && (right - 120.0).abs() < 1.0, "{text:?} from {left} to {right} must be right-aligned");
         }
-        assert!(right <= 120.5, "lines stay inside the column: {right}");
-        // The first words read on the first line, at the top.
-        let top = lines.iter().min_by(|a, b| a.0.y.total_cmp(&b.0.y)).unwrap();
-        assert!(top.2.contains("این"), "{top:?}");
-        // Collapsed: one line, its ellipsis on the left where right-to-left reading ends.
-        let collapsed = wrapped_shapes(persian, true);
-        assert_eq!(collapsed.len(), 1);
-        assert!(collapsed[0].2.starts_with('\u{2026}'), "{collapsed:?}");
-        // Text without right-to-left script is a plain label, as before.
-        let latin = wrapped_shapes("A short note", false);
-        assert_eq!(latin.len(), 1);
-        assert_eq!(latin[0].2, "A short note");
-        assert!(latin[0].0.x.abs() < 0.5);
+        assert!(lines[0].2.contains("این"), "{lines:?}");
+        // A short comment sits at the right edge too.
+        let [(pos, galley)] = &wrapped_galleys("سلام", false)[..] else { panic!("one label") };
+        assert!((rows(*pos, galley)[0].1 - 120.0).abs() < 1.0, "{:?}", rows(*pos, galley));
+        // Collapsed: one row, its ellipsis on the left where right-to-left reading ends.
+        let [(pos, galley)] = &wrapped_galleys(persian, true)[..] else { panic!("one label") };
+        assert_eq!(galley.rows.len(), 1);
+        let leftmost = galley.rows[0].glyphs.iter().min_by(|a, b| a.pos.x.total_cmp(&b.pos.x)).map(|g| g.chr);
+        assert_eq!(leftmost, Some('\u{2026}'), "{:?}", rows(*pos, galley));
+        // Text without right-to-left script is a plain label at the left.
+        let [(pos, galley)] = &wrapped_galleys("A short note", false)[..] else { panic!("one label") };
+        assert_eq!(rows(*pos, galley).len(), 1);
+        assert!(pos.x.abs() < 0.5);
     }
 
     #[test]

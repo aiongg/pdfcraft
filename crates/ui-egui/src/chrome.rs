@@ -383,8 +383,7 @@ fn tab_name(name: &str) -> String {
 
 /// The width a tab takes when nothing has to shrink.
 fn tab_natural_width(ui: &egui::Ui, t: &Tokens, name: &str) -> f32 {
-    let label = crate::bidi::visual(&tab_name(name)).into_owned();
-    ui.fonts_mut(|f| f.layout_no_wrap(label, theme::regular(13.0), t.text).size().x) + TAB_CHROME
+    ui.fonts_mut(|f| f.layout_no_wrap(tab_name(name), theme::regular(13.0), t.text).size().x) + TAB_CHROME
 }
 
 /// The widest any tab may be so that tabs of `natural` widths, `gap` apart, fit in `budget`:
@@ -432,12 +431,8 @@ fn tab(
     // A shrunk tab shows as much of its name as fits (the tooltip has all of it).
     if let Some(cap) = cap {
         let room = (cap - TAB_CHROME).max(0.0);
-        label = ui.fonts_mut(|f| {
-            crate::panels::ellipsized_prefix(&label, |s| f.layout_no_wrap(crate::bidi::visual(s).into_owned(), font.clone(), t.text).size().x <= room)
-        });
+        label = ui.fonts_mut(|f| crate::panels::ellipsized_prefix(&label, |s| f.layout_no_wrap(s.to_owned(), font.clone(), t.text).size().x <= room));
     }
-    // Painted text only: the accessibility name below keeps the logical order.
-    let label = crate::bidi::visual(&label).into_owned();
     let text_w = ui.fonts_mut(|f| f.layout_no_wrap(label.clone(), font.clone(), t.text).size().x);
     let width = cap.map_or(text_w + TAB_CHROME, |cap| (text_w + TAB_CHROME).min(cap));
     // Full strip height so the active tab sits on the mode bar instead of floating in the title bar.
@@ -478,14 +473,10 @@ fn tab(
         *close = Some(index);
     }
     let shown = match file {
-        Some(file) => std::borrow::Cow::Owned(format!("{}\n{}", crate::bidi::visual(name), crate::bidi::visual(file))),
-        None => crate::bidi::visual(name),
+        Some(file) => format!("{name}\n{file}"),
+        None => name.to_owned(),
     };
-    theme::hand(resp).on_hover_text(if dirty {
-        crate::i18n::fmt(tl!("{name} — unsaved changes"), &[("name", shown.as_ref())])
-    } else {
-        shown.into_owned()
-    })
+    theme::hand(resp).on_hover_text(if dirty { crate::i18n::fmt(tl!("{name} — unsaved changes"), &[("name", &shown)]) } else { shown })
 }
 
 pub fn mode_bar(app: &mut PdfCraftApp, ui: &mut egui::Ui) {

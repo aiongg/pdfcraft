@@ -75,7 +75,6 @@ pub use link_ui::LinkDraft;
 pub use optimize_ui::{OptimizeDraft, OptimizeTab};
 pub use sign_ui::{DigitalIdEntry, SignDraft, SignGraphic, SignStep};
 mod autoscroll;
-mod bidi;
 pub mod bulk_fields;
 mod dialogs;
 mod edit_text_ui;

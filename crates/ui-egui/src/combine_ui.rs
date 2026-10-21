@@ -742,7 +742,7 @@ pub(crate) fn page(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     ui.close();
                 }
                 for (i, name) in &open_docs {
-                    if ui.button(crate::bidi::visual(name).as_ref()).clicked() {
+                    if ui.button(name.as_str()).clicked() {
                         app.add_open_documents(&[*i]);
                         ui.close();
                     }
@@ -932,7 +932,7 @@ fn skip_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
         ui.add_space(6.0);
         for (name, why) in left_out.iter().take(SKIP_PROMPT_NAMES) {
             ui.horizontal_wrapped(|ui| {
-                ui.label(egui::RichText::new(format!("• {}", crate::bidi::visual(name))).strong());
+                ui.label(egui::RichText::new(format!("• {name}")).strong());
                 ui.label(egui::RichText::new(*why).color(t.text_muted));
             });
         }
@@ -1467,7 +1467,7 @@ fn table_body(
                         row.col(|ui| match kind {
                             SortKey::Name => {
                                 ui.add(icons::image("file-text", 16.0, t.icon));
-                                ui.add(egui::Label::new(crate::bidi::visual(&f.name).as_ref()).truncate().selectable(false));
+                                ui.add(egui::Label::new(f.name.as_str()).truncate().selectable(false));
                             }
                             // The range field and how many pages it takes.
                             SortKey::Pages => {

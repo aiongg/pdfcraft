@@ -214,8 +214,7 @@ pub(crate) fn show(
             if g.is_some() && g != group {
                 ui.add_space(6.0);
                 let title = g.clone().unwrap_or_default();
-                // Catalog labels are already in display order; an author's name is put in it here.
-                let shown = if sort == SortBy::Author && a.author.is_some() { crate::bidi::visual_auto(&title) } else { tl!(&title).into() };
+                let shown = if sort == SortBy::Author && a.author.is_some() { title.as_str() } else { tl!(&title) };
                 ui.label(egui::RichText::new(shown).font(theme::semibold(12.5)).color(t.text_muted));
                 group = g;
             }
@@ -294,7 +293,7 @@ fn card(
             let mut buttons_left = f32::INFINITY;
             let head = ui.horizontal(|ui| {
                 avatar(ui, t, Some(subtype_icon(&a.subtype)), None, color);
-                let author = a.author.as_deref().map_or_else(|| tl!("Unknown author").into(), crate::bidi::visual_auto);
+                let author = a.author.as_deref().unwrap_or(tl!("Unknown author"));
                 ui.label(egui::RichText::new(author).font(theme::semibold(12.5)).color(t.text));
                 if let Some(m) = &a.modified {
                     ui.add(egui::Label::new(egui::RichText::new(m).font(theme::regular(11.0)).color(t.text_faint)).truncate());
@@ -370,7 +369,7 @@ fn card(
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 2.0;
                         ui.horizontal(|ui| {
-                            let author = r.author.as_deref().map_or_else(|| tl!("Reply").into(), crate::bidi::visual_auto);
+                            let author = r.author.as_deref().unwrap_or(tl!("Reply"));
                             ui.label(egui::RichText::new(author).font(theme::semibold(12.0)));
                             if let Some(m) = &r.modified {
                                 ui.add(egui::Label::new(egui::RichText::new(m).font(theme::regular(11.0)).color(t.text_faint)).truncate());
@@ -595,8 +594,7 @@ pub(crate) fn header_controls(ui: &mut egui::Ui, info: &DocInfo, view: &mut DocV
         ui.separator();
         ui.label(egui::RichText::new(tl!("Author")).small());
         for a in &authors {
-            let name = crate::bidi::visual_auto(a);
-            toggle(ui, &mut cv.hidden_authors, a, if a.is_empty() { tl!("Unknown author") } else { &name });
+            toggle(ui, &mut cv.hidden_authors, a, if a.is_empty() { tl!("Unknown author") } else { a });
         }
         ui.separator();
         ui.label(egui::RichText::new(tl!("Status")).small());

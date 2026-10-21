@@ -893,8 +893,8 @@ fn graphic_of(signature: Option<&SavedSig>, g: &SignGraphic) -> Option<SavedSig>
 /// The words of a visible signature's labels in `lang`, and whether they fell back to English.
 ///
 /// The labels are stamped into the document, so they are all in `lang` or all in English, never a
-/// mix. English when `lang` is English; when it is written right to left (its catalog is kept in
-/// display order, not the order a PDF stores text in); when one label has no translation; or when
+/// mix. English when `lang` is English; when it is written right to left (the stamp draws its text
+/// left to right, without reordering it); when one label has no translation; or when
 /// the signature's font can't draw one (Chinese, Japanese, Cyrillic, Greek in Helvetica), which
 /// signing would refuse. The English words are the sign crate's own, so they can't drift apart.
 pub(crate) fn appearance_labels(lang: crate::i18n::Lang) -> (AppearanceLabels, bool) {

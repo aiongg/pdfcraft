@@ -974,8 +974,8 @@ impl Card {
             }
             None => (theme::medium(12.5), t.text, name_y),
         };
-        let fits = |s: &str| painter.layout_no_wrap(crate::bidi::visual(s).into_owned(), font.clone(), colour).size().x <= max_w;
-        let shown = crate::bidi::visual(&fit_name(&f.name, fits)).into_owned();
+        let fits = |s: &str| painter.layout_no_wrap(s.to_owned(), font.clone(), colour).size().x <= max_w;
+        let shown = fit_name(&f.name, fits);
         painter.text(pos2(c.center().x, y), Align2::CENTER_CENTER, shown, font, colour);
         let note = if self.page.is_none() && !f.range.trim().is_empty() {
             match &self.check {
@@ -1151,7 +1151,7 @@ pub(crate) fn preview(app: &mut PdfCraftApp, ctx: &egui::Context, t: &Tokens) {
     let modal = egui::Modal::new(egui::Id::unique("combine-preview")).show(ctx, |ui| {
         ui.set_width(width);
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(crate::bidi::visual(&f.name)).font(theme::semibold(15.0)));
+            ui.label(egui::RichText::new(&f.name).font(theme::semibold(15.0)));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if icons::button(ui, "x", 30.0, false, tl!("Close")).clicked() {
                     close = true;

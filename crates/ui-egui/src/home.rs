@@ -189,8 +189,8 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 );
                 // The name and path stop short of the page count; hovering shows the whole path.
                 let width = detail.left() - 16.0 - (body.left() + 46.0);
-                widgets::row_text(ui, body.min + vec2(46.0, 15.0), crate::bidi::visual(&r.name), theme::medium(13.5), t.text, width);
-                widgets::row_text(ui, body.min + vec2(46.0, 32.0), crate::bidi::visual(&r.path), theme::regular(11.0), t.text_faint, width);
+                widgets::row_text(ui, body.min + vec2(46.0, 15.0), &r.name, theme::medium(13.5), t.text, width);
+                widgets::row_text(ui, body.min + vec2(46.0, 32.0), &r.path, theme::regular(11.0), t.text_faint, width);
                 if theme::hand(resp).on_hover_text(&r.path).clicked() {
                     open = Some(r.path.clone());
                 }
