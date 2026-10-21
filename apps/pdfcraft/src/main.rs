@@ -330,7 +330,8 @@ fn native_options(integrated: bool, app_frame: bool, renderer: eframe::Renderer)
     }
     let persistence_path = settings_dir().map(|d| d.join("app.ron"));
     // Set explicitly, so the renderer never depends on which one eframe defaults to.
-    let mut native = eframe::NativeOptions { viewport, persistence_path, renderer, ..Default::default() };
+    // craft-ui's font stack (pdfcraft_ui_egui::theme::font_stack) finds installed faces itself.
+    let mut native = eframe::NativeOptions { viewport, persistence_path, renderer, system_font_fallback: false, ..Default::default() };
     if renderer == eframe::Renderer::Wgpu {
         configure_gpu(&mut native);
     }
