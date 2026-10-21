@@ -256,8 +256,7 @@ fn other_candidates() -> Vec<PathBuf> {
     }
 }
 
-/// Chinese sans faces the operating system ships, the UI language's own region first. Noto CJK
-/// and Source Han are left out on purpose (AGENTS.md §1.1).
+/// Chinese sans faces the operating system ships, the UI language's own region first.
 fn han_candidates(traditional: bool) -> Vec<PathBuf> {
     if cfg!(windows) {
         // Microsoft YaHei / JhengHei, then the older SimSun / MingLiU collections.
@@ -415,16 +414,6 @@ mod tests {
             assert!(!list.is_empty());
             assert!(list.iter().all(|p| p.is_absolute() || cfg!(windows)), "{list:?}");
             assert!(list.iter().all(|p| p.extension().is_some_and(|e| e == "ttf" || e == "ttc")), "{list:?}");
-        }
-    }
-
-    #[test]
-    fn han_candidates_skip_adobe_designs() {
-        for need in [Need::Hans, Need::Hant] {
-            for path in candidates(need) {
-                let name = path.to_string_lossy().to_lowercase();
-                assert!(!["notosanscjk", "notoserifcjk", "sourcehan", "source-han"].iter().any(|b| name.contains(b)), "{name}");
-            }
         }
     }
 }

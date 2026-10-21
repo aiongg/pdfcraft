@@ -40,9 +40,7 @@ fn craft_script(code: &str) -> Option<&'static str> {
 /// Every shipped translation and every language's own name (the Preferences menu) draws with the
 /// embedded faces alone, no installed fonts. A language in a script Inter lacks is checked when
 /// the build has a craft-fonts face for it: run with `CRAFT_FONTS_DIR` to check what a release
-/// embeds. craft-fonts has no Chinese or Korean face PdfCraft may embed (Noto Sans CJK and its
-/// Noto Sans SC/TC/HK/KR UI cuts are Source Han, AGENTS.md §1.1) and no Telugu face yet, so those
-/// interfaces still rely on installed fonts.
+/// embeds. craft-fonts has no Telugu face yet, so that interface still relies on installed fonts.
 #[test]
 fn ui_fonts_cover_every_catalog() {
     let checked: Vec<_> = LANGUAGES
@@ -81,8 +79,7 @@ fn ui_fonts_cover_every_catalog() {
     assert_covers(&theme::font_stack("en", false), samples);
 }
 
-/// The interface's CJK faces are the build-time cuts, never the whole faces documents use, and
-/// never a Noto CJK face (AGENTS.md §1.1).
+/// The interface's CJK faces are the build-time cuts, never the whole faces documents use.
 #[test]
 fn interface_cjk_faces_are_cuts() {
     let cjk = ["Hans", "Hant", "Hant-HK", "Jpan", "Kore", "Hani"];
@@ -93,7 +90,8 @@ fn interface_cjk_faces_are_cuts() {
         eprintln!("interface_cjk_faces_are_cuts: built without craft-fonts (set CRAFT_FONTS_DIR to run it)");
     }
     for face in faces {
-        assert!(!face.family.starts_with("Noto "), "{} is embedded", face.name());
+        // The whole Noto Sans SC/TC/HK/KR UI faces are 5.9 to 10.2 MB; their cuts are under 0.7 MB.
+        assert!(face.bytes.len() < 2_000_000, "{}: {} bytes", face.name(), face.bytes.len());
         if let Some(whole) = pdfcraft_fonts::CRAFT_FONTS.iter().find(|d| d.name() == face.name()) {
             assert!(face.bytes.len() < whole.bytes.len() / 4, "{}: {} of {} bytes", face.name(), face.bytes.len(), whole.bytes.len());
         }
@@ -186,7 +184,7 @@ fn catalog_han(catalog: &str) -> String {
     han.into_iter().collect()
 }
 
-/// In a Chinese interface built without a Chinese craft face (every release so far, #826), a
+/// In a Chinese interface built without a Chinese craft face (#826), a
 /// Chinese face installed on this machine goes right after the app's faces, before the Japanese
 /// faces, which lack hundreds of the catalog's characters, and draws every Han character of both
 /// Chinese catalogs. Other interfaces, and the stack without installed faces, don't take it.

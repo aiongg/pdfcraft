@@ -8,19 +8,12 @@
 //! wasm32 it embeds only BIZ UDPGothic Regular and any `Arab`, `Telu`, `Hebr` or `Thai` face, to
 //! keep the web build within hosting limits (Cloudflare Pages: 25 MiB per file).
 
-include!("src/barred.rs");
-
 include!("src/families.rs");
 
 fn main() {
     let wasm = craft_fonts_build::target_is_wasm();
     let written = craft_fonts_build::Embed::documents(DOCUMENT_FAMILIES)
         .filter(move |face| {
-            let scripts: Vec<&str> = face.scripts.iter().map(String::as_str).collect();
-            if barred(&face.family, &scripts) {
-                println!("cargo::warning=craft-fonts: not embedding {} {} (AGENTS.md §1.1)", face.family, face.style);
-                return false;
-            }
             // The web build keeps the small faces of the scripts it writes and its interface draws.
             let web_face =
                 (face.family == "BIZ UDPGothic" && face.style == "Regular") || ["Arab", "Telu", "Hebr", "Thai"].iter().any(|s| face.has_script(s));

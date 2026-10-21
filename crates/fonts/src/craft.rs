@@ -1,8 +1,7 @@
 //! Fonts from the optional craft-fonts build input (<https://github.com/storytold/craft-fonts>).
 //!
-//! `build.rs` embeds the document families it names (Japanese, Arabic and Thai faces), leaving out
-//! any face AGENTS.md §1.1 bars (`src/barred.rs`), when PdfCraft is built with
-//! `CRAFT_FONTS_DIR=<checkout>`; otherwise [`CRAFT_FONTS`] is empty and everything here returns
+//! `build.rs` embeds the document families it names (Japanese, Arabic and Thai faces) when PdfCraft
+//! is built with `CRAFT_FONTS_DIR=<checkout>`; otherwise [`CRAFT_FONTS`] is empty and everything here returns
 //! nothing. Callers must work either way.
 
 /// A font from the optional craft-fonts build input (empty unless built with `CRAFT_FONTS_DIR`).
@@ -248,21 +247,6 @@ mod tests {
         // An Arabic face is never a CJK fallback, and the other way round.
         assert!(order_cjk(&faces, false).iter().all(|f| f.family == "BIZ UDPGothic"));
         assert_eq!(ui_arabic_fonts().len(), CRAFT_FONTS.iter().filter(|f| f.has_script("Arab")).count());
-    }
-
-    /// Whatever the craft-fonts checkout holds, no Adobe type design is embedded (AGENTS.md §1.1).
-    #[test]
-    fn barred_families_are_never_embedded() {
-        use crate::barred::barred;
-        for face in CRAFT_FONTS {
-            assert!(!barred(face.family, face.scripts), "{} is embedded", face.name());
-        }
-        assert!(barred("Noto Sans CJK SC", &["Hans", "Latn"]));
-        assert!(barred("Noto Sans HK UI", &["Hant-HK"]));
-        assert!(barred("Source Serif 4", &["Latn"]));
-        assert!(!barred("Noto Sans Arabic", &["Arab"]));
-        assert!(!barred("Noto Sans", &["Latn", "Cyrl", "Grek", "Deva"]));
-        assert!(!barred("BIZ UDPGothic", &["Jpan", "Latn"]));
     }
 
     #[test]

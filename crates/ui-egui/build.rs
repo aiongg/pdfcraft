@@ -32,12 +32,9 @@ fn main() {
     ui_fonts();
 }
 
-include!("../fonts/src/barred.rs");
-
 include!("../fonts/src/families.rs");
 
-/// The interface's own craft-fonts faces: the interface faces (`role ui`) that AGENTS.md §1.1
-/// allows, cut to the characters of every catalog (each face gets every catalog's characters),
+/// The interface's own craft-fonts faces: the interface faces (`role ui`), cut to the characters of every catalog (each face gets every catalog's characters),
 /// and the interface families of `families.rs`, whole. The interface shares the document families
 /// (Arabic, Thai) with `pdfcraft_fonts::CRAFT_FONTS`, so they are embedded once. The web build
 /// keeps only the cuts.
@@ -46,16 +43,7 @@ fn ui_fonts() {
     let embedded = craft_fonts_build::Embed::new()
         .for_ui()
         .subset_to(catalogs())
-        .filter(move |face| {
-            let scripts: Vec<&str> = face.scripts.iter().map(String::as_str).collect();
-            if barred(&face.family, &scripts) {
-                if face.is_ui() {
-                    println!("cargo::warning=craft-fonts: not embedding the interface face {} {} (AGENTS.md §1.1)", face.family, face.style);
-                }
-                return false;
-            }
-            face.is_ui() || (!wasm && INTERFACE_FAMILIES.contains(&face.family.as_str()))
-        })
+        .filter(move |face| face.is_ui() || (!wasm && INTERFACE_FAMILIES.contains(&face.family.as_str())))
         .embedded_elsewhere(DOCUMENT_FAMILIES)
         .write("ui_craft_fonts.rs");
     if let Err(e) = embedded {
@@ -63,13 +51,16 @@ fn ui_fonts() {
     }
 }
 
-/// The translation catalogs the interface embeds (`src/i18n/*.tsv`).
+/// The text the interface's cuts must draw: the translation catalogs (`src/i18n/*.tsv`), and
+/// `src/i18n/mod.rs`, whose `LANGUAGES` table holds each language's own name (the Preferences
+/// menu lists them all whatever the interface language).
 fn catalogs() -> Vec<std::path::PathBuf> {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/i18n");
     println!("cargo::rerun-if-changed={}", dir.display());
     let mut paths: Vec<std::path::PathBuf> =
         std::fs::read_dir(&dir).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "tsv")).collect();
     paths.sort();
+    paths.push(dir.join("mod.rs"));
     paths
 }
 

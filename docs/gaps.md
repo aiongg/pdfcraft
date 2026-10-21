@@ -115,16 +115,17 @@ update the numbers.
 
 ### 5. Chinese UI shows missing-glyph boxes in releases
 
-- **Missing:** a Simplified Chinese (`Hans`) UI face in release builds and a working fallback.
+- **Missing:** the Chinese interface faces in release builds. The release-pinned craft-fonts has no
+  Noto Sans SC/TC/HK/KR UI faces; with a revision that has them, the interface embeds them cut to
+  the catalogs' characters, on desktop and the web.
 - **Evidence:** [#826](https://github.com/storytold/pdfcraft/issues/826),
   [#688](https://github.com/storytold/pdfcraft/issues/688),
   [#728](https://github.com/storytold/pdfcraft/issues/728),
   [#758](https://github.com/storytold/pdfcraft/issues/758),
-  [#689](https://github.com/storytold/pdfcraft/issues/689) (Flatpak). `AGENTS.md` §1.1 bars Noto
-  CJK (Source Han rebranded), so craft-fonts needs another openly licensed Hans face.
+  [#689](https://github.com/storytold/pdfcraft/issues/689) (Flatpak).
 - **Impact:** the second-largest language group sees a broken interface although the catalog is 97%
   translated.
-- **Estimate:** 6–12 h (font sourcing in craft-fonts plus the fallback chain). **Doc:**
+- **Estimate:** 1 h (move the craft-fonts pin). **Doc:**
   [localization-parity.md](localization-parity.md).
 
 ### 6. Open-issue backlog of wrong results in shipped features

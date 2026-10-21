@@ -211,7 +211,7 @@ pub const SYSTEM_HAN: &str = "system-han";
 /// 3. with `installed`, on desktop, faces already installed on this machine
 ///    ([`crate::system_fonts`]) for characters no embedded face has: an Arabic file name in a build
 ///    without craft-fonts, Hindi, Telugu (#1531), Sinhala and Tamil (#1688). In a Chinese interface
-///    built without a Chinese craft face (every release so far, #826), the installed Chinese face
+///    built without a Chinese craft face (#826), the installed Chinese face
 ///    ([`SYSTEM_HAN`]) goes before the Japanese craft faces, which lack hundreds of the catalog's
 ///    characters. `PDFCRAFT_SYSTEM_FONTS=0` leaves installed faces out;
 /// 4. egui's default faces. Hack, egui's monospace face, also ends the other families' embedded

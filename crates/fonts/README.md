@@ -28,8 +28,7 @@ PDFs and the renderer's Japanese substitutes), Noto Sans Arabic and Noto Sans Th
 interface draws Arabic and Thai with them too; its other faces (CJK cuts to its catalogs'
 characters, Noto Sans, Georgian, Armenian, Ethiopic, symbols, maths and emoji) are embedded by
 `crates/ui-egui/build.rs`. A family joins the list when a document code path needs it (Noto Sans
-Hebrew and a Telugu face once craft-fonts has them). Both tables leave out the faces AGENTS.md
-§1.1 bars (`src/barred.rs`: Adobe's Source families, and every Noto face for a CJK script).
+Hebrew and a Telugu face once craft-fonts has them).
 Without that variable `CRAFT_FONTS` is empty and everything below copes:
 
 - `ui_japanese_fonts`: the `Jpan` faces, BIZ UDPGothic first (the renderer's Japanese substitutes).
