@@ -32,7 +32,11 @@ fn fixture(n: usize) -> Vec<u8> {
 }
 
 fn harness() -> Harness<'static, PdfCraftApp> {
-    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
+    harness_built(Harness::builder())
+}
+
+fn harness_built(builder: egui_kittest::HarnessBuilder<PdfCraftApp>) -> Harness<'static, PdfCraftApp> {
+    let mut h = builder.with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
         let mut app = PdfCraftApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("a.pdf", None, fixture(5)).unwrap();
@@ -1798,7 +1802,11 @@ fn mouse_wheel_scrolls_while_selecting_text() {
     h.run_steps(2);
 }
 fn selection_wheel_harness() -> (Harness<'static, PdfCraftApp>, usize, egui::Pos2) {
-    let mut h = harness();
+    selection_wheel_harness_built(Harness::builder())
+}
+
+fn selection_wheel_harness_built(builder: egui_kittest::HarnessBuilder<PdfCraftApp>) -> (Harness<'static, PdfCraftApp>, usize, egui::Pos2) {
+    let mut h = harness_built(builder);
     h.state_mut().set_option("zoom", "200").unwrap();
     h.state_mut().set_option("left", "closed").unwrap();
     h.state_mut().set_option("panel", "none").unwrap();
@@ -1820,7 +1828,17 @@ fn selection_wheel_harness() -> (Harness<'static, PdfCraftApp>, usize, egui::Pos
 }
 
 fn selection_wheel_delta(unit: egui::MouseWheelUnit, amount: f32, held: bool, animated: bool) -> f32 {
-    let (mut h, view, end) = selection_wheel_harness();
+    selection_wheel_delta_built(Harness::builder(), unit, amount, held, animated)
+}
+
+fn selection_wheel_delta_built(
+    builder: egui_kittest::HarnessBuilder<PdfCraftApp>,
+    unit: egui::MouseWheelUnit,
+    amount: f32,
+    held: bool,
+    animated: bool,
+) -> f32 {
+    let (mut h, view, end) = selection_wheel_harness_built(builder);
     h.state_mut().animation_effects =
         if animated { pdfcraft_ui_egui::motion::AnimationEffects::On } else { pdfcraft_ui_egui::motion::AnimationEffects::Off };
     if !held {
@@ -1854,9 +1872,13 @@ fn selection_wheel_preserves_normal_distance_and_reduced_motion() {
 
 #[test]
 fn selection_point_scroll_is_not_applied_twice() {
+    // At 60 frames a second, as egui repaints while it eases a wheel delta. Frames a quarter
+    // second apart outlast the point path's window for hiding egui's eased copy, so its last
+    // tenth would scroll as well.
+    let builder = || Harness::builder().with_step_dt(1.0 / 60.0);
     for animated in [true, false] {
-        let normal = selection_wheel_delta(egui::MouseWheelUnit::Point, 30.0, false, animated);
-        let held = selection_wheel_delta(egui::MouseWheelUnit::Point, 30.0, true, animated);
+        let normal = selection_wheel_delta_built(builder(), egui::MouseWheelUnit::Point, 30.0, false, animated);
+        let held = selection_wheel_delta_built(builder(), egui::MouseWheelUnit::Point, 30.0, true, animated);
         eprintln!("Point animated={animated}: released={normal}, held={held}");
         assert!(normal > 1.0, "point wheel must scroll: {normal}");
         assert!((held - 30.0).abs() < 1.0, "animated={animated}: held precision motion={held}, normal={normal}");
