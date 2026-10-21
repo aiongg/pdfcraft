@@ -282,6 +282,20 @@ mod tests {
         assert_eq!(document_hebrew_font(false).is_some(), CRAFT_FONTS.iter().any(|f| f.covers("Hebr")));
     }
 
+    /// `build.rs` embeds whole only the Japanese CJK faces, so a checkout with a large Chinese or
+    /// Korean face (craft-fonts has the 16.4 MB Noto Sans CJK SC) leaves the binary as it was: the
+    /// four Japanese faces of the pinned craft-fonts are 24.1 MB.
+    #[test]
+    fn only_the_japanese_cjk_faces_are_embedded_whole() {
+        let cjk = ["Hani", "Hans", "Hant", "Jpan", "Kore"];
+        let whole: Vec<_> = CRAFT_FONTS.iter().filter(|f| f.scripts.iter().any(|s| cjk.contains(s))).collect();
+        for face in &whole {
+            assert!(["Shippori Mincho", "BIZ UDPGothic", "BIZ UDMincho"].contains(&face.family), "{} is embedded", face.name());
+        }
+        let bytes: usize = whole.iter().map(|f| f.bytes.len()).sum();
+        assert!(bytes < 25_000_000, "{bytes} bytes of CJK faces");
+    }
+
     #[test]
     fn craft_fonts_are_optional_and_consistent() {
         // Holds with or without CRAFT_FONTS_DIR.

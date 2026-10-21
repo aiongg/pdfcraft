@@ -231,9 +231,9 @@ fn catalog_han(catalog: &str) -> String {
     han.into_iter().collect()
 }
 
-/// In a Chinese interface built without a `Hans` face (#826), a Chinese face installed on this
-/// machine goes before the Japanese faces, which lack hundreds of the catalog's characters, and
-/// draws every Han character of both Chinese catalogs.
+/// In a Chinese interface built without a `Hans` face (every release so far, #826), a Chinese
+/// face installed on this machine goes before the Japanese faces, which lack hundreds of the
+/// catalog's characters, and draws every Han character of both Chinese catalogs.
 #[test]
 fn chinese_ui_uses_an_installed_chinese_face() {
     if !pdfcraft_fonts::ui_chinese_fonts().is_empty() {

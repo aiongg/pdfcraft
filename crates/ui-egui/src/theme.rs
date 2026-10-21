@@ -228,10 +228,11 @@ pub const SYSTEM_TAMIL_FALLBACK: &str = "system-tamil-fallback";
 /// What [`install_fonts_for`] installs: [`font_definitions_for`], then, on desktop, one face
 /// already installed on this machine. It only draws characters no embedded face has.
 ///
-/// - In a Chinese interface built without a `Hans` craft-fonts face (#826), it is a Chinese
-///   system face (Microsoft YaHei, PingFang, …), placed before the Japanese craft-fonts faces:
-///   they lack hundreds of the catalog's characters (欢, 导, 签, …), and one line drawn from two
-///   faces with different vertical metrics would not sit on one baseline.
+/// - In a Chinese interface built without a `Hans` craft-fonts face (every release so far,
+///   #826), it is a Chinese system face (Microsoft YaHei, PingFang, …), placed before the
+///   Japanese craft-fonts faces: they lack hundreds of the catalog's characters (欢, 导, 签, …),
+///   and one line drawn from two faces with different vertical metrics would not sit on one
+///   baseline.
 /// - Otherwise it is the last fallback of every family (an Arabic file name in a build without
 ///   craft-fonts).
 ///
