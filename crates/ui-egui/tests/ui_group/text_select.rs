@@ -199,7 +199,7 @@ fn selected_text_copy_edit_and_context_menus() {
     h.run_steps(2); // Hide floating Copy so this test can only reach menu entries.
     h.get_by_label("Menu").click();
     h.run_steps(2);
-    h.get_by_label("Edit ⏵").hover();
+    h.get_by_role(egui::Role::Menu).get_by_label("Edit").hover();
     h.run_steps(3);
     h.get_by_label_contains("Copy").click();
     let mut did_copy = false;
@@ -323,7 +323,7 @@ fn selected_text_copy_keeps_focused_input_clipboard_ownership() {
     h.state_mut().views[0].open_find();
     h.state_mut().views[0].find.as_mut().unwrap().query = "widget café".into();
     h.run_steps(3);
-    h.ctx.memory_mut(|m| m.request_focus(egui::Id::new("find-input")));
+    h.ctx.memory_mut(|m| m.request_focus(egui::Id::unique("find-input")));
     h.run_steps(2);
     h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
     h.run_steps(2);
@@ -373,7 +373,13 @@ fn press_and_move(h: &mut Harness<'static, PdfCraftApp>, from: Pos2, to: Pos2) {
 
 /// One wheel event, with time to scroll (egui spreads a wheel line over a few frames).
 fn wheel(h: &mut Harness<'static, PdfCraftApp>, unit: MouseWheelUnit, dy: f32) {
-    h.event(Event::MouseWheel { unit, delta: egui::vec2(0.0, dy), phase: TouchPhase::Move, modifiers: Modifiers::NONE });
+    h.event(Event::MouseWheel {
+        unit,
+        delta: egui::vec2(0.0, dy),
+        phase: TouchPhase::Move,
+        modifiers: Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
+    });
     h.run_steps(10);
 }
 

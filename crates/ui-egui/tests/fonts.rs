@@ -299,7 +299,7 @@ fn primary_ui_fonts_cover_latin_and_cyrillic_catalogs() {
     let defs = theme::font_definitions();
     assert_eq!(&defs.families[&FontFamily::Monospace][..2], ["JetBrainsMono", "Inter"]);
     let fallback = &defs.font_data["Inter"];
-    let fallback_font = skrifa::FontRef::from_index(&fallback.font, fallback.index).unwrap();
+    let fallback_font = skrifa::FontRef::from_index((*fallback.font).as_ref(), fallback.index).unwrap();
     let fallback_charmap = fallback_font.charmap();
     for (code, catalog) in [
         ("cs", include_str!("../src/i18n/cs.tsv")),
@@ -327,7 +327,7 @@ fn primary_ui_fonts_cover_latin_and_cyrillic_catalogs() {
         }
         for name in ["Inter", "Inter-Medium", "Inter-SemiBold", "JetBrainsMono"] {
             let data = &defs.font_data[name];
-            let font = skrifa::FontRef::from_index(&data.font, data.index).unwrap();
+            let font = skrifa::FontRef::from_index((*data.font).as_ref(), data.index).unwrap();
             let charmap = font.charmap();
             let mut missing: Vec<char> =
                 text.chars().filter(|c| charmap.map(*c).is_none() && (name != "JetBrainsMono" || fallback_charmap.map(*c).is_none())).collect();

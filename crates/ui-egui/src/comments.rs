@@ -1384,7 +1384,7 @@ pub(crate) fn composer(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, 
         ComposerKind::Edit(_) => "Edit comment",
     };
     let pos = pos2(anchor.x + 12.0, anchor.y);
-    egui::Area::new(egui::Id::new(("comment-composer", view.id.0))).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
+    egui::Area::new(egui::Id::unique(("comment-composer", view.id.0))).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
         egui::Frame::popup(ui.style()).inner_margin(egui::Margin::same(12)).corner_radius(CornerRadius::same(8)).show(ui, |ui| {
             ui.set_width(260.0);
             ui.horizontal(|ui| {
@@ -1725,7 +1725,7 @@ pub enum CanvasAction {
 const RECENT_CUSTOM: usize = 5;
 
 fn recent_custom_id() -> egui::Id {
-    egui::Id::new("pdfcraft-recent-custom-colours")
+    egui::Id::unique("pdfcraft-recent-custom-colours")
 }
 
 /// Custom colours picked with "Other colour…" this session, newest first (#1193).
@@ -1759,7 +1759,7 @@ fn rgb_of(c: Color32) -> Rgb {
 /// One round swatch; `on` rings it as the current colour.
 fn swatch(ui: &mut egui::Ui, c: Rgb, on: bool, tooltip: &str) -> egui::Response {
     let (r, resp) = ui.allocate_exact_size(vec2(22.0, 22.0), Sense::click());
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tooltip));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tooltip));
     ui.painter().circle_filled(r.center(), 9.0, color32(c));
     ui.painter().circle_stroke(r.center(), 9.0, Stroke::new(1.0, Color32::from_black_alpha(40)));
     if on || resp.hovered() {
@@ -1781,7 +1781,7 @@ fn other_colour_swatch(ui: &mut egui::Ui, open: bool) -> egui::Response {
         ui.painter().circle_stroke(c, 11.0, Stroke::new(1.5, SELECT_BLUE));
     }
     let label = tl!("Other colour…");
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, true, open, label));
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, open, label));
     resp.on_hover_text(label)
 }
 
@@ -1870,7 +1870,7 @@ pub(crate) fn quick_bar_controls(ui: &mut egui::Ui, tool: CommentTool, prefs: &m
     let (r, resp) = ui.allocate_exact_size(vec2(32.0, 32.0), Sense::click());
     ui.painter().circle_filled(r.center(), 9.0, color32(style.color));
     ui.painter().circle_stroke(r.center(), 9.0, Stroke::new(1.0, Color32::from_black_alpha(50)));
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Colour")));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Colour")));
     let resp = resp.on_hover_text(tl!("Colour"));
     egui::Popup::menu(&resp).align(egui::RectAlign::RIGHT_START).show(|ui| {
         if let Some(c) = swatch_grid(ui, Some(style.color)) {
@@ -1934,7 +1934,7 @@ fn fill_button(ui: &mut egui::Ui, fill: Option<Rgb>) -> egui::Response {
         Some(_) => tl!("Fill colour"),
         None => tl!("Fill colour: none"),
     };
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, label));
     resp.on_hover_text(label)
 }
 
@@ -2071,6 +2071,8 @@ mod tests {
             },
             Vec::new(),
         );
+        // egui's colour picker labels its copy button 📋, which no face here draws.
+        h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
         h.run();
         assert!(h.query_by_label("Apply").is_none(), "the picker starts closed");
         assert!(h.query_by_label("Recent colours").is_none());
@@ -2093,6 +2095,8 @@ mod tests {
             let _ = swatch_grid(ui, Some([0.2, 0.4, 0.6]));
             let _ = swatch_grid(ui, Some([0.6, 0.4, 0.2]));
         });
+        // egui's colour picker labels its copy button 📋, which no face here draws.
+        h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
         h.run();
         let plus = h.query_all_by_label("Other colour…").collect::<Vec<_>>();
         assert_eq!(plus.len(), 2);

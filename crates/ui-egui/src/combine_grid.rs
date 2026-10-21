@@ -610,7 +610,11 @@ pub(crate) fn grid(
     let over_grid = ui.rect_contains_pointer(viewport);
     let mut width = viewport.width();
     let mut focused_card = None;
-    let output = egui::ScrollArea::vertical().id_salt("combine-grid").auto_shrink([false, false]).show_viewport(ui, |ui, clip| {
+    let mut scroll_area = egui::ScrollArea::vertical().id_salt("combine-grid").auto_shrink([false, false]);
+    if let Some(y) = ui.data_mut(|d| d.remove_temp::<f32>(zoom_scroll_id())) {
+        scroll_area = scroll_area.vertical_scroll_offset(y);
+    }
+    let output = scroll_area.show_viewport(ui, |ui, clip| {
         // Dragging near the top or bottom edge scrolls.
         if drag.is_some()
             && let Some(p) = pointer
@@ -790,16 +794,21 @@ pub(crate) fn grid(
                 let y = (TOP + (i / cols) as f32 * cell.y - above).min(content - viewport.height()).max(0.0);
                 // Set as the scroll position itself, before the next frame draws anything: no
                 // jump, and no scroll still animating (to a card revealed by the keys, say) can
-                // carry it elsewhere.
-                let mut state = egui::scroll_area::State::default();
-                state.offset = vec2(0.0, y);
-                state.store(&ctx, output.id);
+                // carry it elsewhere: a fresh state ends any animation, and the next frame
+                // opens the grid at `y`.
+                egui::scroll_area::State::default().store(&ctx, output.id);
+                ctx.data_mut(|d| d.insert_temp(zoom_scroll_id(), y));
             }
             ctx.request_repaint();
         }
     }
 
     action
+}
+
+/// Where the grid scrolls to on its next frame after a zoom (see the zoom anchor).
+fn zoom_scroll_id() -> egui::Id {
+    egui::Id::unique("combine-grid-zoom-scroll")
 }
 
 /// One card's place and what it shows.
@@ -822,8 +831,8 @@ struct Card {
 impl Card {
     fn id(&self, ui: &egui::Ui, f: &CombineFile) -> egui::Id {
         match self.page {
-            None => ui.id().with(("combine-card", f.id)),
-            Some((nth, ..)) => ui.id().with(("combine-page", f.id, nth)),
+            None => ui.scope_id().with(("combine-card", f.id)),
+            Some((nth, ..)) => ui.scope_id().with(("combine-page", f.id, nth)),
         }
     }
 
@@ -841,7 +850,7 @@ impl Card {
         };
         // As the organize grid's pages: a check box that is on when selected; and, for screen
         // readers, selected as items in a list are.
-        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, true, self.selected, &label));
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::CheckBox, true, self.selected, &label));
         let pages = match self.page {
             // For screen readers: which page of how many.
             Some((_, p, _)) => crate::i18n::fmt(tl!("Page {p} of {n}"), &[("p", &p.saturating_add(1).to_string()), ("n", &f.pages.to_string())]),
@@ -1139,7 +1148,7 @@ pub(crate) fn preview(app: &mut PdfCraftApp, ctx: &egui::Context, t: &Tokens) {
     // No larger than the GPU takes, or the render would be refused.
     let longest = ctx.input(|i| i.max_texture_side as f32).min(PREVIEW_SIDE);
     let thumbs = &mut app.combine_thumbs;
-    let modal = egui::Modal::new(egui::Id::new("combine-preview")).show(ctx, |ui| {
+    let modal = egui::Modal::new(egui::Id::unique("combine-preview")).show(ctx, |ui| {
         ui.set_width(width);
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new(crate::bidi::visual(&f.name)).font(theme::semibold(15.0)));

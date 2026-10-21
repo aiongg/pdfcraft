@@ -817,6 +817,7 @@ pub(crate) fn image_input(
     {
         resp.context_menu(|ui| image_menu(ui, page, sel, images, view, action));
         menu_drawn = true;
+        mark_image_menu_drawn(ui, resp);
     }
     let Some(p) = hover_pos.filter(|p| xf.rect.contains(*p)) else { return false };
     let Some(hit) = boxes.iter().enumerate().rposition(|(i, b)| b.contains(p) && image_contains(i, p)) else { return false };
@@ -839,8 +840,26 @@ pub(crate) fn image_input(
     }
     if selected == Some(hit) && !menu_drawn {
         resp.context_menu(|ui| image_menu(ui, page, hit, images, view, action));
+        mark_image_menu_drawn(ui, resp);
     }
     true
+}
+
+/// The pass in which the picture menu was last drawn into `resp`'s popup.
+fn image_menu_pass(resp: &egui::Response) -> egui::Id {
+    resp.id.with("image-menu-pass")
+}
+
+fn mark_image_menu_drawn(ui: &egui::Ui, resp: &egui::Response) {
+    let pass = ui.ctx().cumulative_pass_nr();
+    ui.ctx().data_mut(|d| d.insert_temp(image_menu_pass(resp), pass));
+}
+
+/// Whether this pass drew the picture menu into `resp`'s popup, which the page's own menu then
+/// leaves alone: both are `resp`'s context menu.
+pub(crate) fn image_menu_drawn(ui: &egui::Ui, resp: &egui::Response) -> bool {
+    let pass = ui.ctx().cumulative_pass_nr();
+    ui.ctx().data(|d| d.get_temp::<u64>(image_menu_pass(resp))) == Some(pass)
 }
 
 /// The right-click menu of the picture `hit` (its rotate, flip, replace, copy, cut, redact, link,
@@ -1337,7 +1356,7 @@ pub(crate) fn overlay(ctx: &egui::Context, view: &mut DocView, info: &DocInfo) -
     let font = editor_font(&ed.look, smallest.map_or(ed.size, |s| (s * scale * 0.5).clamp(1.0, 300.0).min(ed.size)));
     let text_color = color32(ed.look.color);
     let mut done = None;
-    egui::Area::new(egui::Id::new("edit-text-line")).order(egui::Order::Foreground).fixed_pos(Pos2::new(ed.rect.left(), ed.rect.top())).show(
+    egui::Area::new(egui::Id::unique("edit-text-line")).order(egui::Order::Foreground).fixed_pos(Pos2::new(ed.rect.left(), ed.rect.top())).show(
         ctx,
         |ui| {
             // The editor opens at the source size. Once text changes, show the real draft
@@ -1386,7 +1405,7 @@ pub(crate) fn overlay(ctx: &egui::Context, view: &mut DocView, info: &DocInfo) -
                 let mut layouter =
                     |ui: &egui::Ui, text: &dyn egui::TextBuffer, wrap_width: f32| editor_galley(ui, &snapshot, text.as_str(), scale, wrap_width);
                 let output = egui::TextEdit::multiline(&mut ed.text)
-                    .id(egui::Id::new("edit-text-line-input"))
+                    .id(egui::Id::unique("edit-text-line-input"))
                     .font(font.clone())
                     .margin(egui::Margin::ZERO)
                     .layouter(&mut layouter)

@@ -280,6 +280,8 @@ fn typing_moving_styling_and_deleting_added_content() {
 #[test]
 fn text_the_standard_fonts_cant_draw_stays_in_the_editor() {
     let mut h = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     assert!(h.state_mut().execute("edit.text"));
     h.run_steps(2);
     let p = at(&h, 40.0, 300.0);
@@ -316,6 +318,8 @@ fn text_the_standard_fonts_cant_draw_stays_in_the_editor() {
 #[test]
 fn a_kept_draft_goes_with_its_deleted_page() {
     let mut h = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     assert!(h.state_mut().apply_edit(pdfcraft_engine::Edit::InsertBlankPage { at: 1, width: 612.0, height: 792.0 }));
     h.run_steps(2);
     assert!(h.state_mut().execute("edit.text"));

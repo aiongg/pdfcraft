@@ -808,6 +808,8 @@ fn attachment_save_preserves_bytes_metadata_and_selected_destination() {
     let chosen = dir.0.join("user chosen 資料.bin");
     let original = attachment_fixture();
     let mut h = harness(&[]);
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     h.state_mut().open_bytes("attachment.pdf", None, original.clone()).unwrap();
     h.run_steps(2);
     let id = h.state().views[0].id;

@@ -158,7 +158,7 @@ fn find_shortcuts_advance_and_retreat_matches() {
     assert_eq!(n, 15);
     // Surrender text edit focus so canvas shortcut handler receives key events.
     h.state_mut().views[0].find.as_mut().unwrap().focus = false;
-    h.ctx.memory_mut(|m| m.surrender_focus(egui::Id::new("find-input")));
+    h.ctx.memory_mut(|m| m.surrender_focus(egui::Id::unique("find-input")));
     h.run_steps(2);
     let start = h.state().views[0].find.as_ref().unwrap().current.unwrap();
     // ⌘G advances to next match.
@@ -340,7 +340,7 @@ fn page_input_focused(h: &Harness<'static, PdfCraftApp>) -> bool {
     let focused = h.ctx.memory(|m| m.focused());
     let view = &h.state().views[h.state().active.unwrap()];
     // Also identifies the original editor when running this test-only patch on the baseline.
-    focused == Some(egui::Id::new(("page-input", view.id.0))) || focused == Some(egui::Id::new("page-input"))
+    focused == Some(egui::Id::unique(("page-input", view.id.0))) || focused == Some(egui::Id::unique("page-input"))
 }
 
 /// Exercise the real navigation editor, including its focus and Enter handling.
@@ -968,7 +968,7 @@ fn wrapped_revision_buttons_stay_above_binding_and_open_the_saved_revision() {
         let left = h.get_by_label("Left Edge").rect();
         let right = h.get_by_label("Right Edge").rect();
         // Properties requests a fixed width. Measure its card in each viewport.
-        let card = h.ctx.data(|d| d.get_temp::<egui::Rect>(egui::Id::new("dialog").with("card"))).expect("Properties is shown");
+        let card = h.ctx.data(|d| d.get_temp::<egui::Rect>(egui::Id::unique("dialog").with("card"))).expect("Properties is shown");
         for (n, rect) in &buttons {
             for (label, below) in [("Binding", binding), ("Left Edge", left), ("Right Edge", right)] {
                 assert!(rect.bottom() <= below.top(), "revision {n} overlaps {label} at viewport width {width}: {rect:?}, {below:?}");
@@ -1475,7 +1475,13 @@ fn the_scroll_speed_preference_scales_mouse_wheel_notches() {
         let top = |h: &Harness<'static, PdfCraftApp>| h.state().views[i].page_screen_rect(0).expect("page 1 on screen").min.y;
         let before = top(&h);
         h.event(egui::Event::PointerMoved(h.state().views[i].viewport_rect().center()));
-        h.event(egui::Event::MouseWheel { unit, delta: egui::vec2(0.0, -dy), phase: egui::TouchPhase::Move, modifiers: egui::Modifiers::NONE });
+        h.event(egui::Event::MouseWheel {
+            unit,
+            delta: egui::vec2(0.0, -dy),
+            phase: egui::TouchPhase::Move,
+            modifiers: egui::Modifiers::NONE,
+            source: egui::MouseWheelSource::Unknown,
+        });
         // egui spreads a wheel notch over a few frames.
         h.run_steps(30);
         before - top(&h)
@@ -1782,6 +1788,7 @@ fn mouse_wheel_scrolls_while_selecting_text() {
         delta: egui::vec2(0.0, -3.0),
         phase: egui::TouchPhase::Move,
         modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
     });
     h.run_steps(20);
     let after = h.state().views[view].page_screen_rect(0).unwrap().top();
@@ -1821,7 +1828,13 @@ fn selection_wheel_delta(unit: egui::MouseWheelUnit, amount: f32, held: bool, an
     }
     h.run_steps(2);
     let before = h.state().views[view].page_screen_rect(0).unwrap().top();
-    h.event(egui::Event::MouseWheel { unit, delta: egui::vec2(0.0, -amount), phase: egui::TouchPhase::Move, modifiers: egui::Modifiers::NONE });
+    h.event(egui::Event::MouseWheel {
+        unit,
+        delta: egui::vec2(0.0, -amount),
+        phase: egui::TouchPhase::Move,
+        modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
+    });
     h.run_steps(40);
     before - h.state().views[view].page_screen_rect(0).unwrap().top()
 }
@@ -1855,7 +1868,13 @@ fn selection_control_wheel_still_zooms() {
     for modifiers in [egui::Modifiers::CTRL, egui::Modifiers::COMMAND] {
         let (mut h, view, _) = selection_wheel_harness();
         let before = h.state().views[view].page_screen_rect(0).unwrap().width();
-        h.event(egui::Event::MouseWheel { unit: egui::MouseWheelUnit::Line, delta: egui::vec2(0.0, 1.0), phase: egui::TouchPhase::Move, modifiers });
+        h.event(egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0.0, 1.0),
+            phase: egui::TouchPhase::Move,
+            modifiers,
+            source: egui::MouseWheelSource::Unknown,
+        });
         h.run_steps(40);
         let after = h.state().views[view].page_screen_rect(0).unwrap().width();
         assert!(after > before + 1.0, "control wheel should zoom: {before} -> {after}");
@@ -1873,6 +1892,7 @@ fn selection_wheel_outside_document_does_not_scroll() {
         delta: egui::vec2(0.0, -1.0),
         phase: egui::TouchPhase::Move,
         modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
     });
     h.run_steps(40);
     let after = h.state().views[view].page_screen_rect(0).unwrap().top();
@@ -1900,6 +1920,7 @@ fn selection_wheel_does_not_scroll_behind_preferences() {
         delta: egui::vec2(0.0, -1.0),
         phase: egui::TouchPhase::Move,
         modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
     });
     h.run_steps(40);
     let after = h.state().views[view].page_screen_rect(0).unwrap().top();
@@ -1916,6 +1937,7 @@ fn selection_mouse_wheel_resumes_after_point_scrolling() {
             delta: egui::vec2(0.0, -30.0),
             phase: egui::TouchPhase::Move,
             modifiers: egui::Modifiers::NONE,
+            source: egui::MouseWheelSource::Unknown,
         });
         h.run_steps(delay);
         let before = h.state().views[view].page_screen_rect(0).unwrap().top();
@@ -1927,6 +1949,7 @@ fn selection_mouse_wheel_resumes_after_point_scrolling() {
             delta: egui::vec2(0.0, -1.0),
             phase: egui::TouchPhase::Move,
             modifiers: egui::Modifiers::NONE,
+            source: egui::MouseWheelSource::Unknown,
         });
         h.run_steps(40);
         let after = h.state().views[view].page_screen_rect(0).unwrap().top();

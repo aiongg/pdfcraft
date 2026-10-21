@@ -425,7 +425,7 @@ fn card(
     // clickable everywhere.
     let hit = if selected { frame.inner } else { rect };
     let click = ui
-        .interact(hit, ui.id().with(("card", key)), Sense::click())
+        .interact(hit, ui.scope_id().with(("card", key)), Sense::click())
         .on_hover_cursor(egui::CursorIcon::PointingHand)
         .on_hover_text(crate::i18n::fmt(tl!("{kind} — click to show it on the page"), &[("kind", tl!(kind_label(a)))]));
     if click.clicked() {
@@ -436,7 +436,7 @@ fn card(
     if click.double_clicked() && allowed {
         view.comments.editing = Some((a.page, a.index, a.contents.clone().unwrap_or_default()));
     }
-    let menu_id = ui.id().with(("card-menu", key));
+    let menu_id = ui.scope_id().with(("card-menu", key));
     if open_menu {
         egui::Popup::open_id(ui.ctx(), menu_id);
     }

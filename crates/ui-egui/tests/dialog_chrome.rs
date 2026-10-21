@@ -27,7 +27,7 @@ fn fixture() -> Vec<u8> {
 }
 
 fn card(h: &Harness<'_, PdfCraftApp>, id: &str) -> egui::Rect {
-    h.ctx.data(|d| d.get_temp(egui::Id::new(id).with("card"))).unwrap_or_else(|| panic!("missing dialog card {id}"))
+    h.ctx.data(|d| d.get_temp(egui::Id::unique(id).with("card"))).unwrap_or_else(|| panic!("missing dialog card {id}"))
 }
 
 fn protected() -> Vec<u8> {

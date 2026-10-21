@@ -166,6 +166,9 @@ pub struct Control {
     shared: Arc<Mutex<Shared>>,
     pending: Vec<Pending>,
     next_tag: u64,
+    /// Screenshots egui has delivered, by tag; requests wait for theirs in `pending`.
+    shots_tx: Sender<(u64, Arc<egui::ColorImage>)>,
+    shots_rx: Receiver<(u64, Arc<egui::ColorImage>)>,
 }
 
 /// Install the control channel on `ctx`: returns the app half and a client.
@@ -174,7 +177,8 @@ pub fn attach(ctx: &egui::Context) -> (Control, ControlClient) {
     ctx.add_plugin(ControlPlugin { shared: shared.clone() });
     ctx.enable_accesskit();
     let (tx, rx) = channel();
-    (Control { rx, shared, pending: Vec::new(), next_tag: 1 }, ControlClient { tx, ctx: ctx.clone() })
+    let (shots_tx, shots_rx) = channel();
+    (Control { rx, shared, pending: Vec::new(), next_tag: 1, shots_tx, shots_rx }, ControlClient { tx, ctx: ctx.clone() })
 }
 
 /// What a request needs from the app (implemented by `PdfCraftApp`).
@@ -204,7 +208,12 @@ impl Control {
                 Handled::Screenshot(region) => {
                     let tag = self.next_tag;
                     self.next_tag += 1;
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::new(tag)));
+                    let shots = self.shots_tx.clone();
+                    ctx.request_screenshot(move |image| {
+                        // The receiver lives as long as the app; a send after it is gone has
+                        // nobody to answer.
+                        let _ = shots.send((tag, image));
+                    });
                     self.pending.push(Pending::Screenshot { tag, region, reply: req.reply, since: now_secs() });
                 }
             }
@@ -215,18 +224,7 @@ impl Control {
     }
 
     fn finish_pending(&mut self, ctx: &egui::Context) {
-        let shots: Vec<(u64, Arc<egui::ColorImage>)> = ctx.input(|i| {
-            i.raw
-                .events
-                .iter()
-                .filter_map(|e| match e {
-                    egui::Event::Screenshot { user_data, image, .. } => {
-                        user_data.data.as_ref().and_then(|d| d.downcast_ref::<u64>()).map(|tag| (*tag, image.clone()))
-                    }
-                    _ => None,
-                })
-                .collect()
-        });
+        let shots: Vec<(u64, Arc<egui::ColorImage>)> = self.shots_rx.try_iter().collect();
         let ppp = ctx.pixels_per_point();
         let now = now_secs();
         let passes = self.passes();
@@ -285,14 +283,14 @@ impl Control {
             "ui.commands" => Ok(Handled::Now(Ok(host.commands()))),
             "ui.dock" | "ui.dock.reset" => Ok(Handled::Now(host.dock(method == "ui.dock.reset", p))),
             "ui.command" if str_param("id")? == "ui.dock" => Ok(Handled::Now(host.dock(false, p.get("params").unwrap_or(p)))),
-            "ui.command" => Ok(Handled::Now(host.command(str_param("id")?))),
+            "ui.command" => Ok(once_drawn(host.command(str_param("id")?))),
             "ui.set" => {
                 let value = match p.get("value") {
                     Some(Value::String(s)) => s.clone(),
                     Some(v) => v.to_string(),
                     None => return Err("ui.set: missing parameter value".into()),
                 };
-                Ok(Handled::Now(host.set(str_param("key")?, &value)))
+                Ok(once_drawn(host.set(str_param("key")?, &value)))
             }
             "ui.open" => Ok(Handled::Now(host.open(str_param("path")?))),
             "ui.inspect" => Ok(Handled::Now(Ok(self.inspect(p)))),
@@ -518,6 +516,15 @@ enum Handled {
     Now(Reply),
     AfterFrames(u32, Value),
     Screenshot(Option<egui::Rect>),
+}
+
+/// A reply sent once what the request opened is drawn: egui lays out a new window in an
+/// invisible pass first, which puts nothing in the accessibility tree.
+fn once_drawn(reply: Reply) -> Handled {
+    match reply {
+        Ok(value) => Handled::AfterFrames(2, value),
+        Err(e) => Handled::Now(Err(e)),
+    }
 }
 
 fn widget(id: NodeId, n: &accesskit::Node, depth: usize, focused: bool) -> Value {

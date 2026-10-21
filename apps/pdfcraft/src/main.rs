@@ -1013,7 +1013,7 @@ mod tests {
 
     #[test]
     fn egui_wgpu_carries_the_surface_size_fit() {
-        // Issue #577: egui-wgpu 0.36.2 configures a window's surface at the window's size, and
+        // Issue #577: egui-wgpu 0.37.0 configures a window's surface at the window's size, and
         // `Surface::configure` panics when that's beyond the device's `max_texture_dimension_2d`
         // (emilk/egui#8361). vendor/egui-wgpu fits it within the limit. A dependency bump that
         // resolves egui-wgpu from crates.io again, or a re-vendored copy without the patch, would

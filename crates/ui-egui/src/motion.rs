@@ -149,7 +149,7 @@ pub(crate) fn animated(ctx: &egui::Context) -> bool {
 }
 
 fn zoom_id() -> egui::Id {
-    egui::Id::new("pdfcraft-motion-wheel-zoom")
+    egui::Id::unique("pdfcraft-motion-wheel-zoom")
 }
 
 /// This pass's zoom factor from a pinch or ⌘/Ctrl with the wheel (1.0 for none): egui's
@@ -194,7 +194,7 @@ impl WheelReader {
         let mut modifiers = self.touch.unwrap_or_default();
         for event in events {
             match event {
-                Event::MouseWheel { unit, delta: step, phase, modifiers: latest } => match phase {
+                Event::MouseWheel { unit, delta: step, phase, modifiers: latest, .. } => match phase {
                     TouchPhase::Start => {
                         self.touch = Some(*latest);
                         modifiers = *latest;
@@ -256,7 +256,7 @@ mod tests {
     use std::rc::Rc;
 
     fn wheel(unit: MouseWheelUnit, delta: Vec2, phase: TouchPhase, modifiers: Modifiers) -> Event {
-        Event::MouseWheel { unit, delta, phase, modifiers }
+        Event::MouseWheel { unit, delta, phase, modifiers, source: egui::MouseWheelSource::Unknown }
     }
 
     fn notch(dy: f32, modifiers: Modifiers) -> Event {

@@ -271,7 +271,7 @@ fn the_pages_menu_comes_from_the_registry() {
     let mut h = harness();
     h.get_by_label("Menu").click();
     h.run_steps(2);
-    h.get_by_label("Pages ⏵").hover();
+    h.get_by_label("Pages").hover();
     h.run_steps(3);
     h.get_by_label_contains("Delete pages").click();
     h.run_steps(3);
@@ -299,9 +299,9 @@ fn the_open_recent_menu_lists_files_and_opens_one() {
     h.run_steps(4);
     h.get_by_label("Menu").click();
     h.run_steps(2);
-    h.get_by_label("File ⏵").hover();
+    h.get_by_label("File").hover();
     h.run_steps(3);
-    h.get_by_label("Open Recent ⏵").hover();
+    h.get_by_label("Open Recent").hover();
     h.run_steps(3);
     let original = h.state().views[0].id;
     h.get_by_label_contains("recent.pdf").click();
@@ -319,7 +319,7 @@ fn the_open_recent_menu_is_disabled_while_the_list_is_empty() {
     let mut h = harness();
     h.get_by_label("Menu").click();
     h.run_steps(2);
-    h.get_by_label("File ⏵").hover();
+    h.get_by_label("File").hover();
     h.run_steps(3);
     assert!(
         h.query_by(|n| n.label().as_deref() == Some("Open Recent") && n.is_disabled()).is_some(),
@@ -343,16 +343,16 @@ fn clear_recent_files_at_the_foot_of_open_recent_empties_the_list() {
     h.run_steps(4);
     h.get_by_label("Menu").click();
     h.run_steps(2);
-    h.get_by_label("File ⏵").hover();
+    h.get_by_label("File").hover();
     h.run_steps(3);
-    h.get_by_label("Open Recent ⏵").hover();
+    h.get_by_label("Open Recent").hover();
     h.run_steps(3);
     h.get_by_label("Clear Recent Files").click();
     h.run_steps(3);
     assert!(h.state().recent.is_empty(), "the list is empty");
     h.get_by_label("Menu").click();
     h.run_steps(2);
-    h.get_by_label("File ⏵").hover();
+    h.get_by_label("File").hover();
     h.run_steps(3);
     assert!(h.query_by(|n| n.label().as_deref() == Some("Open Recent") && n.is_disabled()).is_some(), "and Open Recent is disabled");
 }
@@ -432,7 +432,7 @@ fn view_menu(os: OperatingSystem) -> Harness<'static, PdfCraftApp> {
     h.ctx.set_os(os);
     h.get_by_label("Menu").click();
     h.run_steps(2);
-    h.get_by_label("View ⏵").hover();
+    h.get_by_label("View").hover();
     h.run_steps(3);
     h
 }
@@ -587,6 +587,8 @@ fn palette_ime_idle_frames_and_reopen_do_not_interrupt_composition() {
 #[test]
 fn palette_ime_chinese_preedit_commit_and_cancel_remain_uninterrupted() {
     let mut h = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     let mut interruptions = Vec::new();
     h.state_mut().run_command("view.palette");
     h.run_steps(3);

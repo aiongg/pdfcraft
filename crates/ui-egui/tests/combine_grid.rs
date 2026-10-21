@@ -94,8 +94,12 @@ fn grid_of(files: Vec<(&str, Vec<u8>)>, size: egui::Vec2) -> Harness<'static, Pd
 
 /// The same, after only `steps` frames (1: the first thumbnails have only just been asked for).
 fn grid_after(files: Vec<(&str, Vec<u8>)>, size: egui::Vec2, steps: usize) -> Harness<'static, PdfCraftApp> {
+    grid_built(Harness::builder().with_size(size), files, steps)
+}
+
+fn grid_built(builder: egui_kittest::HarnessBuilder<PdfCraftApp>, files: Vec<(&str, Vec<u8>)>, steps: usize) -> Harness<'static, PdfCraftApp> {
     let files: Vec<(String, Vec<u8>)> = files.into_iter().map(|(n, b)| (n.to_string(), b)).collect();
-    let mut h = Harness::builder().with_size(size).build_eframe(move |_cc| {
+    let mut h = builder.build_eframe(move |_cc| {
         let mut app = PdfCraftApp::new();
         app.set_option("language", "en").unwrap();
         app.use_files(FilePurpose::Combine, files);
@@ -519,7 +523,9 @@ fn combine_follows_the_order_shown_in_the_grid() {
 #[test]
 fn long_and_unusual_names_are_shortened_on_the_card_but_kept_whole() {
     let long = "Überweisungsbestätigung für das dritte Quartal 2026 – Endfassung (unterschrieben).pdf";
-    let mut h = grid_of(vec![(long, fixture(1)), ("日本語のファイル名.pdf", fixture(1)), ("a&b <c> 'd'.pdf", fixture(1))], vec2(1400.0, 900.0));
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    let builder = Harness::builder().allow_missing_glyphs().with_size(vec2(1400.0, 900.0));
+    let mut h = grid_built(builder, vec![(long, fixture(1)), ("日本語のファイル名.pdf", fixture(1)), ("a&b <c> 'd'.pdf", fixture(1))], 4);
     // The card's label is the whole name; only the drawing is shortened.
     h.get_by_label(long);
     h.get_by_label("日本語のファイル名.pdf");
@@ -714,6 +720,7 @@ fn ctrl_wheel(h: &mut Harness<'static, PdfCraftApp>, at: Pos2, dy: f32) {
         delta: vec2(0.0, dy),
         phase: egui::TouchPhase::Move,
         modifiers: Modifiers::COMMAND,
+        source: egui::MouseWheelSource::Unknown,
     });
     h.run_steps(3);
 }
@@ -838,6 +845,7 @@ fn zooming_keeps_the_card_under_the_pointer_in_place_and_thumbnails_never_go_bla
         delta: vec2(0.0, -300.0),
         phase: egui::TouchPhase::Move,
         modifiers: Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
     });
     h.run_steps(6);
     // A card fully in view, below the toolbar, with its thumbnail drawn.
@@ -859,6 +867,7 @@ fn zooming_keeps_the_card_under_the_pointer_in_place_and_thumbnails_never_go_bla
         delta: vec2(0.0, 120.0),
         phase: egui::TouchPhase::Move,
         modifiers: Modifiers::COMMAND,
+        source: egui::MouseWheelSource::Unknown,
     });
     // The wheel zooms smoothly over several frames; in every one the card stays put.
     let mut zooms = Vec::new();
@@ -938,6 +947,7 @@ fn scrolled_grid(dy: f32) -> (Harness<'static, PdfCraftApp>, f32) {
         delta: vec2(0.0, -dy),
         phase: egui::TouchPhase::Move,
         modifiers: Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
     });
     h.run_steps(8);
     (h, top)
@@ -986,6 +996,7 @@ fn zooming_out_at_the_bottom_leaves_no_gap_below_the_last_card() {
         delta: vec2(0.0, -20_000.0),
         phase: egui::TouchPhase::Move,
         modifiers: Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
     });
     h.run_steps(8);
     let bottom = card(&h, "f39.pdf").bottom();
@@ -1613,6 +1624,7 @@ fn collapsing_brings_the_files_card_into_view() {
             delta: vec2(0.0, -120.0),
             phase: egui::TouchPhase::Move,
             modifiers: Modifiers::NONE,
+            source: egui::MouseWheelSource::Unknown,
         });
         h.run_steps(3);
     }

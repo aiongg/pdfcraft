@@ -395,6 +395,7 @@ fn overflowing_tabs_can_be_reached_by_scrolling() {
             delta: egui::vec2(-500.0, 0.0),
             phase: egui::TouchPhase::Move,
             modifiers: egui::Modifiers::NONE,
+            source: egui::MouseWheelSource::Unknown,
         });
         h.run_steps(8);
     }
@@ -516,6 +517,7 @@ fn narrow_tab_strips_accept_vertical_wheel_scrolling() {
                 delta: egui::vec2(0.0, -500.0),
                 phase: egui::TouchPhase::Move,
                 modifiers: egui::Modifiers::NONE,
+                source: egui::MouseWheelSource::Unknown,
             });
             h.run_steps(8);
         }

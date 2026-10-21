@@ -488,10 +488,10 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 d.to = d.to.clamp(1, count);
                 d.from = d.from.clamp(1, d.to);
                 ui.horizontal(|ui| {
-                    ui.label(tl!("Original: replace pages"));
-                    let from = ui.add(egui::DragValue::new(&mut d.from).range(1..=count));
-                    ui.label(tl!("to"));
-                    let to = ui.add(egui::DragValue::new(&mut d.to).range(1..=count));
+                    let original = ui.label(tl!("Original: replace pages"));
+                    let from = ui.add(egui::DragValue::new(&mut d.from).range(1..=count)).labelled_by(original.id);
+                    let to_label = ui.label(tl!("to"));
+                    let to = ui.add(egui::DragValue::new(&mut d.to).range(1..=count)).labelled_by(to_label.id);
                     if from.changed() || to.changed() {
                         d.range_edited = true;
                     }
@@ -501,8 +501,8 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 let max_start = d.src_pages.saturating_sub(n) + 1;
                 d.src_from = d.src_from.clamp(1, max_start.max(1));
                 ui.horizontal(|ui| {
-                    ui.label(crate::i18n::fmt(tl!("Replacement: pages of {name}"), &[("name", &d.name)]));
-                    ui.add(egui::DragValue::new(&mut d.src_from).range(1..=max_start.max(1)));
+                    let replacement = ui.label(crate::i18n::fmt(tl!("Replacement: pages of {name}"), &[("name", &d.name)]));
+                    ui.add(egui::DragValue::new(&mut d.src_from).range(1..=max_start.max(1))).labelled_by(replacement.id);
                     ui.label(crate::i18n::fmt(tl!("to {n}"), &[("n", &(d.src_from + n - 1).to_string())]));
                     ui.label(egui::RichText::new(crate::i18n::fmt(tl!("of {name}"), &[("name", &d.src_pages.to_string())])).color(t.text_muted));
                 });
@@ -1138,7 +1138,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
             }
             Dialog::About => {
                 // Tabs About · Contributors · Models (craftrules standards/contributors.md).
-                let tab_id = egui::Id::new("about_tab");
+                let tab_id = egui::Id::unique("about_tab");
                 let mut tab = ui.data_mut(|d| d.get_temp::<u8>(tab_id)).unwrap_or(0);
                 ui.horizontal_wrapped(|ui| {
                     for (i, label) in ["About", "Contributors", "Models"].into_iter().enumerate() {

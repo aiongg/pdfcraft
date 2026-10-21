@@ -327,7 +327,7 @@ pub(crate) fn section(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 let resp = widgets::ghost_button(ui, "x", tl!("Unpin"));
                 // Every folder has an Unpin button: say which one it is.
                 let label = crate::i18n::fmt(tl!("Unpin {folder}"), &[("folder", &name)]);
-                resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
+                resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
                 if resp.clicked() {
                     unpin = Some(folder.clone());
                 }
@@ -353,7 +353,7 @@ pub(crate) fn section(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         let shown = if expanded { listing.files.len() } else { listing.files.len().min(SHOWN) };
         for f in listing.files.iter().take(shown) {
             let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 38.0), Sense::click());
-            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &f.name));
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &f.name));
             if resp.hovered() {
                 ui.painter().rect_filled(rect, CornerRadius::same(8), t.hover);
             }

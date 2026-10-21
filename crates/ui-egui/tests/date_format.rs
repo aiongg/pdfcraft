@@ -133,7 +133,8 @@ fn month_names_follow_the_date_language_or_else_the_interface_language() {
 
 #[test]
 fn a_date_the_pdf_cannot_hold_is_refused_with_a_warning_first() {
-    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    let mut h = Harness::builder().allow_missing_glyphs().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
         let mut app = PdfCraftApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("form.pdf", None, PDF.to_vec()).expect("opens");

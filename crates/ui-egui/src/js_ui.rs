@@ -264,19 +264,23 @@ fn reading_mode_label(mode: &str) -> &'static str {
 pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> bool {
     ui.label(egui::RichText::new(tl!("Preferences")).font(theme::semibold(18.0)));
     ui.horizontal(|ui| {
-        ui.label(tl!("Interface language"));
+        let name = ui.label(tl!("Interface language"));
         let selected = crate::i18n::Lang::from_code(&app.language).map_or(tl!("Auto"), crate::i18n::Lang::name);
         let before = app.language.clone();
-        egui::ComboBox::from_id_salt("interface-language").selected_text(selected).show_ui(ui, |ui| {
-            if ui.selectable_value(&mut app.language, crate::i18n::AUTO.to_string(), tl!("Auto")).clicked() {
-                ui.close();
-            }
-            for language in crate::i18n::Lang::all() {
-                if ui.selectable_value(&mut app.language, language.code().to_string(), language.name()).clicked() {
+        egui::ComboBox::from_id_salt("interface-language")
+            .selected_text(selected)
+            .show_ui(ui, |ui| {
+                if ui.selectable_value(&mut app.language, crate::i18n::AUTO.to_string(), tl!("Auto")).clicked() {
                     ui.close();
                 }
-            }
-        });
+                for language in crate::i18n::Lang::all() {
+                    if ui.selectable_value(&mut app.language, language.code().to_string(), language.name()).clicked() {
+                        ui.close();
+                    }
+                }
+            })
+            .response
+            .labelled_by(name.id);
         // Relabel the rest of this dialog in the new language right away, not next frame.
         if app.language != before {
             crate::i18n::set_current(crate::i18n::Lang::from_pref(&app.language));
@@ -284,24 +288,28 @@ pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tok
     });
     ui.horizontal(|ui| {
         use crate::ui_scale;
-        ui.label(tl!("Interface size"));
+        let name = ui.label(tl!("Interface size"));
         // Auto shows the size it draws at: the display's scale times the system's text scale.
         let native = ui.ctx().native_pixels_per_point().unwrap_or(1.0);
         let auto_percent = ui_scale::percent(ui_scale::drawn(None, app.system_text_scale, native));
         let auto = crate::i18n::fmt(tl!("Auto ({percent}%)"), &[("percent", &auto_percent.to_string())]);
         let selected = app.ui_scale.map_or_else(|| auto.clone(), |f| format!("{}%", ui_scale::percent(f)));
-        egui::ComboBox::from_id_salt("interface-size").selected_text(selected).show_ui(ui, |ui| {
-            if ui.selectable_value(&mut app.ui_scale, None, auto).clicked() {
-                ui.close();
-            }
-            for p in ui_scale::PRESETS {
-                let factor = f32::from(p) / 100.0;
-                if ui.selectable_label(app.ui_scale.is_some_and(|f| ui_scale::percent(f) == u32::from(p)), format!("{p}%")).clicked() {
-                    app.ui_scale = Some(factor);
+        egui::ComboBox::from_id_salt("interface-size")
+            .selected_text(selected)
+            .show_ui(ui, |ui| {
+                if ui.selectable_value(&mut app.ui_scale, None, auto).clicked() {
                     ui.close();
                 }
-            }
-        });
+                for p in ui_scale::PRESETS {
+                    let factor = f32::from(p) / 100.0;
+                    if ui.selectable_label(app.ui_scale.is_some_and(|f| ui_scale::percent(f) == u32::from(p)), format!("{p}%")).clicked() {
+                        app.ui_scale = Some(factor);
+                        ui.close();
+                    }
+                }
+            })
+            .response
+            .labelled_by(name.id);
     });
     ui.label(
         egui::RichText::new(tl!("Auto follows the system's text size. Pages always render at the display's full resolution."))
@@ -406,38 +414,42 @@ pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tok
     // is app-wide: every open document follows it, and documents open with it.
     ui.label(egui::RichText::new(tl!("Reading colours")).font(theme::semibold(13.0)));
     ui.horizontal(|ui| {
-        ui.label(tl!("Replace document colours"));
+        let name = ui.label(tl!("Replace document colours"));
         let mode = app.reading_colors.mode_name();
-        egui::ComboBox::from_id_salt("reading-colors").selected_text(tl!(reading_mode_label(mode))).show_ui(ui, |ui| {
-            for (m, label) in [
-                ("off", "Off"),
-                ("black-on-white", "Black on white"),
-                ("white-on-black", "White on black"),
-                ("yellow-on-black", "Yellow on black"),
-                ("green-on-black", "Green on black"),
-                ("custom", "Custom"),
-            ] {
-                if ui.selectable_label(mode == m, tl!(label)).clicked() {
-                    match m {
-                        "off" => app.set_reading_colors(pdfcraft_render::ReadingColors::default()),
-                        "custom" => {
-                            // Custom starts from the colours already chosen, or black on white.
-                            let colors = app.reading_colors.params.map_or(pdfcraft_render::ReadingColors::BLACK_ON_WHITE, |params| {
-                                pdfcraft_render::ReadingColors { params: Some(params) }
-                            });
-                            app.set_reading_colors(colors);
-                        }
-                        // `parse` knows these names; a preset comes with its own flags.
-                        preset => {
-                            if let Ok(colors) = pdfcraft_render::ReadingColors::parse(preset, None, None, None, None) {
+        egui::ComboBox::from_id_salt("reading-colors")
+            .selected_text(tl!(reading_mode_label(mode)))
+            .show_ui(ui, |ui| {
+                for (m, label) in [
+                    ("off", "Off"),
+                    ("black-on-white", "Black on white"),
+                    ("white-on-black", "White on black"),
+                    ("yellow-on-black", "Yellow on black"),
+                    ("green-on-black", "Green on black"),
+                    ("custom", "Custom"),
+                ] {
+                    if ui.selectable_label(mode == m, tl!(label)).clicked() {
+                        match m {
+                            "off" => app.set_reading_colors(pdfcraft_render::ReadingColors::default()),
+                            "custom" => {
+                                // Custom starts from the colours already chosen, or black on white.
+                                let colors = app.reading_colors.params.map_or(pdfcraft_render::ReadingColors::BLACK_ON_WHITE, |params| {
+                                    pdfcraft_render::ReadingColors { params: Some(params) }
+                                });
                                 app.set_reading_colors(colors);
                             }
+                            // `parse` knows these names; a preset comes with its own flags.
+                            preset => {
+                                if let Ok(colors) = pdfcraft_render::ReadingColors::parse(preset, None, None, None, None) {
+                                    app.set_reading_colors(colors);
+                                }
+                            }
                         }
+                        ui.close();
                     }
-                    ui.close();
                 }
-            }
-        });
+            })
+            .response
+            .labelled_by(name.id);
     });
     if app.reading_colors.params.is_some() {
         let mut changed = false;

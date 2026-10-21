@@ -64,7 +64,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         for id in RECOMMENDED {
                             let Some(g) = catalog::group(id) else { continue };
                             let (rect, resp) = ui.allocate_exact_size(vec2(190.0, 104.0), Sense::click());
-                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!(g.label)));
+                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!(g.label)));
                             let press = theme::Press::track(ui, &resp);
                             card_lift(ui, &t, rect, press);
                             let fill = press.fill(t.card, t.hover, t.pressed);
@@ -102,7 +102,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                             }
                         }
                         let (rect, resp) = ui.allocate_exact_size(vec2(170.0, 104.0), Sense::click());
-                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Open file")));
+                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Open file")));
                         let press = theme::Press::track(ui, &resp);
                         card_lift(ui, &t, rect, press);
                         ui.painter().rect(
@@ -134,7 +134,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 if !app.recent.is_empty() {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         let resp = widgets::ghost_button(ui, "trash-2", tl!("Clear"));
-                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, tl!("Clear Recent Files")));
+                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Clear Recent Files")));
                         clear = resp.on_hover_text(tl!("Clear Recent Files")).clicked();
                     });
                 }
@@ -147,7 +147,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             let mut remove = None;
             for r in &app.recent {
                 let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 46.0), Sense::click());
-                resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &r.name));
+                resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &r.name));
                 let press = theme::Press::track(ui, &resp);
                 // The row, not its response: the pointer stays "in" the row over its remove button.
                 let hovered = ui.rect_contains_pointer(rect);
@@ -160,9 +160,9 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                 if hovered {
                     // Remove just this file from the list (#430); the file itself is untouched.
                     let x_rect = Rect::from_center_size(rect.right_center() - vec2(26.0, 0.0), vec2(28.0, 28.0));
-                    let x = ui.interact(x_rect, ui.id().with(("remove-recent", &r.path)), Sense::click());
+                    let x = ui.interact(x_rect, ui.scope_id().with(("remove-recent", &r.path)), Sense::click());
                     let label = crate::i18n::fmt(tl!("Remove {name} from Recent"), &[("name", &r.name)]);
-                    x.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &label));
+                    x.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &label));
                     if x.hovered() {
                         ui.painter().rect_filled(x_rect, CornerRadius::same(6), t.pressed);
                     }

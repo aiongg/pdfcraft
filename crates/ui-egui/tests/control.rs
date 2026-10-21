@@ -161,7 +161,7 @@ fn control_text_focus_retains_text_undo_ownership() {
     ok(&mut h, &c, "ui.focus", json!({"id": widgets["widgets"][0]["id"]}));
     assert!(h.ctx.text_edit_focused());
     ok(&mut h, &c, "ui.type", json!({"text": "target"}));
-    let search_id = egui::Id::new(("bookmark_search", h.state().views[0].id.0));
+    let search_id = egui::Id::unique(("bookmark_search", h.state().views[0].id.0));
     assert_eq!(h.ctx.data(|d| d.get_temp::<String>(search_id)).as_deref(), Some("target"));
     ok(&mut h, &c, "ui.key", json!({"key": "Z", "modifiers": ["command"]}));
     assert_eq!(h.ctx.data(|d| d.get_temp::<String>(search_id)).as_deref(), Some(""));
@@ -328,6 +328,8 @@ fn lithuanian_inspector_title_updates_through_the_control_channel() {
 fn language_switch_preserves_document_and_command_ids() {
     use pdfcraft_ui_egui::i18n;
     let (mut h, c) = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     let doc = h.state().views[0].id;
     h.state_mut().session.apply(doc, pdfcraft_engine::Edit::RotatePages { pages: vec![0], degrees: 90 }).unwrap();
     let documents = ok(&mut h, &c, "ui.state", json!({}))["documents"].clone();
@@ -344,7 +346,7 @@ fn language_switch_preserves_document_and_command_ids() {
         let lang = i18n::Lang::from_code(code).unwrap();
         h.get_by_label(i18n::tr(lang, "Menu")).click();
         h.run_steps(2);
-        h.get_by_label(&format!("{} ⏵", i18n::tr(lang, "File"))).hover();
+        h.get_by_label(&format!("{}", i18n::tr(lang, "File"))).hover();
         h.run_steps(3);
         h.get_by_label_contains(i18n::tr(lang, "Open…"));
         ok(&mut h, &c, "ui.key", json!({ "key": "Escape" }));
@@ -606,6 +608,7 @@ fn autoscroll_cancels_on_click_wheel_focus_loss_and_pointer_exit() {
         delta: egui::vec2(0.0, -20.0),
         phase: egui::TouchPhase::Move,
         modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
     });
     h.run_steps(2);
     assert!(!h.state().views[0].auto_scrolling());
@@ -738,6 +741,8 @@ fn state_and_view_options() {
 #[test]
 fn japanese_controls_and_search_keep_command_ids() {
     let (mut h, c) = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     ok(&mut h, &c, "ui.set", json!({ "key": "language", "value": "ja" }));
     assert_eq!(ok(&mut h, &c, "ui.state", json!({}))["language"], "ja");
     ok(&mut h, &c, "ui.click", json!({ "label": "閲覧" }));
@@ -765,6 +770,8 @@ fn japanese_controls_and_search_keep_command_ids() {
 #[test]
 fn german_preferences_and_search_keep_command_ids() {
     let (mut h, c) = harness();
+    // The language list names Chinese, Japanese and Thai, which draw as tofu without craft-fonts.
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     ok(&mut h, &c, "ui.set", json!({ "key": "language", "value": "de" }));
     ok(&mut h, &c, "ui.click", json!({ "label": "Lesen" }));
     assert_eq!(ok(&mut h, &c, "ui.state", json!({}))["mode"], "Read");
@@ -828,9 +835,11 @@ fn ukrainian_preferences_and_search_keep_command_ids() {
 #[test]
 fn preferences_menu_and_shortcut_allow_switching_interface_languages() {
     let (mut h, c) = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     ok(&mut h, &c, "ui.set", json!({ "key": "language", "value": "ja" }));
     ok(&mut h, &c, "ui.click", json!({ "label": "メニュー" }));
-    ok(&mut h, &c, "ui.click", json!({ "label": "編集 ⏵" }));
+    ok(&mut h, &c, "ui.click", json!({ "label": "編集" }));
     let menu = ok(&mut h, &c, "ui.inspect", json!({ "query": "環境設定…" }));
     let prefs = menu["widgets"].as_array().unwrap().iter().find(|w| w["clickable"] == true).expect("Preferences menu item");
     ok(&mut h, &c, "ui.click", json!({ "id": prefs["id"] }));
@@ -863,6 +872,8 @@ fn preferences_menu_and_shortcut_allow_switching_interface_languages() {
 #[test]
 fn japanese_dialogs_errors_and_custom_action_names() {
     let (mut h, c) = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     ok(&mut h, &c, "ui.set", json!({"key": "language", "value": "ja"}));
     for (dialog, label) in [
         ("properties", "文書のプロパティ"),
@@ -903,6 +914,8 @@ fn japanese_dialogs_errors_and_custom_action_names() {
 #[test]
 fn simplified_chinese_about_tabs_and_credit_controls() {
     let (mut h, c) = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     let documents = ok(&mut h, &c, "ui.state", json!({}))["documents"].clone();
     ok(&mut h, &c, "ui.set", json!({"key": "language", "value": "zh-hans"}));
     ok(&mut h, &c, "ui.set", json!({"key": "dialog", "value": "about"}));
@@ -930,6 +943,8 @@ fn simplified_chinese_about_tabs_and_credit_controls() {
 #[test]
 fn simplified_chinese_signature_prompts_and_errors_keep_document_state() {
     let (mut h, c) = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     let documents = ok(&mut h, &c, "ui.state", json!({}))["documents"].clone();
     ok(&mut h, &c, "ui.set", json!({"key": "language", "value": "zh-hans"}));
     ok(&mut h, &c, "ui.set", json!({"key": "dialog", "value": "signature"}));
@@ -1493,6 +1508,8 @@ fn control_quit_retains_inactive_fill_sign_typing_after_cancel() {
 #[test]
 fn control_quit_retains_blocked_content_typing_after_cancel() {
     let (mut h, c) = harness();
+    // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
     ok(&mut h, &c, "ui.command", json!({"id":"edit.text"}));
     h.run_steps(3);
     let point = h.state().views[0].page_screen_rect(0).unwrap().center();
@@ -1535,7 +1552,13 @@ fn navigation_wheel(h: &mut Harness<'static, PdfCraftApp>, pos: egui::Pos2, delt
         vec![
             egui::Event::ModifiersChanged(modifiers),
             egui::Event::PointerMoved(pos),
-            egui::Event::MouseWheel { unit: egui::MouseWheelUnit::Point, delta: egui::vec2(0.0, delta), modifiers, phase: egui::TouchPhase::Move },
+            egui::Event::MouseWheel {
+                unit: egui::MouseWheelUnit::Point,
+                delta: egui::vec2(0.0, delta),
+                modifiers,
+                phase: egui::TouchPhase::Move,
+                source: egui::MouseWheelSource::Unknown,
+            },
         ],
     );
     h.run_steps(20);
@@ -1635,7 +1658,7 @@ fn page_size_shows_while_the_pointer_is_in_the_bottom_left_quadrant() {
     let (mut h, _c) = harness();
     let area = h.state().views[0].viewport_rect();
     let shown = |h: &Harness<'static, PdfCraftApp>| {
-        let layer = egui::LayerId::new(egui::Order::Foreground, egui::Id::new("page-size-hint"));
+        let layer = egui::LayerId::new(egui::Order::Foreground, egui::Id::unique("page-size-hint"));
         h.ctx.memory(|m| m.areas().visible_last_frame(&layer))
     };
     let away = area.center() + egui::vec2(300.0, -200.0);
@@ -1714,6 +1737,7 @@ fn routine_continuous_scrolling_does_not_add_navigation_history() {
         unit: egui::MouseWheelUnit::Point,
         delta: egui::vec2(0.0, -1200.0),
         modifiers: egui::Modifiers::NONE,
+        source: egui::MouseWheelSource::Unknown,
         phase: egui::TouchPhase::Move,
     });
     h.run_steps(8);

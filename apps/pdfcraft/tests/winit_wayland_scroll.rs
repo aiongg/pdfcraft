@@ -30,7 +30,13 @@ fn wheel_trace(source: AxisSource, discrete: bool) -> Vec<(f32, egui::Vec2)> {
         let (unit, dy) = if discrete { (MouseWheelUnit::Line, 1.0) } else { (MouseWheelUnit::Point, 24.0) };
         let input = RawInput {
             time: Some(frame as f64 / 60.0),
-            events: vec![Event::MouseWheel { unit, delta: vec2(0.0, dy), phase: egui_phase(phase), modifiers }],
+            events: vec![Event::MouseWheel {
+                unit,
+                delta: vec2(0.0, dy),
+                phase: egui_phase(phase),
+                modifiers,
+                source: egui::MouseWheelSource::Unknown,
+            }],
             ..Default::default()
         };
         ctx.run_ui(input, |ui| seen.push(ui.input(|i| (i.zoom_delta(), i.smooth_scroll_delta)))).textures_delta.clear();

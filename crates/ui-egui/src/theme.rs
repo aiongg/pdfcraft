@@ -122,7 +122,7 @@ impl Tokens {
     }
 
     pub fn get(ctx: &egui::Context) -> Self {
-        ctx.data(|d| d.get_temp::<Tokens>(egui::Id::new("pdfcraft-theme"))).unwrap_or_else(|| Self::for_kind(ThemeKind::Light))
+        ctx.data(|d| d.get_temp::<Tokens>(egui::Id::unique("pdfcraft-theme"))).unwrap_or_else(|| Self::for_kind(ThemeKind::Light))
     }
 
     pub fn dark(&self) -> bool {
@@ -343,7 +343,7 @@ fn baseline_drop(primary: [f32; 3], fallback: [f32; 3]) -> f32 {
 /// well under a pixel. A face that doesn't parse is left as it is (egui will skip it anyway).
 pub(crate) fn on_interface_baseline(mut data: FontData) -> FontData {
     let primary = vertical_metrics(pdfcraft_fonts::INTER_REGULAR, 0);
-    if let (Some(primary), Some(fallback)) = (primary, vertical_metrics(&data.font, data.index)) {
+    if let (Some(primary), Some(fallback)) = (primary, vertical_metrics((*data.font).as_ref(), data.index)) {
         data.tweak.y_offset_factor = -baseline_drop(primary, fallback);
     }
     data
@@ -426,7 +426,7 @@ pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
     // Our saved choice owns the palette; both egui branches receive it below.
     ctx.set_theme(egui::ThemePreference::System);
     let t = Tokens::for_kind(kind);
-    ctx.data_mut(|d| d.insert_temp(egui::Id::new("pdfcraft-theme"), t));
+    ctx.data_mut(|d| d.insert_temp(egui::Id::unique("pdfcraft-theme"), t));
     let mut v = if t.dark() { Visuals::dark() } else { Visuals::light() };
     v.panel_fill = t.panel;
     v.window_fill = t.card;

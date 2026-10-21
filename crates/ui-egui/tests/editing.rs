@@ -859,7 +859,8 @@ fn save_prompt_fits_the_smallest_window_whatever_the_name() {
     let size = egui::vec2(820.0, 520.0);
     for name in names {
         let start: String = name.chars().take(10).collect();
-        let mut h = Harness::builder().with_size(size).build_eframe(move |_cc| {
+        // Chinese, Japanese and Thai draw as tofu without craft-fonts (CRAFT_FONTS_DIR).
+        let mut h = Harness::builder().allow_missing_glyphs().with_size(size).build_eframe(move |_cc| {
             let mut app = PdfCraftApp::new();
             app.set_option("language", "en").unwrap();
             app.open_bytes(&name, None, fixture(1)).expect("fixture opens");
@@ -932,7 +933,7 @@ fn edit_menu_names_the_step_to_undo() {
     });
     h.get_by_label("Menu").click();
     h.run_steps(2);
-    h.get_by_label("Edit ⏵").hover(); // submenus open on hover; their labels carry the arrow
+    h.get_by_role(egui::Role::Menu).get_by_label("Edit").hover(); // submenus open on hover
     h.run_steps(3);
     h.get_by_label_contains("Undo Rotate page").click(); // the label includes the shortcut
     h.run_steps(3);
