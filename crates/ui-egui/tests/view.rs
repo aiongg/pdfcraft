@@ -1647,7 +1647,9 @@ fn long_view_menu_fits_a_short_window() {
     assert!(after < before && after <= 400.0, "menu did not scroll into view: {before} -> {after}");
     h.get_by_label("Side panels").hover();
     h.run_steps(4);
-    h.get_all_by_label("Bookmarks").last().unwrap().click();
+    // The submenu's item. egui 0.37 nests a menu under its button in the accessibility tree,
+    // so another Bookmarks button now comes after it.
+    h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Bookmarks").click();
     h.run_steps(4);
     assert_eq!(h.state().right, Some(pdfcraft_ui_egui::RightPanel::Bookmarks));
 }
