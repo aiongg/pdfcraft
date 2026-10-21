@@ -17,8 +17,8 @@ add a language: [localization.md](localization.md). Summary in [ROADMAP.md](../R
 - **Not counted:** error details from the engine and the operating system, which are shown in
   English inside a translated frame; there is no translated user documentation or help yet (Acrobat
   ships localized help).
-- **Script support** comes from [localization.md](localization.md), the vendored winit IME patches
-  (`vendor/README.md`) and user reports.
+- **Script support** comes from [localization.md](localization.md), the IME patches in the craft suite's winit
+  (aiongg/winit `craft/suite`) and user reports.
 - **Native review**: "community" means a native speaker contributed or corrected the catalog in a
   pull request or issue; "no" means no record of review. No catalog has had a formal review.
 - **Acrobat** ships 24 interface localizations on macOS (`.lproj`: cs, da, de, en, es, fi, fr, hu,
@@ -39,7 +39,7 @@ add a language: [localization.md](localization.md). Summary in [ROADMAP.md](../R
 | Indonesian | `id` | 0 | none | Latin | no | none | no | 3–5 |
 | Japanese | `ja` | 2,123 (99.1%) | dialogs and tooltips; no help | BIZ UDPGothic from craft-fonts; IME patched on macOS, Windows, X11, Wayland; vertical text renders but can't be edited | no | partial | yes | 4–8 |
 | German | `de` | 2,128 (99.3%) | dialogs and tooltips; no help | Latin | community, in progress (#828: terminology, clipping) | partial | yes | 2–4 |
-| Korean | `ko` | 0 | none | Hangul IME patched (Microsoft and Apple Korean, `vendor/README.md` winit 3, 6, 9, 10); no Hangul UI face in craft-fonts | no | none | yes | 6–10 |
+| Korean | `ko` | 0 | none | Hangul IME patched (Microsoft and Apple Korean, aiongg/winit `craft/suite`); no Hangul UI face in craft-fonts | no | none | yes | 6–10 |
 | Vietnamese | `vi` | 2,591 (100% of current union + theme Appearance) | dialogs and tooltips; no help | Latin with stacked diacritics; bundled Inter covers them (fonts test) | community | partial | no | 2–4 |
 
 **Localization dimension ≈ 68%**: the mean over the twelve, counting a catalog's percentage but only

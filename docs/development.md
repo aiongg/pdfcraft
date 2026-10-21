@@ -75,8 +75,8 @@ egui-wgpu's other device requirements. Restored windows on mixed-DPI monitors ca
 default 8192-pixel extent even when the GPU supports a larger surface (#577). The enabled extent
 never exceeds the adapter's capability. A window larger than even that (restored at another
 monitor's scale, or stretched across monitors) gets a surface fitted within the limit and is drawn
-at a correspondingly lower scale instead of panicking in `Surface::configure` (vendored egui-wgpu,
-`surface_fit`; see `vendor/README.md`). On DX12, PdfCraft's Windows default, the surface is
+at a correspondingly lower scale instead of panicking in `Surface::configure` (egui-wgpu from aiongg/egui
+`craft/0.37`, `surface_fit`). On DX12, PdfCraft's Windows default, the surface is
 stretched over the window: softer, but complete and lined up with the pointer. wgpu's GL backend
 copies it unscaled into a corner of the window instead.
 
@@ -92,9 +92,9 @@ PdfCraft draws with wgpu, and starts again with eframe's own OpenGL renderer (gl
 before the app is created: no adapter, no device, or a window surface the device can't configure.
 The last of these was a panic, not an error, because wgpu's default error handler panics and
 eframe configures the surface before any app code runs; a 2015 Intel GPU whose driver timed out in
-`Surface::configure` on wgpu's GL backend closed PdfCraft at launch (#519). Vendored egui-wgpu
-configures a new window's surface inside `winit::catch_errors` and returns a validation,
-out-of-memory or internal error as `WgpuError::ConfigureSurface` (see `vendor/README.md`). Still a
+`Surface::configure` on wgpu's GL backend closed PdfCraft at launch (#519). egui-wgpu (aiongg/egui
+`craft/0.37`) configures a new window's surface inside `winit::catch_errors` and returns a validation,
+out-of-memory or internal error as `WgpuError::ConfigureSurface`. Still a
 panic, as upstream: an error in a later reconfigure (resizing, a lost surface); a device lost
 during that first configure (wgpu reports it only to a callback, so the first frame panics, after
 the app has started); and a window shown at zero size, which is first configured on resize. If

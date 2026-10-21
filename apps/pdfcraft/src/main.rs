@@ -1012,35 +1012,11 @@ mod tests {
     }
 
     #[test]
-    fn egui_wgpu_carries_the_surface_size_fit() {
-        // Issue #577: egui-wgpu 0.37.0 configures a window's surface at the window's size, and
-        // `Surface::configure` panics when that's beyond the device's `max_texture_dimension_2d`
-        // (emilk/egui#8361). vendor/egui-wgpu fits it within the limit. A dependency bump that
-        // resolves egui-wgpu from crates.io again, or a re-vendored copy without the patch, would
-        // bring the crash back: re-apply the patch, or drop the copy once an egui release has a
-        // fix (vendor/README.md).
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let lock = std::fs::read_to_string(root.join("Cargo.lock")).unwrap();
-        let egui_wgpu = lock.split("[[package]]").find(|p| p.contains("\nname = \"egui-wgpu\"\n")).expect("egui-wgpu is in Cargo.lock");
-        assert!(!egui_wgpu.contains("\nsource = "), "egui-wgpu must resolve to vendor/egui-wgpu, not:{egui_wgpu}");
-        // `surface_fit` is tested above; these keep it in the paths that size a surface.
-        let painter = std::fs::read_to_string(root.join("vendor/egui-wgpu/src/winit.rs")).unwrap().replace("\r\n", "\n");
-        for patch in [
-            "let (width, height, render_scale) = surface_fit(window_width, window_height, max_side);",
-            "let (fit_width, fit_height, _) = surface_fit(width, height, self.max_surface_side());",
-            "pixels_per_point: pixels_per_point * surface_state.render_scale,",
-            "old_state.window_width,\n            old_state.window_height,",
-        ] {
-            assert!(painter.contains(patch), "vendor/egui-wgpu lost its surface size patch: {patch}");
-        }
-    }
-
-    #[test]
     fn a_gpu_error_while_a_window_is_set_up_is_returned_not_a_panic() {
         // Issue #519: on a 2015 Intel GPU, wgpu's GL backend couldn't configure the window's
         // surface (`GpuWaitTimeout`), and wgpu's default error handler panicked before the app was
-        // created, so PdfCraft never got to retry with OpenGL. vendor/egui-wgpu configures a new
-        // window's surface inside `catch_errors`. A real device on PdfCraft's own GPU settings,
+        // created, so PdfCraft never got to retry with OpenGL. egui-wgpu (craft/0.37) configures a
+        // new window's surface inside `catch_errors`. A real device on PdfCraft's own GPU settings,
         // and an error wgpu raises before anything reaches the driver: a texture one pixel wider
         // than the device allows.
         use eframe::wgpu;
@@ -1089,26 +1065,6 @@ mod tests {
     }
 
     #[test]
-    fn egui_wgpu_returns_a_surface_it_cannot_configure_as_an_error() {
-        // Issue #519: `catch_errors` is tested above; this keeps it around the first configure of
-        // every new window's surface, and its error reaching eframe as `WgpuError` (eframe then
-        // returns `Error::Wgpu`, which `main` retries with OpenGL). Without it a failed configure
-        // panics before the app is created, and the OpenGL retry never runs.
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let lock = std::fs::read_to_string(root.join("Cargo.lock")).unwrap();
-        let egui_wgpu = lock.split("[[package]]").find(|p| p.contains("\nname = \"egui-wgpu\"\n")).expect("egui-wgpu is in Cargo.lock");
-        assert!(!egui_wgpu.contains("\nsource = "), "egui-wgpu must resolve to vendor/egui-wgpu, not:{egui_wgpu}");
-        let painter = std::fs::read_to_string(root.join("vendor/egui-wgpu/src/winit.rs")).unwrap().replace("\r\n", "\n");
-        let add_surface = painter.split("async fn add_surface(").nth(1).and_then(|s| s.split("\n    fn ").next()).expect("add_surface");
-        for patch in [
-            "let installed = catch_errors(&device, || {\n            self.install_surface(surface, viewport_id, size.width, size.height, false);\n        })",
-            "return Err(crate::WgpuError::ConfigureSurface(error));",
-        ] {
-            assert!(add_surface.contains(patch), "vendor/egui-wgpu lost its surface configure patch: {patch}");
-        }
-    }
-
-    #[test]
     fn pipeline_creation_error_is_returned_and_device_remains_usable() {
         use eframe::{egui_wgpu, wgpu};
         let _gpu = gpu();
@@ -1140,20 +1096,27 @@ mod tests {
     }
 
     #[test]
-    fn winit_carries_the_windows_11_monitor_scale_fix() {
-        // Issue #324: winit 0.30.13 as released nudges a window dragged onto a monitor with another
-        // scale factor back onto the one it is leaving, so on Windows 11 it ends up on the wrong
-        // monitor, at the wrong size and scale. vendor/winit carries the fix from winit master. A
-        // dependency bump that resolves winit from crates.io again, or a re-vendored copy without
-        // the patch, would silently bring the bug back: re-apply the patch, or drop the copy once a
-        // winit 0.30 release has the fix (vendor/README.md).
+    fn egui_and_winit_resolve_to_the_craft_suite_branches() {
+        // The releases lack fixes PdfCraft relies on. aiongg/egui craft/0.37 carries egui-wgpu's
+        // surface fit (#577: a window beyond `max_texture_dimension_2d` panicked in
+        // `Surface::configure`) and its error scopes around a new window's first configure (#519:
+        // a failure panicked before the OpenGL retry could run), with the suite's bidi and IME
+        // fixes. aiongg/winit craft/suite carries the IME, DPI and window fixes (Windows 11
+        // monitor scale #324, X11 server DPI #1150, macOS title-bar drags, Wayland scroll phases
+        // #991). Both branches test their patches; a dependency bump that resolves one of these
+        // crates elsewhere would drop them silently.
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let lock = std::fs::read_to_string(root.join("Cargo.lock")).unwrap();
-        let winit = lock.split("[[package]]").find(|p| p.contains("\nname = \"winit\"\n")).expect("winit is in Cargo.lock");
-        assert!(!winit.contains("\nsource = "), "winit must resolve to vendor/winit, not:{winit}");
-        let dpi_changed = std::fs::read_to_string(root.join("vendor/winit/src/platform_impl/windows/event_loop.rs")).unwrap();
-        let patch = "if !WIN10_BUILD_VERSION.is_some_and(|build| build < 22000) {\n                new_outer_rect = suggested_rect;";
-        assert!(dpi_changed.contains(patch), "vendor/winit lost its WM_DPICHANGED patch");
+        for (name, source) in [
+            ("egui", "git+https://github.com/aiongg/egui?branch=craft%2F0.37#"),
+            ("egui-wgpu", "git+https://github.com/aiongg/egui?branch=craft%2F0.37#"),
+            ("epaint", "git+https://github.com/aiongg/egui?branch=craft%2F0.37#"),
+            ("winit", "git+https://github.com/aiongg/winit?branch=craft%2Fsuite#"),
+        ] {
+            let packages: Vec<_> = lock.split("[[package]]").filter(|p| p.contains(&format!("\nname = \"{name}\"\n"))).collect();
+            assert_eq!(packages.len(), 1, "exactly one {name} in Cargo.lock");
+            assert!(packages[0].contains(&format!("\nsource = \"{source}")), "{name} must resolve to {source}, not:{}", packages[0]);
+        }
     }
 
     const NVIDIA: (u32, u32) = (0x10de, 0x2684);
