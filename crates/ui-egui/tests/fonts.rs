@@ -311,3 +311,43 @@ fn primary_ui_fonts_cover_latin_and_cyrillic_catalogs() {
         }
     }
 }
+
+/// Characters no catalog uses, typed into a text field: a rare Han character (𠮷, U+20BB7), a
+/// Vietnamese letter (ẫ) and a key symbol (⌘). They draw without a panic, and none is a box while
+/// an embedded face has it: Inter has ẫ and ⌘. The Han character is a box here: the interface's CJK
+/// faces are cut to the catalogs, and on desktop an installed face draws it.
+#[test]
+fn characters_outside_the_catalogs_draw_in_a_text_field() {
+    use egui_kittest::kittest::Queryable as _;
+    use skrifa::MetadataProvider as _;
+    const TYPED: &str = "𠮷ẫ⌘";
+    let stack = theme::font_stack("en", false);
+    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(320.0, 60.0)).build_ui_state(
+        |ui, text: &mut String| {
+            ui.add(egui::TextEdit::singleline(text)).accessible_name("Field");
+        },
+        String::new(),
+    );
+    stack.install(&h.ctx);
+    h.ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Tofu);
+    h.run();
+    h.get_by_label("Field").click();
+    h.run();
+    h.event(egui::Event::Text(TYPED.into()));
+    h.run();
+    assert_eq!(h.state().as_str(), TYPED);
+
+    let mut fonts = stack.fonts(false);
+    let font_id = FontId::proportional(13.0);
+    for c in TYPED.chars() {
+        let embedded = stack
+            .definitions
+            .font_data
+            .values()
+            .any(|d| skrifa::FontRef::from_index((*d.font).as_ref(), d.index).is_ok_and(|font| font.charmap().map(c).is_some()));
+        if embedded {
+            assert!(fonts.has_glyph(&font_id, c), "{c} (U+{:04X}) is a box although an embedded face has it", u32::from(c));
+        }
+    }
+    assert!(fonts.has_glyph(&font_id, 'ẫ') && fonts.has_glyph(&font_id, '⌘'));
+}
