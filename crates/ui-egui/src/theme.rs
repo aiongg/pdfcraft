@@ -573,8 +573,18 @@ mod tests {
     #[test]
     fn installed_faces_share_the_interface_baseline() {
         // Dancing Script's metrics differ from Inter's the way a Chinese face's do (by 0.044 em),
-        // and it has a letter no embedded face has (Ǆ), which egui then takes from it.
+        // and it has a letter (Ǆ) that Inter, JetBrains Mono and egui's faces lack, which egui then
+        // takes from it. Craft-fonts' Noto Sans has Ǆ too, so the stacks leave the craft faces out.
         let dancing = || FontData::from_static(include_bytes!("../../../assets/fonts/DancingScript.ttf"));
+        let without_craft_faces = |mut stack: Stack| {
+            let craft: Vec<String> = craft_faces().iter().map(CraftFace::name).collect();
+            let names: Vec<String> =
+                stack.definitions.font_data.keys().filter(|n| craft.iter().any(|c| n.starts_with(c.as_str()))).cloned().collect();
+            for name in names {
+                stack.remove(&name);
+            }
+            stack
+        };
         let size = 100.0;
         // As egui lays it out by itself, Ǆ sits ~4 pt off H's baseline: the bug (#1676).
         let mut defs = FontDefinitions::empty();
@@ -587,13 +597,13 @@ mod tests {
         let mut installed = FaceList::default();
         installed.insert("installed", dancing());
         installed.set_chain(FontFamily::Proportional, vec!["installed".into()]);
-        let stack = font_stack_with(FontPolicyPlatform::Other, "de", Some((installed, None)));
+        let stack = without_craft_faces(font_stack_with(FontPolicyPlatform::Other, "de", Some((installed, None))));
         let width = |mut fonts: Fonts| galley(&mut fonts, FontFamily::Proportional, size, 1.0, "Ǆ").size().x;
         assert_ne!(width(stack.fonts(true)), width(stack.fonts(false)), "the installed face draws Ǆ");
         let aligned = glyph_tops(&mut stack.fonts(true), size, "HǄ");
         assert_eq!(aligned[1], aligned[0], "an installed face: {aligned:?}");
 
-        let stack = font_stack_with(FontPolicyPlatform::Other, "zh-hans", Some((FaceList::default(), Some(dancing()))));
+        let stack = without_craft_faces(font_stack_with(FontPolicyPlatform::Other, "zh-hans", Some((FaceList::default(), Some(dancing())))));
         assert!(stack.chain(&FontFamily::Proportional).iter().any(|n| n == SYSTEM_HAN));
         let aligned = glyph_tops(&mut stack.fonts(false), size, "HǄ");
         assert_eq!(aligned[1], aligned[0], "the installed Chinese face: {aligned:?}");
