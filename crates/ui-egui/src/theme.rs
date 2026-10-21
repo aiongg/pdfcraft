@@ -1,7 +1,9 @@
 //! Design tokens and egui style (plan/acrobat/02-ui-ux.md §1: neutral chrome, white panels,
 //! one blue accent; Dark Gray keeps pages white). Every custom widget reads `Tokens::get`.
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+use craft_ui::fonts::{CraftFace, Family, I18nScripts, Stack, SystemFonts, UiFonts};
 
 use egui::epaint::text::{FontTweak, HintingTarget, SmoothHinting};
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Response, Stroke, Vec2, Visuals};
@@ -182,119 +184,181 @@ pub fn hand(resp: Response) -> Response {
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
+/// Install the interface fonts for an English interface. See [`install_fonts_for`].
 pub fn install_fonts(ctx: &egui::Context) {
-    install_fonts_for(ctx, CjkPreference::Default);
+    install_fonts_for(ctx, crate::i18n::Lang::EN.code());
 }
 
-/// The interface language's claim on the CJK fallback faces.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum CjkPreference {
-    /// Japanese faces first (every non-Chinese language).
-    #[default]
-    Default,
-    SimplifiedChinese,
-    TraditionalChinese,
-}
-
-impl CjkPreference {
-    /// The preference for a UI language code (`zh-hans`, `zh-hant`, anything else).
-    pub fn for_language(code: &str) -> Self {
-        match code {
-            "zh-hans" => Self::SimplifiedChinese,
-            "zh-hant" => Self::TraditionalChinese,
-            _ => Self::Default,
-        }
-    }
-}
-
-/// Install the interface fonts with the CJK fallback order for the UI language (Chinese
-/// first for Chinese, Japanese first otherwise). Call it when the language changes; the new
+/// Install the interface fonts for the UI language `language` (a [`crate::i18n::Lang`] code),
+/// with the installed faces on desktop ([`font_stack`]). Call it when the language changes; the new
 /// faces take effect next frame.
-pub fn install_fonts_for(ctx: &egui::Context, cjk: CjkPreference) {
-    ctx.set_fonts(installed_font_definitions(cjk));
+pub fn install_fonts_for(ctx: &egui::Context, language: &str) {
+    // Installing raises the minimum widget height to a row of the language's faces plus twice the
+    // button padding. PdfCraft's controls pad themselves, so the fit takes egui's default padding,
+    // as it does at startup, before [`apply`]: a Latin interface keeps egui's height.
+    let padding = ctx.global_style().spacing.button_padding;
+    ctx.all_styles_mut(|s| s.spacing.button_padding = egui::style::Spacing::default().button_padding);
+    font_stack(language, true).install(ctx);
+    ctx.all_styles_mut(|s| s.spacing.button_padding = padding);
 }
 
-/// The name of the installed face [`installed_font_definitions`] may add after the embedded ones.
-pub const SYSTEM_FALLBACK: &str = "system-fallback";
-/// The name of the installed Devanagari (Hindi) face [`installed_font_definitions`] may add.
-pub const SYSTEM_DEVANAGARI_FALLBACK: &str = "system-devanagari-fallback";
-/// The name of the installed Telugu face [`installed_font_definitions`] may add.
-pub const SYSTEM_TELUGU_FALLBACK: &str = "system-telugu-fallback";
-/// The name of the installed Sinhala face [`installed_font_definitions`] may add.
-pub const SYSTEM_SINHALA_FALLBACK: &str = "system-sinhala-fallback";
-/// The name of the installed Tamil face [`installed_font_definitions`] may add.
-pub const SYSTEM_TAMIL_FALLBACK: &str = "system-tamil-fallback";
+/// The name [`font_stack`] gives the installed Chinese face of a Chinese interface.
+pub const SYSTEM_HAN: &str = "system-han";
 
-/// What [`install_fonts_for`] installs: [`font_definitions_for`], then, on desktop, one face
-/// already installed on this machine. It only draws characters no embedded face has.
+/// The interface fonts for the UI language `language`, in [`craft_ui::fonts`]' order:
 ///
-/// - In a Chinese interface built without a `Hans` craft-fonts face (every release so far,
-///   #826), it is a Chinese system face (Microsoft YaHei, PingFang, …), placed before the
-///   Japanese craft-fonts faces: they lack hundreds of the catalog's characters (欢, 导, 签, …),
-///   and one line drawn from two faces with different vertical metrics would not sit on one
-///   baseline.
-/// - Otherwise it is the last fallback of every family (an Arabic file name in a build without
-///   craft-fonts).
-///
-/// Installed Devanagari, Telugu, Sinhala and Tamil faces, when there are, end every family just
-/// before that one, so Hindi, Telugu (#1531), Sinhala and Tamil (#1688) text, such as a file
-/// name, draws in a build without such faces.
-///
-/// `PDFCRAFT_SYSTEM_FONTS=0` leaves them out.
-pub fn installed_font_definitions(cjk: CjkPreference) -> FontDefinitions {
+/// 1. Inter (Inter Medium and SemiBold heading the `medium` and `semibold` families) and, for
+///    code, JetBrains Mono, which falls back to Inter for the letters it lacks (Bulgarian ѝ);
+/// 2. the faces of the optional craft-fonts build input (`CRAFT_FONTS_DIR`) for the UI language,
+///    then for every other interface language: none without it. An Arabic interface puts its
+///    Arabic face first, so rows are tall enough for its marks;
+/// 3. with `installed`, on desktop, faces already installed on this machine
+///    ([`crate::system_fonts`]) for characters no embedded face has: an Arabic file name in a build
+///    without craft-fonts, Hindi, Telugu (#1531), Sinhala and Tamil (#1688). In a Chinese interface
+///    built without a Chinese craft face (every release so far, #826), the installed Chinese face
+///    ([`SYSTEM_HAN`]) goes before the Japanese craft faces, which lack hundreds of the catalog's
+///    characters. `PDFCRAFT_SYSTEM_FONTS=0` leaves installed faces out;
+/// 4. egui's default faces. Hack, egui's monospace face, also ends the other families' embedded
+///    faces, ahead of installed ones, for symbols such as ▸.
+pub fn font_stack(language: &str, installed: bool) -> Stack {
+    font_stack_on(current_font_policy_platform(), language, installed)
+}
+
+fn font_stack_on(platform: FontPolicyPlatform, language: &str, installed: bool) -> Stack {
+    let face = |name: &str, bytes: &'static [u8]| FontData::from_static(bytes).tweak(primary_font_tweak(platform, name));
+    let medium = FontFamily::Name("medium".into());
+    let semibold = FontFamily::Name("semibold".into());
+    let codes: Vec<&str> = crate::i18n::LANGUAGES.iter().map(|l| l.code).collect();
     #[cfg_attr(target_arch = "wasm32", expect(unused_mut))]
-    let mut fonts = font_definitions_for(cjk == CjkPreference::SimplifiedChinese);
+    let mut fonts = UiFonts::new(&I18nScripts)
+        .app_face("Inter-Medium", face("Inter-Medium", include_bytes!("../../../assets/fonts/Inter-Medium.ttf")), std::slice::from_ref(&medium))
+        .app_face(
+            "Inter-SemiBold",
+            face("Inter-SemiBold", include_bytes!("../../../assets/fonts/Inter-SemiBold.ttf")),
+            std::slice::from_ref(&semibold),
+        )
+        .app_face("JetBrainsMono", face("JetBrainsMono", include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf")), &[FontFamily::Monospace])
+        // Shared with typed signatures' fallback glyphs, so the font is embedded once.
+        .app_face("Inter", face("Inter", pdfcraft_fonts::INTER_REGULAR), &[FontFamily::Proportional, FontFamily::Monospace, medium, semibold])
+        .family(Family::named("medium").weight(500))
+        .family(Family::named("semibold").weight(600))
+        .craft_faces(craft_faces())
+        .languages(&codes)
+        .ui_language(language)
+        .system_fonts(SystemFonts::Off);
     #[cfg(not(target_arch = "wasm32"))]
-    {
-        use crate::system_fonts::{Need, fallback};
-        // Before the general installed face, which stays the last fallback outside Chinese.
+    let han = if installed && let Some(faces) = installed::faces() {
+        fonts = fonts.system_fonts(SystemFonts::AfterCraft).system_provider(Arc::new(faces));
+        installed::han(language)
+    } else {
+        None
+    };
+    #[cfg(target_arch = "wasm32")]
+    let _ = installed;
+    let mut stack = fonts.stack();
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(han) = han {
+        let japanese: Vec<String> = craft_faces().iter().filter(|f| f.scripts.contains(&"Jpan")).map(CraftFace::name).collect();
+        let families: Vec<FontFamily> = stack.definitions.families.keys().cloned().collect();
+        for family in families {
+            let chain = stack.chain(&family);
+            let at = chain.iter().position(|n| japanese.iter().any(|j| n.starts_with(j.as_str()))).unwrap_or(chain.len());
+            stack.insert(&family, at, SYSTEM_HAN, han.clone());
+        }
+    }
+    // egui's Hack has symbols the interface draws in plain text that Inter lacks (▸ in menu paths),
+    // which would otherwise be boxes on a machine without an installed face for them.
+    if let Some(hack) = FontDefinitions::default().font_data.get("Hack") {
+        let families: Vec<FontFamily> = stack.definitions.families.keys().filter(|f| **f != FontFamily::Monospace).cloned().collect();
+        for family in families {
+            stack.insert(&family, usize::MAX, "Hack", (**hack).clone());
+        }
+    }
+    stack
+}
+
+/// The craft-fonts faces this build embedded ([`pdfcraft_fonts::CRAFT_FONTS`]; empty unless
+/// built with `CRAFT_FONTS_DIR`).
+fn craft_faces() -> &'static [CraftFace] {
+    static FACES: OnceLock<Vec<CraftFace>> = OnceLock::new();
+    FACES.get_or_init(|| {
+        pdfcraft_fonts::CRAFT_FONTS
+            .iter()
+            .map(|f| CraftFace { family: f.family, style: f.style, scripts: f.scripts, bytes: f.bytes, index: 0 })
+            .collect()
+    })
+}
+
+/// Faces installed on this machine, read at runtime and never embedded (AGENTS.md §1.4).
+#[cfg(not(target_arch = "wasm32"))]
+mod installed {
+    use craft_ui::fonts::FaceList;
+    use egui::{FontData, FontFamily};
+
+    use crate::system_fonts::{self, Need};
+
+    /// The installed faces asked after the craft faces, in order: one per script that needs its
+    /// own face, then the general fallback. `None` with `PDFCRAFT_SYSTEM_FONTS=0`.
+    pub(super) fn faces() -> Option<FaceList> {
+        if std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0") {
+            return None;
+        }
+        let mut list = FaceList::default();
+        let mut chain = Vec::new();
         for (name, data) in [
-            (SYSTEM_DEVANAGARI_FALLBACK, crate::system_fonts::devanagari_fallback()),
-            (SYSTEM_TELUGU_FALLBACK, crate::system_fonts::telugu_fallback()),
-            (SYSTEM_SINHALA_FALLBACK, crate::system_fonts::sinhala_fallback()),
-            (SYSTEM_TAMIL_FALLBACK, crate::system_fonts::tamil_fallback()),
+            ("system-devanagari-fallback", system_fonts::devanagari_fallback()),
+            ("system-telugu-fallback", system_fonts::telugu_fallback()),
+            ("system-sinhala-fallback", system_fonts::sinhala_fallback()),
+            ("system-tamil-fallback", system_fonts::tamil_fallback()),
+            ("system-fallback", system_fonts::fallback(Need::Other)),
         ] {
-            let Some(data) = data else { continue };
-            fonts.font_data.insert(name.to_owned(), data);
-            for stack in fonts.families.values_mut() {
-                stack.push(name.to_owned());
+            if let Some(data) = data {
+                list.insert(name, (*data).clone());
+                chain.push(name.to_owned());
             }
         }
-        let need = match cjk {
-            _ if !pdfcraft_fonts::ui_chinese_fonts().is_empty() => Need::Other,
-            CjkPreference::SimplifiedChinese => Need::Hans,
-            CjkPreference::TraditionalChinese => Need::Hant,
-            CjkPreference::Default => Need::Other,
+        // Every family asks the proportional list.
+        list.set_chain(FontFamily::Proportional, chain);
+        Some(list)
+    }
+
+    /// The installed Chinese face for a Chinese interface built without a Chinese craft face.
+    pub(super) fn han(language: &str) -> Option<FontData> {
+        let need = match language {
+            "zh-hans" => Need::Hans,
+            "zh-hant" => Need::Hant,
+            _ => return None,
         };
-        if let Some(data) = fallback(need) {
-            fonts.font_data.insert(SYSTEM_FALLBACK.to_owned(), data);
-            let japanese: Vec<String> = pdfcraft_fonts::ui_japanese_fonts().iter().map(|f| f.name()).collect();
-            for stack in fonts.families.values_mut() {
-                let at = match need {
-                    Need::Other => None,
-                    Need::Hans | Need::Hant => stack.iter().position(|n| japanese.contains(n)),
-                };
-                stack.insert(at.unwrap_or(stack.len()), SYSTEM_FALLBACK.to_owned());
+        let chinese = super::craft_faces().iter().any(|f| f.scripts.iter().any(|s| matches!(*s, "Hans" | "Hant")));
+        if chinese {
+            return None;
+        }
+        system_fonts::fallback(need).map(|data| (*data).clone())
+    }
+}
+
+/// The embedded interface fonts of an English interface ([`font_stack`] without installed faces)
+/// as one set of definitions, egui's default faces last in every family, for a context that
+/// takes them through `set_fonts`.
+pub fn font_definitions() -> FontDefinitions {
+    font_definitions_on(current_font_policy_platform())
+}
+
+fn font_definitions_on(platform: FontPolicyPlatform) -> FontDefinitions {
+    let mut definitions = font_stack_on(platform, crate::i18n::Lang::EN.code(), false).definitions;
+    let egui = FontDefinitions::default();
+    for (family, chain) in &mut definitions.families {
+        let tail = egui.families.get(family).or_else(|| egui.families.get(&FontFamily::Proportional));
+        for name in tail.into_iter().flatten() {
+            if let Some(data) = egui.font_data.get(name)
+                && !chain.contains(name)
+            {
+                definitions.font_data.entry(name.clone()).or_insert_with(|| Arc::clone(data));
+                chain.push(name.clone());
             }
         }
     }
-    fonts
-}
-
-/// The interface fonts: Inter (and JetBrains Mono for code) first, then egui's defaults, then
-/// the CJK, Arabic, Telugu, Hebrew and Thai faces of the optional craft-fonts build input as the
-/// last fallback in every family. Without craft-fonts there is no Japanese, Chinese, Arabic,
-/// Telugu, Hebrew or Thai face here.
-pub fn font_definitions() -> FontDefinitions {
-    font_definitions_for(false)
-}
-
-/// [`font_definitions`] with the CJK fallback order for the UI language. Simplified Chinese
-/// must come first in Chinese mode: otherwise shared characters render in the Japanese face
-/// while Simplified-only characters (e.g. U+6B22 欢) fall through to the Chinese face, and
-/// the mixed vertical metrics sink them below the line.
-pub fn font_definitions_for(prefer_hans: bool) -> FontDefinitions {
-    font_definitions_for_platform(prefer_hans, current_font_policy_platform())
+    definitions
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -315,99 +379,12 @@ fn primary_font_tweak(platform: FontPolicyPlatform, name: &str) -> FontTweak {
     tweak
 }
 
-/// A face's vertical metrics in em, as egui reads them: skrifa's ascent, descent (negative) and
-/// line gap at the default location. `None` when the face doesn't parse.
-fn vertical_metrics(bytes: &[u8], index: u32) -> Option<[f32; 3]> {
-    use skrifa::MetadataProvider as _;
-    let font = skrifa::FontRef::from_index(bytes, index).ok()?;
-    let m = font.metrics(skrifa::instance::Size::unscaled(), skrifa::instance::LocationRef::default());
-    let em = f32::from(m.units_per_em);
-    let metrics = [m.ascent / em, m.descent / em, m.leading / em];
-    (em > 0.0 && metrics.iter().all(|v| v.is_finite())).then_some(metrics)
-}
-
-/// How far below the primary face's baseline egui draws a fallback face's, in em of the font size
-/// (negative: above). egui centres the fallback's line box (ascent − descent + gap) on the
-/// primary's rather than lining up their baselines, so the baseline moves by half the difference
-/// of ascent + descent, less half the difference of the line gaps (epaint `text_layout`).
-fn baseline_drop(primary: [f32; 3], fallback: [f32; 3]) -> f32 {
-    let [pa, pd, pg] = primary;
-    let [a, d, g] = fallback;
-    ((a + d) - (pa + pd) + pg - g) / 2.0
-}
-
-/// `data` with its glyphs moved onto Inter's baseline (#1676). Without this, Chinese next to Latin
-/// in one label sits higher or lower than the Latin by a few percent of the font size, depending on
-/// the installed Chinese face (PingFang, Microsoft JhengHei, SimSun…). Inter is the first face of
-/// every proportional family; the monospace family's JetBrains Mono differs from it by 0.004 em,
-/// well under a pixel. A face that doesn't parse is left as it is (egui will skip it anyway).
+/// `data` set to sit on the interface's baseline when it is a fallback (#1676): without this, egui
+/// centres a fallback face's line box on Inter's, so Chinese next to Latin in one label sits higher
+/// or lower than the Latin by a few percent of the font size, depending on the installed face.
 pub(crate) fn on_interface_baseline(mut data: FontData) -> FontData {
-    let primary = vertical_metrics(pdfcraft_fonts::INTER_REGULAR, 0);
-    if let (Some(primary), Some(fallback)) = (primary, vertical_metrics((*data.font).as_ref(), data.index)) {
-        data.tweak.y_offset_factor = -baseline_drop(primary, fallback);
-    }
+    data.tweak.set_baseline_fallback(true);
     data
-}
-
-fn font_definitions_for_platform(prefer_hans: bool, platform: FontPolicyPlatform) -> FontDefinitions {
-    let mut fonts = FontDefinitions::default();
-    let add = |fonts: &mut FontDefinitions, name: &str, bytes: &'static [u8]| {
-        let data = FontData::from_static(bytes);
-        let data = if ["Inter", "Inter-Medium", "Inter-SemiBold", "JetBrainsMono"].contains(&name) {
-            data.tweak(primary_font_tweak(platform, name))
-        } else {
-            on_interface_baseline(data)
-        };
-        fonts.font_data.insert(name.to_owned(), Arc::new(data));
-    };
-    // Shared with typed signatures' fallback glyphs, so the font is embedded once.
-    add(&mut fonts, "Inter", pdfcraft_fonts::INTER_REGULAR);
-    add(&mut fonts, "Inter-Medium", include_bytes!("../../../assets/fonts/Inter-Medium.ttf"));
-    add(&mut fonts, "Inter-SemiBold", include_bytes!("../../../assets/fonts/Inter-SemiBold.ttf"));
-    add(&mut fonts, "JetBrainsMono", include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf"));
-    fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "Inter".to_owned());
-    fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "JetBrainsMono".to_owned());
-    // Keep missing Latin/Cyrillic letters in the app's own faces (for example Bulgarian ѝ,
-    // absent from JetBrains Mono), before egui's defaults or optional system/CJK fallbacks.
-    fonts.families.entry(FontFamily::Monospace).or_default().insert(1, "Inter".to_owned());
-    // The same static bytes pdfcraft-fonts uses for Japanese/Chinese text in PDFs: one copy, not two.
-    for face in pdfcraft_fonts::ui_cjk_fonts(prefer_hans) {
-        let name = face.name();
-        // Japanese and Chinese faces have distinct family names, so no collision here.
-        if !fonts.font_data.contains_key(&name) {
-            add(&mut fonts, &name, face.bytes);
-        }
-        for family in [FontFamily::Proportional, FontFamily::Monospace] {
-            fonts.families.entry(family).or_default().push(name.clone());
-        }
-    }
-    // Arabic-script faces (file names, document titles), Telugu faces (the Telugu interface,
-    // file names), Hebrew faces (file names, text being edited) and Thai faces after the CJK ones; the
-    // ranges don't overlap.
-    for face in pdfcraft_fonts::ui_arabic_fonts()
-        .into_iter()
-        .chain(pdfcraft_fonts::ui_telugu_fonts())
-        .chain(pdfcraft_fonts::ui_hebrew_fonts())
-        .chain(pdfcraft_fonts::ui_thai_fonts())
-    {
-        let name = face.name();
-        if !fonts.font_data.contains_key(&name) {
-            add(&mut fonts, &name, face.bytes);
-        }
-        for family in [FontFamily::Proportional, FontFamily::Monospace] {
-            let stack = fonts.families.entry(family).or_default();
-            if !stack.contains(&name) {
-                stack.push(name.clone());
-            }
-        }
-    }
-    let fallback: Vec<String> = fonts.families[&FontFamily::Proportional].clone();
-    for (fam, primary) in [("medium", "Inter-Medium"), ("semibold", "Inter-SemiBold")] {
-        let mut stack = vec![primary.to_owned()];
-        stack.extend(fallback.iter().cloned());
-        fonts.families.insert(FontFamily::Name(fam.into()), stack);
-    }
-    fonts
 }
 
 pub fn regular(size: f32) -> FontId {
@@ -589,22 +566,20 @@ mod tests {
                 color_transfer_function: egui::epaint::FontColorTransferFunction::Gamma(0.75),
                 ..TextOptions::default()
             },
-            font_definitions_for_platform(false, platform),
+            font_definitions_on(platform),
         )
     }
 
-    /// The baseline of each glyph of `text` laid out by egui at `size` points, in points from the
-    /// top of the row: its position plus its face's `y_offset_factor`, as epaint draws it.
-    fn baselines(fallback: FontData, size: f32, text: &str) -> Vec<f32> {
-        let factor = fallback.tweak.y_offset_factor;
+    /// The vertical position of each glyph of `text` laid out by egui at `size` points, with Inter
+    /// first and `fallback` after it.
+    fn glyph_tops(fallback: FontData, size: f32, text: &str) -> Vec<f32> {
         let mut defs = FontDefinitions::empty();
         defs.font_data.insert("Inter".into(), Arc::new(FontData::from_static(pdfcraft_fonts::INTER_REGULAR)));
         defs.font_data.insert("fallback".into(), Arc::new(fallback));
         defs.families.insert(FontFamily::Proportional, vec!["Inter".into(), "fallback".into()]);
         let mut fonts = Fonts::new(TextOptions::default(), defs);
         let g = galley(&mut fonts, FontFamily::Proportional, size, 1.0, text);
-        let inter_has = |c: char| c.is_ascii();
-        g.rows[0].glyphs.iter().map(|gl| gl.pos.y + if inter_has(gl.chr) { 0.0 } else { size * factor }).collect()
+        g.rows[0].glyphs.iter().map(|gl| gl.pos.y).collect()
     }
 
     #[test]
@@ -614,22 +589,16 @@ mod tests {
         let dancing: &'static [u8] = include_bytes!("../../../assets/fonts/DancingScript.ttf");
         let size = 100.0;
         // As egui lays it out by itself, Ǆ sits ~4 pt off H's baseline: the bug (#1676).
-        let raw = baselines(FontData::from_static(dancing), size, "HǄ");
+        let raw = glyph_tops(FontData::from_static(dancing), size, "HǄ");
         assert!((raw[1] - raw[0]).abs() > 3.0, "the test fonts must differ: {raw:?}");
-        let drop = baseline_drop(vertical_metrics(pdfcraft_fonts::INTER_REGULAR, 0).unwrap(), vertical_metrics(dancing, 0).unwrap());
-        assert!((raw[1] - raw[0] - size * drop).abs() <= 1.0, "baseline_drop predicts egui: {raw:?} vs {drop}");
-        // On the interface baseline, to the pixel.
-        let aligned = baselines(on_interface_baseline(FontData::from_static(dancing)), size, "HǄ");
-        assert!((aligned[1] - aligned[0]).abs() <= 1.0, "{aligned:?}");
-        // A face that doesn't parse is left alone rather than guessed at.
-        assert_eq!(on_interface_baseline(FontData::from_static(b"not a font")).tweak, FontTweak::default());
-        assert_eq!(vertical_metrics(b"", 0), None);
+        let aligned = glyph_tops(on_interface_baseline(FontData::from_static(dancing)), size, "HǄ");
+        assert_eq!(aligned[1], aligned[0], "{aligned:?}");
     }
 
     #[test]
     fn windows_hinting_changes_only_the_jetbrains_symmetric_rendering_field() {
-        let baseline = font_definitions_for_platform(false, FontPolicyPlatform::Other);
-        let windows = font_definitions_for_platform(false, FontPolicyPlatform::Windows);
+        let baseline = font_definitions_on(FontPolicyPlatform::Other);
+        let windows = font_definitions_on(FontPolicyPlatform::Windows);
 
         assert_eq!(baseline.families, windows.families);
         assert_eq!(baseline.font_data.keys().collect::<Vec<_>>(), windows.font_data.keys().collect::<Vec<_>>());
@@ -657,8 +626,8 @@ mod tests {
             }
         }
         assert_eq!(
-            font_definitions_for(false).font_data["JetBrainsMono"].tweak,
-            font_definitions_for_platform(false, current_font_policy_platform()).font_data["JetBrainsMono"].tweak
+            font_definitions().font_data["JetBrainsMono"].tweak,
+            font_definitions_on(current_font_policy_platform()).font_data["JetBrainsMono"].tweak
         );
     }
 

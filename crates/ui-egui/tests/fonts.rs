@@ -1,11 +1,13 @@
-//! The interface fonts with and without the optional craft-fonts build input (`CRAFT_FONTS_DIR`).
+//! The interface fonts with and without the optional craft-fonts build input (`CRAFT_FONTS_DIR`)
+//! and the faces installed on this machine.
 
+use craft_ui::fonts::{I18nScripts, LanguageScripts, Sample, assert_covers};
 use egui::epaint::text::{Fonts, TextOptions};
 use egui::{Color32, FontFamily, FontId};
+use pdfcraft_ui_egui::i18n::LANGUAGES;
 use pdfcraft_ui_egui::theme;
 
 const JAPANESE: &str = "日本語の文字";
-const CHINESE: &str = "简体中文欢迎";
 const ARABIC: &str = "واحد اثنين";
 const TELUGU: &str = "తెలుగు ఫైల్";
 
@@ -19,104 +21,111 @@ fn layout_widths(fonts: &mut Fonts, text: &str) -> Vec<f32> {
     families().into_iter().map(|id| view.layout_no_wrap(text.to_owned(), id, Color32::BLACK).size().x).collect()
 }
 
-/// Built with craft-fonts, Japanese text renders with real glyphs (no tofu) in every family,
-/// from a craft-fonts face placed after the app's own fonts.
-#[test]
-fn japanese_ui_text_uses_craft_fonts() {
-    if pdfcraft_fonts::ui_japanese_fonts().is_empty() {
-        eprintln!("skipping japanese_ui_text_uses_craft_fonts: built without craft-fonts (set CRAFT_FONTS_DIR to run it)");
-        return;
-    }
-    let defs = theme::font_definitions();
-    for family in [FontFamily::Proportional, FontFamily::Monospace] {
-        let stack = &defs.families[&family];
-        let first_jp = stack.iter().position(|n| n.starts_with("BIZ UDPGothic")).expect("BIZ UDPGothic is a fallback");
-        let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
-        assert!(own < first_jp, "{family:?}: {stack:?}");
-        assert!(stack[first_jp..].iter().all(|n| pdfcraft_fonts::CRAFT_FONTS.iter().any(|f| f.name() == *n)), "{stack:?}");
-    }
-    let mut fonts = Fonts::new(TextOptions::default(), defs);
-    for id in families() {
-        assert!(fonts.has_glyphs(&id, JAPANESE), "{id:?} lacks {JAPANESE}");
-    }
-    // Real glyphs are about a full em wide each; tofu boxes and missing glyphs are not.
-    for w in layout_widths(&mut fonts, JAPANESE) {
-        assert!(w > 13.0 * 0.8 * JAPANESE.chars().count() as f32, "{w}");
+fn embedded(script: &str) -> bool {
+    pdfcraft_fonts::CRAFT_FONTS.iter().any(|f| f.covers(script))
+}
+
+/// The craft-fonts script tag a language's interface text needs; `None` for the scripts Inter has.
+fn craft_script(code: &str) -> Option<&'static str> {
+    match code {
+        "ja" => Some("Jpan"),
+        "zh-hans" => Some("Hans"),
+        "zh-hant" => Some("Hant"),
+        "ar" => Some("Arab"),
+        "te" => Some("Telu"),
+        _ => None,
     }
 }
 
-/// Chinese mode orders the CJK fallback with the `Hans` group first, so one line never
-/// mixes faces with different vertical metrics. Without an allowed `Hans` face in the
-/// build input the order part still holds; glyph coverage follows the craft-fonts checkout.
+/// Every shipped translation and every language's own name (the Preferences menu) draws with the
+/// embedded faces alone, no installed fonts. A language in a script Inter lacks is checked when
+/// the build has a craft-fonts face for it: run with `CRAFT_FONTS_DIR` to check what a release
+/// embeds. craft-fonts has no Chinese face PdfCraft may embed (its Noto Sans CJK is Source Han,
+/// AGENTS.md §1.1) and no Telugu face yet, so those interfaces still rely on installed fonts.
 #[test]
-fn chinese_ui_text_prefers_the_chinese_face() {
-    if pdfcraft_fonts::ui_chinese_fonts().is_empty() {
-        eprintln!(
-            "skipping chinese_ui_text_prefers_the_chinese_face: no Hans face bundled (set CRAFT_FONTS_DIR with an allowed Chinese face to run it)"
-        );
-        return;
+fn ui_fonts_cover_every_catalog() {
+    let checked: Vec<_> = LANGUAGES
+        .iter()
+        .filter(|l| match craft_script(l.code) {
+            Some(script) => embedded(script),
+            None => {
+                let scripts = I18nScripts.scripts(l.code);
+                assert!(scripts.iter().all(|s| ["Latn", "Cyrl", "Grek"].contains(s)), "{}: {scripts:?} needs a craft_script entry", l.code);
+                true
+            }
+        })
+        .collect();
+    let skipped: Vec<&str> = LANGUAGES.iter().filter(|l| !checked.iter().any(|c| c.code == l.code)).map(|l| l.code).collect();
+    if !skipped.is_empty() {
+        eprintln!("ui_fonts_cover_every_catalog: not checking {skipped:?}: no embedded face (set CRAFT_FONTS_DIR to check what a release embeds)");
     }
-    let defs = theme::font_definitions_for(true);
-    let hans: Vec<String> = pdfcraft_fonts::ui_chinese_fonts().iter().map(|f| f.name()).collect();
-    for family in [FontFamily::Proportional, FontFamily::Monospace] {
-        let stack = &defs.families[&family];
-        let first_zh = stack.iter().position(|n| hans.iter().any(|h| h == n)).expect("a Hans face is a fallback");
-        let first_ja = stack.iter().position(|n| n.starts_with("BIZ UDPGothic")).expect("BIZ UDPGothic is a fallback");
-        let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
-        assert!(own < first_zh && first_zh < first_ja, "{family:?}: {stack:?}");
+    let mut samples: Vec<Sample<'_>> = Vec::new();
+    for language in &checked {
+        samples.push(Sample { language: language.code, key: "language name", text: language.name });
+        for line in language.source.lines().filter(|l| !l.starts_with('#')) {
+            let mut columns = line.split('\t');
+            if let (Some(key), Some(text)) = (columns.nth(1), columns.next()) {
+                samples.push(Sample { language: language.code, key, text });
+            }
+        }
     }
-    let mut fonts = Fonts::new(TextOptions::default(), defs);
-    for id in families() {
-        assert!(fonts.has_glyphs(&id, CHINESE), "{id:?} lacks {CHINESE}");
+    // File names and document titles in scripts the interface isn't translated to.
+    for (script, text) in [("Arab", ARABIC), ("Hebr", "קובץ חדש"), ("Thai", "ไฟล์เอกสาร"), ("Telu", TELUGU), ("Jpan", JAPANESE)]
+    {
+        if embedded(script) {
+            samples.push(Sample { language: script, key: "content", text });
+        }
     }
-    for w in layout_widths(&mut fonts, CHINESE) {
-        assert!(w > 13.0 * 0.8 * CHINESE.chars().count() as f32, "{w}");
-    }
+    assert!(samples.len() > 1000, "{}", samples.len());
+    assert_covers(&theme::font_stack("en", false), samples);
 }
 
-/// Built with a craft-fonts Arabic face, Arabic text has real glyphs in every family, from a
-/// face placed after the app's own fonts.
+/// Every family starts with PdfCraft's own face in a Latin, Japanese or Chinese interface: Latin
+/// text keeps Inter, and the craft-fonts faces come after it. An Arabic interface with an Arabic
+/// face puts that face first in the text families, so its rows fit the marks; code keeps
+/// JetBrains Mono.
 #[test]
-fn arabic_ui_text_uses_craft_fonts() {
+fn app_faces_lead_unless_the_language_needs_taller_rows() {
+    let leads = [
+        (FontFamily::Proportional, "Inter"),
+        (FontFamily::Monospace, "JetBrainsMono"),
+        (FontFamily::Name("medium".into()), "Inter-Medium"),
+        (FontFamily::Name("semibold".into()), "Inter-SemiBold"),
+    ];
+    for language in ["en", "ja", "zh-hans", "ru"] {
+        let stack = theme::font_stack(language, false);
+        for (family, first) in &leads {
+            let chain = stack.chain(family);
+            assert_eq!(chain.first().map(String::as_str), Some(*first), "{language} {family:?}: {chain:?}");
+        }
+    }
     let arabic: Vec<String> = pdfcraft_fonts::ui_arabic_fonts().iter().map(|f| f.name()).collect();
     if arabic.is_empty() {
-        eprintln!("skipping arabic_ui_text_uses_craft_fonts: no Arab face bundled (set CRAFT_FONTS_DIR with an Arabic face to run it)");
+        eprintln!("skipping the Arabic interface: no Arab face bundled (set CRAFT_FONTS_DIR with an Arabic face to run it)");
         return;
     }
-    let defs = theme::font_definitions();
-    for family in [FontFamily::Proportional, FontFamily::Monospace] {
-        let stack = &defs.families[&family];
-        let first_ar = stack.iter().position(|n| arabic.contains(n)).expect("an Arab face is a fallback");
-        let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
-        assert!(own < first_ar, "{family:?}: {stack:?}");
-    }
-    let mut fonts = Fonts::new(TextOptions::default(), defs);
-    for id in families() {
-        assert!(fonts.has_glyphs(&id, ARABIC), "{id:?} lacks {ARABIC}");
+    let stack = theme::font_stack("ar", false);
+    for (family, first) in &leads {
+        let chain = stack.chain(family);
+        let lead = chain.first().cloned().unwrap_or_default();
+        if *family == FontFamily::Monospace {
+            assert_eq!(lead, *first, "{chain:?}");
+        } else {
+            assert!(arabic.iter().any(|a| lead.starts_with(a.as_str())), "{family:?}: {chain:?}");
+            assert_eq!(chain.get(1).map(String::as_str), Some(*first), "{family:?}: {chain:?}");
+        }
     }
 }
 
-/// Built with a craft-fonts Telugu face, Telugu text has real glyphs in every family, from a
-/// face placed after the app's own fonts, and is shaped: the conjunct క్ష is narrower than క్
-/// and ష held apart by a zero-width non-joiner.
+/// Built with a craft-fonts Telugu face, Telugu text is shaped in every family: the conjunct క్ష
+/// is narrower than క్ and ష held apart by a zero-width non-joiner.
 #[test]
-fn telugu_ui_text_uses_craft_fonts() {
-    let telugu: Vec<String> = pdfcraft_fonts::CRAFT_FONTS.iter().filter(|f| f.covers("Telu")).map(|f| f.name()).collect();
-    if telugu.is_empty() {
-        eprintln!("skipping telugu_ui_text_uses_craft_fonts: no Telu face bundled (set CRAFT_FONTS_DIR with a Telugu face to run it)");
+fn telugu_ui_text_is_shaped() {
+    if !embedded("Telu") {
+        eprintln!("skipping telugu_ui_text_is_shaped: no Telu face bundled (set CRAFT_FONTS_DIR with a Telugu face to run it)");
         return;
     }
-    let defs = theme::font_definitions();
-    for family in [FontFamily::Proportional, FontFamily::Monospace] {
-        let stack = &defs.families[&family];
-        let first_te = stack.iter().position(|n| telugu.contains(n)).expect("a Telu face is a fallback");
-        let own = stack.iter().position(|n| n == "Inter" || n == "JetBrainsMono").expect("the app's own font");
-        assert!(own < first_te, "{family:?}: {stack:?}");
-    }
-    let mut fonts = Fonts::new(TextOptions::default(), defs);
-    for id in families() {
-        assert!(fonts.has_glyphs(&id, TELUGU), "{id:?} lacks {TELUGU}");
-    }
+    let mut fonts = theme::font_stack("te", false).fonts(false);
     let joined = layout_widths(&mut fonts, "క్ష");
     let apart = layout_widths(&mut fonts, "క్\u{200c}ష");
     for (j, a) in joined.iter().zip(&apart) {
@@ -124,97 +133,21 @@ fn telugu_ui_text_uses_craft_fonts() {
     }
 }
 
-/// On a machine with a suitable installed font, the installed definitions end every family
-/// with it and Arabic text has glyphs; the embedded-only definitions never name it.
+/// On a machine with suitable installed fonts, Arabic, Hindi, Telugu (#1531), Sinhala and Tamil
+/// text has glyphs in every family, such as a file name or Telugu's name in Preferences. macOS
+/// always ships Telugu, Sinhala and Tamil faces, so there those never skip.
 #[test]
-fn system_fallback_fills_missing_scripts() {
-    assert!(!theme::font_definitions().font_data.contains_key(theme::SYSTEM_FALLBACK));
-    let defs = theme::installed_font_definitions(theme::CjkPreference::Default);
-    if !defs.font_data.contains_key(theme::SYSTEM_FALLBACK) {
-        eprintln!("skipping system_fallback_fills_missing_scripts: no installed fallback font (or PDFCRAFT_SYSTEM_FONTS=0)");
-        assert!(defs.families.values().all(|stack| !stack.iter().any(|n| n == theme::SYSTEM_FALLBACK)));
-        return;
-    }
-    for (family, stack) in &defs.families {
-        assert_eq!(stack.last().map(String::as_str), Some(theme::SYSTEM_FALLBACK), "{family:?}: {stack:?}");
-        assert_eq!(stack.iter().filter(|n| *n == theme::SYSTEM_FALLBACK).count(), 1, "{family:?}");
-    }
-    let mut fonts = Fonts::new(TextOptions::default(), defs);
-    for id in families() {
-        assert!(fonts.has_glyphs(&id, ARABIC), "{id:?} lacks {ARABIC}");
-        assert!(fonts.has_glyphs(&id, "PdfCraft"), "{id:?}");
-    }
-    assert!(layout_widths(&mut fonts, ARABIC).iter().all(|w| w.is_finite() && *w > 0.0));
-}
-
-/// On a machine with a suitable installed Devanagari font, the installed definitions include
-/// it and Hindi text has glyphs; the embedded-only definitions never name it.
-#[test]
-fn system_fallback_covers_devanagari() {
-    assert!(!theme::font_definitions().font_data.contains_key(theme::SYSTEM_DEVANAGARI_FALLBACK));
-    let defs = theme::installed_font_definitions(theme::CjkPreference::Default);
-    if !defs.font_data.contains_key(theme::SYSTEM_DEVANAGARI_FALLBACK) {
-        eprintln!("skipping system_fallback_covers_devanagari: no installed Devanagari fallback font (or PDFCRAFT_SYSTEM_FONTS=0)");
-        assert!(defs.families.values().all(|stack| !stack.iter().any(|n| n == theme::SYSTEM_DEVANAGARI_FALLBACK)));
-        return;
-    }
-    for (family, stack) in &defs.families {
-        assert!(stack.iter().any(|n| n == theme::SYSTEM_DEVANAGARI_FALLBACK), "{family:?}: {stack:?}");
-        assert_eq!(stack.iter().filter(|n| *n == theme::SYSTEM_DEVANAGARI_FALLBACK).count(), 1, "{family:?}");
-    }
-    let mut fonts = Fonts::new(TextOptions::default(), defs);
-    const DEVANAGARI: &str = "हिंदी पाठ सम्पादन";
-    for id in families() {
-        assert!(fonts.has_glyphs(&id, DEVANAGARI), "{id:?} lacks {DEVANAGARI}");
-    }
-    assert!(layout_widths(&mut fonts, DEVANAGARI).iter().all(|w| w.is_finite() && *w > 0.0));
-}
-
-/// On a machine with an installed Telugu font, the installed definitions include it and Telugu
-/// text has glyphs, so the language's own name in Preferences is not boxes (#1531). macOS always
-/// ships Kohinoor Telugu, so there the test never skips.
-#[test]
-fn system_fallback_covers_telugu() {
-    assert!(!theme::font_definitions().font_data.contains_key(theme::SYSTEM_TELUGU_FALLBACK));
-    let defs = theme::installed_font_definitions(theme::CjkPreference::Default);
+fn installed_faces_draw_scripts_without_an_embedded_face() {
     let off = std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0");
-    if !defs.font_data.contains_key(theme::SYSTEM_TELUGU_FALLBACK) && (off || !cfg!(target_os = "macos")) {
-        eprintln!("skipping system_fallback_covers_telugu: no installed Telugu fallback font (or PDFCRAFT_SYSTEM_FONTS=0)");
-        assert!(defs.families.values().all(|stack| !stack.iter().any(|n| n == theme::SYSTEM_TELUGU_FALLBACK)));
-        return;
-    }
-    for (family, stack) in &defs.families {
-        assert_eq!(stack.iter().filter(|n| *n == theme::SYSTEM_TELUGU_FALLBACK).count(), 1, "{family:?}: {stack:?}");
-    }
-    let mut fonts = Fonts::new(TextOptions::default(), defs);
-    for id in families() {
-        assert!(fonts.has_glyphs(&id, TELUGU), "{id:?} lacks {TELUGU}");
-    }
-    assert!(layout_widths(&mut fonts, TELUGU).iter().all(|w| w.is_finite() && *w > 0.0));
-}
-
-/// On a machine with installed Sinhala and Tamil fonts, the installed definitions include them
-/// and Sinhala and Tamil text, such as a file name, has glyphs instead of boxes (#1688). macOS
-/// always ships Sinhala Sangam MN and Tamil Sangam MN, so there the test never skips.
-#[test]
-fn system_fallback_covers_sinhala_and_tamil() {
-    for (name, text) in [(theme::SYSTEM_SINHALA_FALLBACK, "ශ්‍රී ලංකා ගොනුව"), (theme::SYSTEM_TAMIL_FALLBACK, "தமிழ் கோப்பு")]
+    let mut fonts = theme::font_stack("en", true).fonts(true);
+    for (text, macos) in [(ARABIC, false), ("हिंदी पाठ सम्पादन", false), (TELUGU, true), ("ශ්‍රී ලංකා ගොනුව", true), ("தமிழ் கோப்பு", true)]
     {
-        assert!(!theme::font_definitions().font_data.contains_key(name));
-        let defs = theme::installed_font_definitions(theme::CjkPreference::Default);
-        let off = std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0");
-        if !defs.font_data.contains_key(name) && (off || !cfg!(target_os = "macos")) {
-            eprintln!("skipping {name}: no installed fallback font (or PDFCRAFT_SYSTEM_FONTS=0)");
-            assert!(defs.families.values().all(|stack| !stack.iter().any(|n| n == name)));
+        let drawn = families().into_iter().all(|id| fonts.has_glyphs(&id, text));
+        if !drawn && (off || !macos || !cfg!(target_os = "macos")) {
+            eprintln!("skipping {text}: no installed font has it (or PDFCRAFT_SYSTEM_FONTS=0)");
             continue;
         }
-        for (family, stack) in &defs.families {
-            assert_eq!(stack.iter().filter(|n| *n == name).count(), 1, "{family:?}: {stack:?}");
-        }
-        let mut fonts = Fonts::new(TextOptions::default(), defs);
-        for id in families() {
-            assert!(fonts.has_glyphs(&id, text), "{id:?} lacks {text}");
-        }
+        assert!(drawn, "{text}");
         assert!(layout_widths(&mut fonts, text).iter().all(|w| w.is_finite() && *w > 0.0));
     }
 }
@@ -233,45 +166,55 @@ fn catalog_han(catalog: &str) -> String {
     han.into_iter().collect()
 }
 
-/// In a Chinese interface built without a `Hans` face (every release so far, #826), a Chinese
-/// face installed on this machine goes before the Japanese faces, which lack hundreds of the
-/// catalog's characters, and draws every Han character of both Chinese catalogs.
+/// In a Chinese interface built without a Chinese craft face (every release so far, #826), a
+/// Chinese face installed on this machine goes right after the app's faces, before the Japanese
+/// faces, which lack hundreds of the catalog's characters, and draws every Han character of both
+/// Chinese catalogs. Other interfaces, and the stack without installed faces, don't take it.
 #[test]
 fn chinese_ui_uses_an_installed_chinese_face() {
-    if !pdfcraft_fonts::ui_chinese_fonts().is_empty() {
-        eprintln!("skipping chinese_ui_uses_an_installed_chinese_face: a Hans face is bundled");
+    assert!(!theme::font_stack("zh-hans", false).definitions.font_data.contains_key(theme::SYSTEM_HAN));
+    assert!(!theme::font_stack("ja", true).definitions.font_data.contains_key(theme::SYSTEM_HAN));
+    if embedded("Hans") || embedded("Hant") {
+        eprintln!("skipping chinese_ui_uses_an_installed_chinese_face: a Chinese face is bundled");
         return;
     }
-    for (cjk, catalog) in [
-        (theme::CjkPreference::SimplifiedChinese, include_str!("../src/i18n/zh-hans.tsv")),
-        (theme::CjkPreference::TraditionalChinese, include_str!("../src/i18n/zh-hant.tsv")),
-    ] {
-        let defs = theme::installed_font_definitions(cjk);
-        if !defs.font_data.contains_key(theme::SYSTEM_FALLBACK) {
+    for (code, catalog) in [("zh-hans", include_str!("../src/i18n/zh-hans.tsv")), ("zh-hant", include_str!("../src/i18n/zh-hant.tsv"))] {
+        let stack = theme::font_stack(code, true);
+        if !stack.definitions.font_data.contains_key(theme::SYSTEM_HAN) {
             eprintln!("skipping chinese_ui_uses_an_installed_chinese_face: no installed Chinese face (or PDFCRAFT_SYSTEM_FONTS=0)");
             return;
         }
-        for (family, stack) in &defs.families {
-            let system = stack.iter().position(|n| n == theme::SYSTEM_FALLBACK).expect("in every family");
-            assert_eq!(stack.iter().filter(|n| *n == theme::SYSTEM_FALLBACK).count(), 1, "{family:?}");
-            let own = stack.iter().position(|n| n.starts_with("Inter") || n == "JetBrainsMono").expect("the app's own font");
-            assert!(own < system, "{family:?}: {stack:?}");
-            if let Some(first_ja) = stack.iter().position(|n| n.starts_with("BIZ UDPGothic")) {
-                assert!(system < first_ja, "{family:?}: {stack:?}");
-            }
+        for (family, chain) in &stack.definitions.families {
+            let system = chain.iter().position(|n| n == theme::SYSTEM_HAN).expect("in every family");
+            assert_eq!(chain.iter().filter(|n| *n == theme::SYSTEM_HAN).count(), 1, "{family:?}");
+            assert!(chain[..system].iter().all(|n| n.starts_with("Inter") || n == "JetBrainsMono"), "{family:?}: {chain:?}");
         }
         let han = catalog_han(catalog);
-        assert!(han.contains('欢') || han.contains('說'), "{cjk:?}");
-        let mut fonts = Fonts::new(TextOptions::default(), defs);
+        assert!(han.contains('欢') || han.contains('說'), "{code}");
+        let mut fonts = stack.fonts(false);
         for id in families() {
             let missing: String = han.chars().filter(|c| !fonts.has_glyphs(&id, &c.to_string())).collect();
-            assert!(missing.is_empty(), "{cjk:?} {id:?} lacks {missing}");
+            assert!(missing.is_empty(), "{code} {id:?} lacks {missing}");
         }
     }
-    // Other languages keep the installed face last, as before.
-    let defs = theme::installed_font_definitions(theme::CjkPreference::Default);
-    for stack in defs.families.values() {
-        assert!(stack.iter().position(|n| n == theme::SYSTEM_FALLBACK).is_none_or(|i| i + 1 == stack.len()), "{stack:?}");
+}
+
+/// Widgets are as tall in a Latin interface after a language switch as at startup; an Arabic
+/// interface with an Arabic face makes them taller to fit its rows, and switching back undoes it.
+#[test]
+fn language_switch_keeps_the_widget_height() {
+    let ctx = egui::Context::default();
+    theme::install_fonts(&ctx);
+    theme::apply(&ctx, theme::ThemeKind::default());
+    let height = || ctx.global_style().spacing.interact_size.y;
+    let startup = height();
+    theme::install_fonts_for(&ctx, "de");
+    assert_eq!(height(), startup);
+    if embedded("Arab") {
+        theme::install_fonts_for(&ctx, "ar");
+        assert!(height() > startup, "{} vs {startup}", height());
+        theme::install_fonts_for(&ctx, "de");
+        assert_eq!(height(), startup);
     }
 }
 
@@ -282,11 +225,14 @@ fn ui_fonts_work_without_craft_fonts() {
     let mut fonts = Fonts::new(TextOptions::default(), theme::font_definitions());
     for id in families() {
         assert!(fonts.has_glyphs(&id, "PdfCraft"), "{id:?}");
-        assert_eq!(fonts.has_glyphs(&id, JAPANESE), !pdfcraft_fonts::ui_japanese_fonts().is_empty(), "{id:?}");
+        assert_eq!(fonts.has_glyphs(&id, JAPANESE), embedded("Jpan"), "{id:?}");
     }
     assert!(layout_widths(&mut fonts, JAPANESE).iter().all(|w| w.is_finite() && *w > 0.0));
     assert!(layout_widths(&mut fonts, "PdfCraft").iter().all(|w| *w > 20.0));
     let ctx = egui::Context::default();
+    for language in &LANGUAGES {
+        theme::install_fonts_for(&ctx, language.code);
+    }
     theme::install_fonts(&ctx);
 }
 

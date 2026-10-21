@@ -751,8 +751,8 @@ pub struct PdfCraftApp {
     pub window_state: window_state::WindowState,
     styled: bool,
     fonts_ready: bool,
-    /// The CJK fallback order the installed fonts follow (see `theme::installed_font_definitions`).
-    fonts_cjk: theme::CjkPreference,
+    /// The UI language the installed fonts were built for (see `theme::font_stack`).
+    fonts_lang: i18n::Lang,
     /// The window title last sent to the platform.
     pub window_title: String,
     /// The UI control channel, when enabled (`--control`; off by default).
@@ -1042,7 +1042,7 @@ impl PdfCraftApp {
             window_state: Default::default(),
             styled: false,
             fonts_ready: false,
-            fonts_cjk: theme::CjkPreference::Default,
+            fonts_lang: i18n::Lang::EN,
             control: None,
             bookmark_rename: None,
             last_opened_url: None,
@@ -2971,20 +2971,19 @@ impl eframe::App for PdfCraftApp {
             }
             self.poll_pending_opens();
         }
-        // Chinese wants its own faces before the Japanese ones (one baseline per line).
-        let cjk = theme::CjkPreference::for_language(lang.code());
+        // The UI language's faces come first among the fallbacks, or lead its rows (Arabic).
         if !self.styled {
             egui_extras::install_image_loaders(ctx);
-            theme::install_fonts_for(ctx, cjk);
-            self.fonts_cjk = cjk;
+            theme::install_fonts_for(ctx, lang.code());
+            self.fonts_lang = lang;
             theme::apply(ctx, self.theme);
             self.styled = true;
         } else {
             self.fonts_ready = true;
-            if cjk != self.fonts_cjk {
+            if lang != self.fonts_lang {
                 // Same family names as before, so named fonts stay valid while the new set loads.
-                theme::install_fonts_for(ctx, cjk);
-                self.fonts_cjk = cjk;
+                theme::install_fonts_for(ctx, lang.code());
+                self.fonts_lang = lang;
             }
         }
         self.sync_theme(ctx);
