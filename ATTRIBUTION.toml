@@ -3313,13 +3313,13 @@ sha256 = "e484866d4cce403175bd8d00b128feb08ab42e208de30e42cd9889d8f1735a6e"
 [[build_input]]
 name = "craft-fonts"
 option = "CRAFT_FONTS_DIR"
-title = "Japanese fonts: BIZ UDPGothic (Regular, Bold), Shippori Mincho, BIZ UDMincho; Arabic font: Noto Sans Arabic"
-author = "The BIZ UDGothic and BIZ UDMincho Project Authors (Morisawa Inc.), The Shippori Mincho Project Authors (FONTDASU), The Noto Project Authors (Noto Sans Arabic)"
+title = "Japanese fonts: BIZ UDPGothic (Regular, Bold), Shippori Mincho, BIZ UDMincho; Simplified Chinese font: Noto Sans CJK SC; Arabic font: Noto Sans Arabic"
+author = "The BIZ UDGothic and BIZ UDMincho Project Authors (Morisawa Inc.), The Shippori Mincho Project Authors (FONTDASU), The Noto Project Authors (Noto Sans Arabic; Noto Sans CJK SC by Adobe and Google)"
 source = "https://github.com/storytold/craft-fonts (pinned by commit in .github/workflows/release.yml)"
 licence = "OFL-1.1"
 attribution = "https://github.com/storytold/craft-fonts/blob/main/ATTRIBUTION.md"
 kind = "font"
-usage = "Japanese fallback in the interface (BIZ UDPGothic first) and Japanese glyphs in edited PDF text (Shippori Mincho); Arabic interface text, file names and document titles (Noto Sans Arabic); the web build embeds only BIZ UDPGothic Regular and Noto Sans Arabic. The checkout also holds Noto Sans CJK SC, which crates/fonts/build.rs never embeds (AGENTS.md §1.1)"
+usage = "Japanese fallback in the interface (BIZ UDPGothic first) and Japanese glyphs in edited PDF text (Shippori Mincho); Arabic interface text, file names and document titles (Noto Sans Arabic); Simplified Chinese interface text (Noto Sans CJK SC); the web build embeds only BIZ UDPGothic Regular and Noto Sans Arabic"
 
 [[asset]]
 path = "crates/sign/tests/data/x509-rsa-sha1.pdf"

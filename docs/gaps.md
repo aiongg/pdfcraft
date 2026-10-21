@@ -113,18 +113,19 @@ update the numbers.
   how a document looks.
 - **Estimate:** 100–180 h (the longest feature pole, M7). **Doc:** [target-app-parity.md](target-app-parity.md).
 
-### 5. Chinese UI shows missing-glyph boxes in releases
+### 5. Chinese UI shows missing-glyph boxes on the web
 
-- **Missing:** a Simplified Chinese (`Hans`) UI face in release builds and a working fallback.
+- **Missing:** a Simplified Chinese (`Hans`) UI face in the web build, which embeds only BIZ
+  UDPGothic Regular of the CJK faces. Desktop builds with the release-pinned craft-fonts embed
+  Noto Sans CJK SC.
 - **Evidence:** [#826](https://github.com/storytold/pdfcraft/issues/826),
   [#688](https://github.com/storytold/pdfcraft/issues/688),
   [#728](https://github.com/storytold/pdfcraft/issues/728),
   [#758](https://github.com/storytold/pdfcraft/issues/758),
-  [#689](https://github.com/storytold/pdfcraft/issues/689) (Flatpak). `AGENTS.md` §1.1 bars Noto
-  CJK (Source Han rebranded), so craft-fonts needs another openly licensed Hans face.
-- **Impact:** the second-largest language group sees a broken interface although the catalog is 97%
-  translated.
-- **Estimate:** 6–12 h (font sourcing in craft-fonts plus the fallback chain). **Doc:**
+  [#689](https://github.com/storytold/pdfcraft/issues/689) (Flatpak).
+- **Impact:** the second-largest language group sees a broken web interface although the catalog
+  is 97% translated.
+- **Estimate:** 6–12 h (a Hans face small enough for the web build). **Doc:**
   [localization-parity.md](localization-parity.md).
 
 ### 6. Open-issue backlog of wrong results in shipped features

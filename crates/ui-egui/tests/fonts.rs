@@ -46,14 +46,12 @@ fn japanese_ui_text_uses_craft_fonts() {
 }
 
 /// Chinese mode orders the CJK fallback with the `Hans` group first, so one line never
-/// mixes faces with different vertical metrics. Without an allowed `Hans` face in the
-/// build input the order part still holds; glyph coverage follows the craft-fonts checkout.
+/// mixes faces with different vertical metrics. Without a `Hans` face in the build input the
+/// order part still holds; glyph coverage follows the craft-fonts checkout.
 #[test]
 fn chinese_ui_text_prefers_the_chinese_face() {
     if pdfcraft_fonts::ui_chinese_fonts().is_empty() {
-        eprintln!(
-            "skipping chinese_ui_text_prefers_the_chinese_face: no Hans face bundled (set CRAFT_FONTS_DIR with an allowed Chinese face to run it)"
-        );
+        eprintln!("skipping chinese_ui_text_prefers_the_chinese_face: no Hans face bundled (set CRAFT_FONTS_DIR with a Chinese face to run it)");
         return;
     }
     let defs = theme::font_definitions_for(true);
@@ -233,9 +231,9 @@ fn catalog_han(catalog: &str) -> String {
     han.into_iter().collect()
 }
 
-/// In a Chinese interface built without a `Hans` face (every release so far, #826), a Chinese
-/// face installed on this machine goes before the Japanese faces, which lack hundreds of the
-/// catalog's characters, and draws every Han character of both Chinese catalogs.
+/// In a Chinese interface built without a `Hans` face (#826), a Chinese face installed on this
+/// machine goes before the Japanese faces, which lack hundreds of the catalog's characters, and
+/// draws every Han character of both Chinese catalogs.
 #[test]
 fn chinese_ui_uses_an_installed_chinese_face() {
     if !pdfcraft_fonts::ui_chinese_fonts().is_empty() {

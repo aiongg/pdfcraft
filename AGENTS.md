@@ -20,10 +20,10 @@ An **asset** is any non-code material that the project includes, ships, embeds, 
 
 - **Never** use icons, images, artwork, logos, UI graphics, fonts, stamps, cursors, sample documents or any other asset taken from an Adobe product, installer, website, document or package.
   - "Adobe product" includes Acrobat, Reader, Photoshop, Illustrator, Premiere, Lightroom and Creative Cloud, including the fonts they install (for example Minion, Myriad, Kozuka and the Adobe CJK families).
-  - This holds even when Adobe publishes the material under an open licence, if it is **visual design**. For example, **do not** use Source Han, Source Serif or Source Sans, or Noto CJK, which is Source Han rebranded.
+  - Typefaces released under the SIL Open Font License are allowed like any other OFL font, with an `ATTRIBUTION.toml` entry, whoever designed them: for example Noto CJK and Source Han, taken from their open-source releases. The copies an Adobe product installs stay banned.
 - **Never** recreate, trace, redraw or closely imitate an Adobe icon or graphic. Our icons come from Lucide, and our visual design is our own.
 - Screenshots of Adobe software exist only as private, local observation notes under `plan/acrobat/`, which is gitignored. They must **never** be committed, published, linked, shown in docs, used as a design source to trace, or placed anywhere else in the repository or its outputs.
-- The only Adobe-authored material allowed is **non-visual technical data** that is openly licensed and required for PDF compatibility. Each item needs its own entry in `ATTRIBUTION.toml` with `adobe_data = true`, and the list below is closed:
+- Apart from those OFL typefaces, the only Adobe-authored material allowed is **non-visual technical data** that is openly licensed and required for PDF compatibility. Each item needs its own entry in `ATTRIBUTION.toml` with `adobe_data = true`, and the list below is closed:
   - The CMap resources (BSD-3-Clause), bundled inside the `hayro-cmap` dependency.
   - The standard-14 font metrics and encoding tables in the PDF specification. They are data, not typefaces. They are embedded as code in hayro, and as our own generated table in `crates/fonts/src/std14_metrics.rs` (approved by the owner, 2026-10-08; that file holds the data alone, so the code reading it can change without re-attesting the table), which is what generated appearances measure with and what survives hayro being retired.
 
