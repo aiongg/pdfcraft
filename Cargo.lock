@@ -1125,12 +1125,12 @@ dependencies = [
 [[package]]
 name = "craft-docpath"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=607d38a#607d38a0ddffe195467c4117937915c5ab9095af"
+source = "git+https://github.com/aiongg/craft-libs?rev=7fc94af#7fc94afd0a925e57b84dc7650a1ef6e7ab68294c"
 
 [[package]]
 name = "craft-fonts-build"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=607d38a#607d38a0ddffe195467c4117937915c5ab9095af"
+source = "git+https://github.com/aiongg/craft-libs?rev=7fc94af#7fc94afd0a925e57b84dc7650a1ef6e7ab68294c"
 dependencies = [
  "skera",
  "skrifa 0.48.0",
@@ -1139,7 +1139,7 @@ dependencies = [
 [[package]]
 name = "craft-i18n"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=607d38a#607d38a0ddffe195467c4117937915c5ab9095af"
+source = "git+https://github.com/aiongg/craft-libs?rev=7fc94af#7fc94afd0a925e57b84dc7650a1ef6e7ab68294c"
 dependencies = [
  "fixed_decimal",
  "icu_decimal",
@@ -1161,7 +1161,7 @@ dependencies = [
 [[package]]
 name = "craft-print"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=607d38a#607d38a0ddffe195467c4117937915c5ab9095af"
+source = "git+https://github.com/aiongg/craft-libs?rev=7fc94af#7fc94afd0a925e57b84dc7650a1ef6e7ab68294c"
 dependencies = [
  "craft-winprint-gdi",
  "miniz_oxide 0.8.9",
@@ -1174,7 +1174,7 @@ dependencies = [
 [[package]]
 name = "craft-quit"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=607d38a#607d38a0ddffe195467c4117937915c5ab9095af"
+source = "git+https://github.com/aiongg/craft-libs?rev=7fc94af#7fc94afd0a925e57b84dc7650a1ef6e7ab68294c"
 dependencies = [
  "dispatch2",
  "egui",
@@ -1186,7 +1186,7 @@ dependencies = [
 [[package]]
 name = "craft-ui"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=607d38a#607d38a0ddffe195467c4117937915c5ab9095af"
+source = "git+https://github.com/aiongg/craft-libs?rev=7fc94af#7fc94afd0a925e57b84dc7650a1ef6e7ab68294c"
 dependencies = [
  "craft-fonts-build",
  "craft-i18n",
@@ -1564,7 +1564,7 @@ dependencies = [
 [[package]]
 name = "ecolor"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "bytemuck",
  "emath",
@@ -1596,7 +1596,7 @@ dependencies = [
 [[package]]
 name = "eframe"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "ahash",
  "bytemuck",
@@ -1634,7 +1634,7 @@ dependencies = [
 [[package]]
 name = "egui"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "accesskit",
  "ahash",
@@ -1655,7 +1655,7 @@ dependencies = [
 [[package]]
 name = "egui-wgpu"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "ahash",
  "bytemuck",
@@ -1674,7 +1674,7 @@ dependencies = [
 [[package]]
 name = "egui-winit"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "accesskit_winit",
  "arboard",
@@ -1698,7 +1698,7 @@ dependencies = [
 [[package]]
 name = "egui_extras"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "ahash",
  "egui",
@@ -1712,7 +1712,7 @@ dependencies = [
 [[package]]
 name = "egui_glow"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "bytemuck",
  "egui",
@@ -1725,7 +1725,7 @@ dependencies = [
 [[package]]
 name = "egui_kittest"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "eframe",
  "egui",
@@ -1768,7 +1768,7 @@ dependencies = [
 [[package]]
 name = "emath"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "bytemuck",
  "serde",
@@ -1849,7 +1849,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 dependencies = [
  "ahash",
  "bytemuck",
@@ -1876,7 +1876,7 @@ dependencies = [
 [[package]]
 name = "epaint_default_fonts"
 version = "0.37.0"
-source = "git+https://github.com/aiongg/egui?rev=a7bc087cf#a7bc087cf46779732dd59f4c0c3391e7bc34593c"
+source = "git+https://github.com/aiongg/egui?rev=a4f9a17f6#a4f9a17f64a6bae61350fb85804c9df0d9865916"
 
 [[package]]
 name = "equator"

@@ -1109,9 +1109,9 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let lock = std::fs::read_to_string(root.join("Cargo.lock")).unwrap();
         for (name, source) in [
-            ("egui", "git+https://github.com/aiongg/egui?rev=a7bc087cf#"),
-            ("egui-wgpu", "git+https://github.com/aiongg/egui?rev=a7bc087cf#"),
-            ("epaint", "git+https://github.com/aiongg/egui?rev=a7bc087cf#"),
+            ("egui", "git+https://github.com/aiongg/egui?rev=a4f9a17f6#"),
+            ("egui-wgpu", "git+https://github.com/aiongg/egui?rev=a4f9a17f6#"),
+            ("epaint", "git+https://github.com/aiongg/egui?rev=a4f9a17f6#"),
             ("winit", "git+https://github.com/aiongg/winit?rev=8b35388b#"),
         ] {
             let packages: Vec<_> = lock.split("[[package]]").filter(|p| p.contains(&format!("\nname = \"{name}\"\n"))).collect();
