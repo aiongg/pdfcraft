@@ -1102,17 +1102,17 @@ mod tests {
         // surface fit (#577: a window beyond `max_texture_dimension_2d` panicked in
         // `Surface::configure`) and its error scopes around a new window's first configure (#519:
         // a failure panicked before the OpenGL retry could run), with the suite's bidi and IME
-        // fixes. aiongg/winit craft/suite carries the IME, DPI and window fixes (Windows 11
+        // fixes. aiongg/winit craft/0.30.13-lang carries the IME, DPI and window fixes (Windows 11
         // monitor scale #324, X11 server DPI #1150, macOS title-bar drags, Wayland scroll phases
         // #991). Both branches test their patches; a dependency bump that resolves one of these
-        // crates elsewhere would drop them silently.
+        // crates elsewhere would drop them silently. The workspace pins each branch by rev.
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let lock = std::fs::read_to_string(root.join("Cargo.lock")).unwrap();
         for (name, source) in [
-            ("egui", "git+https://github.com/aiongg/egui?branch=craft%2F0.37#"),
-            ("egui-wgpu", "git+https://github.com/aiongg/egui?branch=craft%2F0.37#"),
-            ("epaint", "git+https://github.com/aiongg/egui?branch=craft%2F0.37#"),
-            ("winit", "git+https://github.com/aiongg/winit?branch=craft%2Fsuite#"),
+            ("egui", "git+https://github.com/aiongg/egui?rev=a7bc087cf#"),
+            ("egui-wgpu", "git+https://github.com/aiongg/egui?rev=a7bc087cf#"),
+            ("epaint", "git+https://github.com/aiongg/egui?rev=a7bc087cf#"),
+            ("winit", "git+https://github.com/aiongg/winit?rev=8b35388b#"),
         ] {
             let packages: Vec<_> = lock.split("[[package]]").filter(|p| p.contains(&format!("\nname = \"{name}\"\n"))).collect();
             assert_eq!(packages.len(), 1, "exactly one {name} in Cargo.lock");

@@ -1,4 +1,4 @@
-//! How egui treats the wheel phases winit (craft/suite) reports on Wayland: pixel-only wheel,
+//! How egui treats the wheel phases winit (craft/0.30.13-lang) reports on Wayland: pixel-only wheel,
 //! wheel-tilt and continuous-source events arrive as standalone `Moved` events, finger scrolls as a
 //! gesture from `Started` (#991). winit tests its phase policy itself.
 

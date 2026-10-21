@@ -9,7 +9,7 @@ A PdfCraft patch in `hayro-syntax::Page::base_dimensions` expresses the existing
 
 In `hayro-interpret`, Type 3 glyph bounding boxes are transformed to device space before intersecting clip and shading bounds; `raster::tests::shaded_type3_glyph_draws_at_multiple_positions` covers translated glyphs (#3178).
 
-winit and the egui crates (egui-wgpu among them) come from the craft suite's shared branches (aiongg/winit `craft/suite`,
+winit and the egui crates (egui-wgpu among them) come from the craft suite's shared branches (aiongg/winit `craft/0.30.13-lang`,
 aiongg/egui `craft/0.37`; `[patch]` in `Cargo.toml`), which carry their own patches and tests.
 
 | Crate | Version | Licence | Patches | Test |
