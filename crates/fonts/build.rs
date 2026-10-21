@@ -31,9 +31,7 @@ fn main() {
     }
 }
 
-/// Family-name prefixes of the faces AGENTS.md §1.1 forbids: Adobe's Source families and Noto
-/// CJK, which is Source Han under another name. The test in `src/craft.rs` has the same list.
-const BARRED_FAMILIES: [&str; 5] = ["Source Han", "Source Serif", "Source Sans", "Noto Sans CJK", "Noto Serif CJK"];
+include!("src/barred.rs");
 
 /// One `CraftFont { .. }` initialiser per manifest line.
 fn craft_fonts(dir: &std::path::Path) -> Result<String, String> {
@@ -47,9 +45,9 @@ fn craft_fonts(dir: &std::path::Path) -> Result<String, String> {
         let [family, style, file, scripts, ..] = f.as_slice() else {
             return Err(format!("malformed manifest line: {line}"));
         };
-        // AGENTS.md §1.1 bars Adobe's type designs whatever their licence, so a checkout that
-        // carries one (craft-fonts has Noto Sans CJK, which is Source Han) never embeds it.
-        if BARRED_FAMILIES.iter().any(|barred| family.starts_with(barred)) {
+        // A checkout that carries a barred face (craft-fonts has Noto Sans CJK and the Noto Sans
+        // SC/TC/HK/KR UI cuts of it) never embeds it.
+        if barred(family, &scripts.split(',').map(str::trim).collect::<Vec<_>>()) {
             println!("cargo::warning=craft-fonts: not embedding {family} {style} (AGENTS.md §1.1)");
             continue;
         }

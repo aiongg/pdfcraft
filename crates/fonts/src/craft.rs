@@ -265,18 +265,19 @@ mod tests {
         assert_eq!(ui_arabic_fonts().len(), CRAFT_FONTS.iter().filter(|f| f.covers("Arab")).count());
     }
 
-    /// Family-name prefixes `build.rs` never embeds (its own `BARRED_FAMILIES`): Adobe's type
-    /// designs, which includes Noto CJK (Source Han under another name).
-    const BARRED_FAMILIES: [&str; 5] = ["Source Han", "Source Serif", "Source Sans", "Noto Sans CJK", "Noto Serif CJK"];
-
     /// Whatever the craft-fonts checkout holds, no Adobe type design is embedded (AGENTS.md §1.1).
     #[test]
     fn barred_families_are_never_embedded() {
+        use crate::barred::barred;
         for face in CRAFT_FONTS {
-            assert!(!BARRED_FAMILIES.iter().any(|barred| face.family.starts_with(barred)), "{} is embedded", face.name());
+            assert!(!barred(face.family, face.scripts), "{} is embedded", face.name());
         }
-        assert!(BARRED_FAMILIES.iter().any(|barred| "Noto Sans CJK SC".starts_with(barred)));
-        assert!(!BARRED_FAMILIES.iter().any(|barred| "Noto Sans Arabic".starts_with(barred)));
+        assert!(barred("Noto Sans CJK SC", &["Hans", "Latn"]));
+        assert!(barred("Noto Sans HK UI", &["Hant-HK"]));
+        assert!(barred("Source Serif 4", &["Latn"]));
+        assert!(!barred("Noto Sans Arabic", &["Arab"]));
+        assert!(!barred("Noto Sans", &["Latn", "Cyrl", "Grek", "Deva"]));
+        assert!(!barred("BIZ UDPGothic", &["Jpan", "Latn"]));
     }
 
     #[test]
