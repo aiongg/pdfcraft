@@ -42,7 +42,7 @@ Catalog entries are written in logical (typing) order, and lookups (`tl!`, `tr`,
 
 What Arabic does not have yet:
 
-- **The layout is not mirrored.** Panels, menus, toolbars and alignment are as in the left-to-right languages, with Arabic labels in them.
+- **PdfCraft's own layout is not mirrored.** egui's chrome mirrors (submenus open to the left, scroll bars, popups, collapsing headers, check boxes and combo boxes), but the side panels, toolbars, tab strip, Home and the hand-placed rows are as in the left-to-right languages, with Arabic labels in them. `CRAFT_UI_DIRECTION=rtl` mirrors any interface language, for checking layouts.
 - Labels built by joining translated pieces in code (a list such as `A · B · C`) keep the code's left-to-right order.
 
 Arabic glyphs come from the craft-fonts `Arab` face (Noto Sans Arabic, kept in the web build too). A build without craft-fonts shows Arabic as replacement boxes on the web; on desktop it falls back to one installed font (below). The craft-fonts revision pinned for CI and releases (`.github/workflows/`) has the Arabic face. That revision also holds Noto Sans CJK SC, which `crates/fonts/build.rs` never embeds: `AGENTS.md` §1.1 bars it, so Chinese still has no embedded face of its own (desktop builds fall back to an installed Chinese face, above).

@@ -2988,6 +2988,13 @@ impl eframe::App for PdfCraftApp {
             }
         }
         self.sync_theme(ctx);
+        // A right-to-left language mirrors egui's own chrome: submenus, scroll bars, popups,
+        // collapsing headers. `CRAFT_UI_DIRECTION=rtl` mirrors any language, for checking layouts.
+        let direction =
+            craft_ui::direction::resolve(lang.code(), if lang.rtl() { craft_ui::direction::Setting::Rtl } else { craft_ui::direction::Setting::Ltr });
+        if craft_ui::direction::is_rtl(ctx) != (direction == craft_ui::direction::Direction::Rtl) {
+            craft_ui::direction::apply(ctx, direction);
+        }
         let native = ctx.native_pixels_per_point().unwrap_or(1.0);
         ui_scale::sync(ctx, ui_scale::zoom(self.ui_scale, self.system_text_scale, native), &mut self.ui_scale_applied);
         // Remember user work even if its tab is subsequently closed or Home is selected.

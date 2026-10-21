@@ -332,6 +332,22 @@ fn a_tab_with_an_arabic_file_name_keeps_its_logical_accessible_name() {
     h.get_by_label(long);
 }
 
+/// The Arabic interface mirrors egui's own chrome, through a theme change too, and English
+/// puts it back.
+#[test]
+fn arabic_interface_mirrors_egui_chrome() {
+    let mut h = harness(|app| app.set_option("language", "ar").expect("Arabic is registered"));
+    assert!(craft_ui::direction::is_rtl(&h.ctx));
+    assert!(h.ctx.global_style().right_to_left);
+    h.state_mut().set_theme_preference(pdfcraft_ui_egui::theme::ThemePreference::Dark);
+    h.run_steps(2);
+    assert!(h.ctx.global_style().right_to_left, "a new theme keeps the direction");
+    h.state_mut().set_option("language", "en").unwrap();
+    h.run_steps(2);
+    assert!(!craft_ui::direction::is_rtl(&h.ctx));
+    assert!(!h.ctx.global_style().right_to_left);
+}
+
 /// A middle click on a tab closes it, as in Acrobat and browsers (#1853); a tab with unsaved
 /// changes asks first, as its close button does.
 #[test]
