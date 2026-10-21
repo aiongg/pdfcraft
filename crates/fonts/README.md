@@ -22,10 +22,14 @@ Today it holds what generated appearances need without a font program:
 It also holds the fonts of the optional [craft-fonts](https://github.com/storytold/craft-fonts)
 build input. `build.rs` embeds them as `CRAFT_FONTS` when the build sets
 `CRAFT_FONTS_DIR=<checkout>` (and fails if it can't while `CRAFT_FONTS_REQUIRED=1`, as releases
-set). Without that variable `CRAFT_FONTS` is empty and everything below copes:
+set). The faces are whole: they draw text written into PDFs, the renderer's Japanese substitutes,
+and the interface's non-CJK scripts. The interface's CJK faces are cuts to its catalogs'
+characters, which `crates/ui-egui/build.rs` embeds. Both tables leave out the faces AGENTS.md §1.1
+bars (`src/barred.rs`: Adobe's Source families, and every Noto face for a CJK script). Without
+that variable `CRAFT_FONTS` is empty and everything below copes:
 
-- `ui_japanese_fonts`: the `Jpan` faces for the interface, BIZ UDPGothic first.
-- `ui_chinese_fonts`: the `Hans` faces for the interface, in manifest order (without one,
+- `ui_japanese_fonts`: the `Jpan` faces, BIZ UDPGothic first (the renderer's Japanese substitutes).
+- `ui_chinese_fonts`: the `Hans` faces, in manifest order (without one,
   Chinese characters the Japanese faces lack show the replacement glyph).
 - `ui_cjk_fonts(prefer_hans)`: both in fallback order for the UI language (Chinese group first
   in Chinese mode, so one line never mixes faces with different vertical metrics).

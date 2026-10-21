@@ -7,6 +7,10 @@
 //!   JSON says the entry was verified (`people_entry`).
 //!
 //! A missing or malformed file gives empty tables (or no names) and a warning.
+//!
+//! It also embeds the interface's CJK faces from the optional craft-fonts build input
+//! (`CRAFT_FONTS_DIR`) as `ui_craft_fonts.rs`: craft-fonts' interface faces (`role ui`), cut to the
+//! characters of the catalogs in `src/i18n` ([`ui_fonts`]).
 
 use std::fmt::Write as _;
 
@@ -24,6 +28,42 @@ fn main() {
     if let Err(e) = std::fs::write(&out, generate(&json, &people)) {
         println!("cargo::warning=writing {}: {e}", out.display());
     }
+    ui_fonts();
+}
+
+include!("../fonts/src/barred.rs");
+
+/// The interface's CJK faces: craft-fonts' interface faces that AGENTS.md §1.1 allows, cut to the
+/// characters of every catalog (each face gets every catalog's characters). The interface's other
+/// scripts use the whole faces of `pdfcraft_fonts::CRAFT_FONTS`, which documents need anyway.
+fn ui_fonts() {
+    let catalogs = catalogs();
+    let embedded = craft_fonts_build::Embed::new()
+        .subset_to(catalogs)
+        .filter(|face| {
+            let scripts: Vec<&str> = face.scripts.iter().map(String::as_str).collect();
+            if barred(&face.family, &scripts) {
+                if face.is_ui() {
+                    println!("cargo::warning=craft-fonts: not embedding the interface face {} {} (AGENTS.md §1.1)", face.family, face.style);
+                }
+                return false;
+            }
+            face.is_ui() && face.is_cjk()
+        })
+        .write("ui_craft_fonts.rs");
+    if let Err(e) = embedded {
+        println!("cargo::error={e}");
+    }
+}
+
+/// The translation catalogs the interface embeds (`src/i18n/*.tsv`).
+fn catalogs() -> Vec<std::path::PathBuf> {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/i18n");
+    println!("cargo::rerun-if-changed={}", dir.display());
+    let mut paths: Vec<std::path::PathBuf> =
+        std::fs::read_dir(&dir).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "tsv")).collect();
+    paths.sort();
+    paths
 }
 
 fn read<T>(path: &std::path::Path, fallback: &str, parse: impl Fn(&str) -> Result<T, String>) -> Option<T> {

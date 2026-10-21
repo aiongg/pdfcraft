@@ -20,6 +20,8 @@ craft-quit = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", 
 craft-print = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", branch = "lang-integration" }
 # Whether a path stored in a document may be opened (GoToR link targets).
 craft-docpath = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", branch = "lang-integration" }
+# The interface's CJK faces, cut at build time to the catalogs' characters (crates/ui-egui/build.rs).
+craft-fonts-build = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", branch = "lang-integration" }
 # internal
 pdfcraft-geom = { path = "crates/geom", version = "0.10.1" }
 pdfcraft-filters = { path = "crates/filters", version = "0.10.1" }

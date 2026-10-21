@@ -1,9 +1,10 @@
 //! Embeds the fonts of the optional craft-fonts build input (`CRAFT_FONTS_DIR`) as `CRAFT_FONTS`.
 //! The recipe is craft-fonts' `docs/integration.md`; unset, `CRAFT_FONTS` is empty. It only reads
 //! the local checkout (no network). `CRAFT_FONTS_REQUIRED=1` (release builds) turns a missing or
-//! unusable checkout into a build error. On wasm32 it embeds only the UI faces (BIZ UDPGothic Regular
-//! and any `Arab`, `Telu`, `Hebr` or `Thai` face), to keep the web build within hosting limits (Cloudflare Pages:
-//! 25 MiB per file).
+//! unusable checkout into a build error. The faces are whole: they draw text written into PDFs and
+//! the interface's non-CJK scripts. The interface's CJK faces are cuts that `crates/ui-egui/build.rs`
+//! embeds. On wasm32 it embeds only BIZ UDPGothic Regular and any `Arab`, `Telu`, `Hebr` or `Thai`
+//! face, to keep the web build within hosting limits (Cloudflare Pages: 25 MiB per file).
 
 use std::fmt::Write as _;
 use std::path::PathBuf;

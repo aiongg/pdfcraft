@@ -11,6 +11,8 @@ workspace = true
 
 [dependencies]
 craft-ui = { workspace = true }
+# The type of the interface font table crates/ui-egui/build.rs writes.
+craft-fonts-build = { workspace = true }
 # macOS: a window close quits through `terminate:` (the Touch Bar crash, #1136); elsewhere a no-op.
 craft-quit = { workspace = true, features = ["egui"] }
 pdfcraft-fonts = { workspace = true }
@@ -80,5 +82,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 skrifa = "0.44"
 
 [build-dependencies]
+# Cuts the interface's CJK faces to the catalogs' characters; the subsetter stays out of the app.
+craft-fonts-build = { workspace = true, features = ["subset"] }
 serde_json = { workspace = true }
 toml = "1"

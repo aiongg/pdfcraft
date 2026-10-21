@@ -1,8 +1,8 @@
 //! Fonts from the optional craft-fonts build input (<https://github.com/storytold/craft-fonts>).
 //!
-//! `build.rs` embeds every font in craft-fonts' manifest when PdfCraft is built with
-//! `CRAFT_FONTS_DIR=<checkout>`; otherwise [`CRAFT_FONTS`] is empty and everything here returns
-//! nothing. Callers must work either way.
+//! `build.rs` embeds every font in craft-fonts' manifest that AGENTS.md §1.1 allows
+//! (`src/barred.rs`) when PdfCraft is built with `CRAFT_FONTS_DIR=<checkout>`; otherwise
+//! [`CRAFT_FONTS`] is empty and everything here returns nothing. Callers must work either way.
 
 /// A font from the optional craft-fonts build input (empty unless built with `CRAFT_FONTS_DIR`).
 pub struct CraftFont {
@@ -27,8 +27,8 @@ impl CraftFont {
     }
 }
 
-/// The `Jpan` craft-fonts faces in the order the interface prefers them: BIZ UDPGothic (a UI
-/// face) first, then the rest in manifest order. Empty without craft-fonts.
+/// The `Jpan` craft-fonts faces, BIZ UDPGothic (a sans face) first, then the rest in manifest
+/// order. Empty without craft-fonts. The interface draws Japanese with its own cut instead.
 pub fn ui_japanese_fonts() -> Vec<&'static CraftFont> {
     let mut fonts: Vec<&CraftFont> = CRAFT_FONTS.iter().filter(|f| f.covers("Jpan")).collect();
     // Stable: manifest order within each group.

@@ -3,6 +3,7 @@
 
 use std::sync::{Arc, OnceLock};
 
+use craft_fonts_build::EmbeddedFace;
 use craft_ui::fonts::{CraftFace, FaceList, Family, I18nScripts, Stack, SystemFonts, UiFonts};
 
 use egui::epaint::text::{FontTweak, HintingTarget, SmoothHinting};
@@ -204,8 +205,9 @@ pub const SYSTEM_HAN: &str = "system-han";
 /// 1. Inter (Inter Medium and SemiBold heading the `medium` and `semibold` families) and, for
 ///    code, JetBrains Mono, which falls back to Inter for the letters it lacks (Bulgarian ѝ);
 /// 2. the faces of the optional craft-fonts build input (`CRAFT_FONTS_DIR`) for the UI language,
-///    then for every other interface language: none without it. An Arabic interface puts its
-///    Arabic face first, so rows are tall enough for its marks;
+///    then for every other interface language: none without it. CJK faces are the interface cuts
+///    ([`craft_faces`]). An Arabic interface puts its Arabic face first, so rows are tall enough
+///    for its marks;
 /// 3. with `installed`, on desktop, faces already installed on this machine
 ///    ([`crate::system_fonts`]) for characters no embedded face has: an Arabic file name in a build
 ///    without craft-fonts, Hindi, Telugu (#1531), Sinhala and Tamil (#1688). In a Chinese interface
@@ -279,15 +281,27 @@ fn font_stack_with(platform: FontPolicyPlatform, language: &str, installed: Opti
     stack
 }
 
-/// The craft-fonts faces this build embedded ([`pdfcraft_fonts::CRAFT_FONTS`]; empty unless
-/// built with `CRAFT_FONTS_DIR`).
-fn craft_faces() -> &'static [CraftFace] {
+/// The interface's CJK faces: craft-fonts' interface faces cut to the characters of the catalogs
+/// (`build.rs`). Empty unless built with `CRAFT_FONTS_DIR`.
+static UI_CJK_FACES: &[EmbeddedFace] = include!(concat!(env!("OUT_DIR"), "/ui_craft_fonts.rs"));
+
+/// Script tags of CJK faces, which the interface takes from [`UI_CJK_FACES`] only.
+const CJK_SCRIPTS: [&str; 6] = ["Hans", "Hant", "Hant-HK", "Jpan", "Kore", "Hani"];
+
+/// The craft-fonts faces of the interface (empty unless built with `CRAFT_FONTS_DIR`): the CJK cuts,
+/// then the other scripts' whole faces from [`pdfcraft_fonts::CRAFT_FONTS`], which documents use
+/// too, so they are embedded once.
+pub fn craft_faces() -> &'static [CraftFace] {
     static FACES: OnceLock<Vec<CraftFace>> = OnceLock::new();
     FACES.get_or_init(|| {
-        pdfcraft_fonts::CRAFT_FONTS
-            .iter()
-            .map(|f| CraftFace { family: f.family, style: f.style, scripts: f.scripts, bytes: f.bytes, index: 0 })
-            .collect()
+        let others = pdfcraft_fonts::CRAFT_FONTS.iter().filter(|f| !CJK_SCRIPTS.iter().any(|s| f.covers(s))).map(|f| CraftFace {
+            family: f.family,
+            style: f.style,
+            scripts: f.scripts,
+            bytes: f.bytes,
+            index: 0,
+        });
+        UI_CJK_FACES.iter().copied().map(CraftFace::from).chain(others).collect()
     })
 }
 

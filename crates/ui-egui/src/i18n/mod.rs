@@ -1057,28 +1057,20 @@ mod tests {
         assert!(missing.is_empty(), "untranslated Italian UI literals: {missing:#?}");
     }
 
-    /// With craft-fonts, every Japanese translation has glyphs: with all interface faces (desktop)
-    /// and with BIZ UDPGothic Regular alone (the web build's only Japanese face).
+    /// With craft-fonts, every Japanese translation has glyphs in the interface fonts, whose only
+    /// Japanese face is BIZ UDPGothic Regular cut to the catalogs' characters (desktop and web).
     #[test]
     fn japanese_labels_have_glyphs() {
-        let craft = pdfcraft_fonts::ui_japanese_fonts();
-        let Some(web) = craft.iter().find(|f| f.family == "BIZ UDPGothic" && f.style == "Regular") else {
+        if !crate::theme::craft_faces().iter().any(|f| f.scripts.contains(&"Jpan")) {
             eprintln!("skipping Japanese glyph checks: build with CRAFT_FONTS_DIR to run them");
             return;
-        };
+        }
         let (entries, _) = parse_entries(JA().0.source, 1);
         let labels: String = entries.iter().flat_map(|e| e.translation.chars()).chain(JA().name().chars()).filter(|c| !c.is_control()).collect();
-        let web_name = web.name();
-        let mut web_only = crate::theme::font_definitions();
-        for family in web_only.families.values_mut() {
-            family.retain(|name| !pdfcraft_fonts::CRAFT_FONTS.iter().any(|face| face.name() == *name) || *name == web_name);
-        }
         use egui::epaint::text::{Fonts, TextOptions};
-        for (build, defs) in [("desktop", crate::theme::font_definitions()), ("web", web_only)] {
-            let mut fonts = Fonts::new(TextOptions::default(), defs);
-            for id in [egui::FontId::proportional(13.0), egui::FontId::monospace(13.0), crate::theme::medium(13.0), crate::theme::semibold(17.0)] {
-                assert!(fonts.has_glyphs(&id, &labels), "{build}: {id:?} lacks a Japanese label glyph");
-            }
+        let mut fonts = Fonts::new(TextOptions::default(), crate::theme::font_definitions());
+        for id in [egui::FontId::proportional(13.0), egui::FontId::monospace(13.0), crate::theme::medium(13.0), crate::theme::semibold(17.0)] {
+            assert!(fonts.has_glyphs(&id, &labels), "{id:?} lacks a Japanese label glyph");
         }
     }
 

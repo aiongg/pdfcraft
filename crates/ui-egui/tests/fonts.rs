@@ -22,7 +22,7 @@ fn layout_widths(fonts: &mut Fonts, text: &str) -> Vec<f32> {
 }
 
 fn embedded(script: &str) -> bool {
-    pdfcraft_fonts::CRAFT_FONTS.iter().any(|f| f.covers(script))
+    theme::craft_faces().iter().any(|f| f.scripts.contains(&script))
 }
 
 /// The craft-fonts script tag a language's interface text needs; `None` for the scripts Inter has.
@@ -40,8 +40,9 @@ fn craft_script(code: &str) -> Option<&'static str> {
 /// Every shipped translation and every language's own name (the Preferences menu) draws with the
 /// embedded faces alone, no installed fonts. A language in a script Inter lacks is checked when
 /// the build has a craft-fonts face for it: run with `CRAFT_FONTS_DIR` to check what a release
-/// embeds. craft-fonts has no Chinese face PdfCraft may embed (its Noto Sans CJK is Source Han,
-/// AGENTS.md §1.1) and no Telugu face yet, so those interfaces still rely on installed fonts.
+/// embeds. craft-fonts has no Chinese or Korean face PdfCraft may embed (Noto Sans CJK and its
+/// Noto Sans SC/TC/HK/KR UI cuts are Source Han, AGENTS.md §1.1) and no Telugu face yet, so those
+/// interfaces still rely on installed fonts.
 #[test]
 fn ui_fonts_cover_every_catalog() {
     let checked: Vec<_> = LANGUAGES
@@ -78,6 +79,25 @@ fn ui_fonts_cover_every_catalog() {
     }
     assert!(samples.len() > 1000, "{}", samples.len());
     assert_covers(&theme::font_stack("en", false), samples);
+}
+
+/// The interface's CJK faces are the build-time cuts, never the whole faces documents use, and
+/// never a Noto CJK face (AGENTS.md §1.1).
+#[test]
+fn interface_cjk_faces_are_cuts() {
+    let cjk = ["Hans", "Hant", "Hant-HK", "Jpan", "Kore", "Hani"];
+    let faces: Vec<_> = theme::craft_faces().iter().filter(|f| f.scripts.iter().any(|s| cjk.contains(s))).collect();
+    if pdfcraft_fonts::CRAFT_FONTS.iter().any(|f| f.family == "BIZ UDPGothic") {
+        assert!(faces.iter().any(|f| f.family == "BIZ UDPGothic"), "no Japanese interface face");
+    } else {
+        eprintln!("interface_cjk_faces_are_cuts: built without craft-fonts (set CRAFT_FONTS_DIR to run it)");
+    }
+    for face in faces {
+        assert!(!face.family.starts_with("Noto "), "{} is embedded", face.name());
+        if let Some(whole) = pdfcraft_fonts::CRAFT_FONTS.iter().find(|d| d.name() == face.name()) {
+            assert!(face.bytes.len() < whole.bytes.len() / 4, "{}: {} of {} bytes", face.name(), face.bytes.len(), whole.bytes.len());
+        }
+    }
 }
 
 /// Every family starts with PdfCraft's own face in a Latin, Japanese or Chinese interface: Latin
