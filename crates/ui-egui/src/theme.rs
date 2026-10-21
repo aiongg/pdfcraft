@@ -3,7 +3,7 @@
 
 use std::sync::{Arc, OnceLock};
 
-use craft_ui::fonts::{CraftFace, Family, I18nScripts, Stack, SystemFonts, UiFonts};
+use craft_ui::fonts::{CraftFace, FaceList, Family, I18nScripts, Stack, SystemFonts, UiFonts};
 
 use egui::epaint::text::{FontTweak, HintingTarget, SmoothHinting};
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Response, Stroke, Vec2, Visuals};
@@ -193,13 +193,7 @@ pub fn install_fonts(ctx: &egui::Context) {
 /// with the installed faces on desktop ([`font_stack`]). Call it when the language changes; the new
 /// faces take effect next frame.
 pub fn install_fonts_for(ctx: &egui::Context, language: &str) {
-    // Installing raises the minimum widget height to a row of the language's faces plus twice the
-    // button padding. PdfCraft's controls pad themselves, so the fit takes egui's default padding,
-    // as it does at startup, before [`apply`]: a Latin interface keeps egui's height.
-    let padding = ctx.global_style().spacing.button_padding;
-    ctx.all_styles_mut(|s| s.spacing.button_padding = egui::style::Spacing::default().button_padding);
     font_stack(language, true).install(ctx);
-    ctx.all_styles_mut(|s| s.spacing.button_padding = padding);
 }
 
 /// The name [`font_stack`] gives the installed Chinese face of a Chinese interface.
@@ -225,12 +219,24 @@ pub fn font_stack(language: &str, installed: bool) -> Stack {
 }
 
 fn font_stack_on(platform: FontPolicyPlatform, language: &str, installed: bool) -> Stack {
+    #[cfg(not(target_arch = "wasm32"))]
+    let installed = installed.then(installed::faces).flatten().map(|faces| (faces, installed::han(language)));
+    #[cfg(target_arch = "wasm32")]
+    let installed = {
+        let _ = installed;
+        None
+    };
+    font_stack_with(platform, language, installed)
+}
+
+/// [`font_stack`] with `installed`: the installed faces asked after the craft faces and, for a
+/// Chinese interface, the installed Chinese face ([`SYSTEM_HAN`]).
+fn font_stack_with(platform: FontPolicyPlatform, language: &str, installed: Option<(FaceList, Option<FontData>)>) -> Stack {
     let face = |name: &str, bytes: &'static [u8]| FontData::from_static(bytes).tweak(primary_font_tweak(platform, name));
     let medium = FontFamily::Name("medium".into());
     let semibold = FontFamily::Name("semibold".into());
     let codes: Vec<&str> = crate::i18n::LANGUAGES.iter().map(|l| l.code).collect();
-    #[cfg_attr(target_arch = "wasm32", expect(unused_mut))]
-    let mut fonts = UiFonts::new(&I18nScripts)
+    let fonts = UiFonts::new(&I18nScripts)
         .app_face("Inter-Medium", face("Inter-Medium", include_bytes!("../../../assets/fonts/Inter-Medium.ttf")), std::slice::from_ref(&medium))
         .app_face(
             "Inter-SemiBold",
@@ -244,20 +250,16 @@ fn font_stack_on(platform: FontPolicyPlatform, language: &str, installed: bool) 
         .family(Family::named("semibold").weight(600))
         .craft_faces(craft_faces())
         .languages(&codes)
-        .ui_language(language)
-        .system_fonts(SystemFonts::Off);
-    #[cfg(not(target_arch = "wasm32"))]
-    let han = if installed && let Some(faces) = installed::faces() {
-        fonts = fonts.system_fonts(SystemFonts::AfterCraft).system_provider(Arc::new(faces));
-        installed::han(language)
-    } else {
-        None
+        .ui_language(language);
+    let (fonts, han) = match installed {
+        Some((faces, han)) => (fonts.system_fonts(SystemFonts::AfterCraft).system_provider(Arc::new(faces)), han),
+        None => (fonts.system_fonts(SystemFonts::Off), None),
     };
-    #[cfg(target_arch = "wasm32")]
-    let _ = installed;
     let mut stack = fonts.stack();
-    #[cfg(not(target_arch = "wasm32"))]
-    if let Some(han) = han {
+    if let Some(mut han) = han {
+        // craft-ui puts the faces its providers find on the interface's baseline; this one goes
+        // into the stack ahead of the craft faces, so it needs the same (#1676).
+        han.tweak.set_baseline_fallback(true);
         let japanese: Vec<String> = craft_faces().iter().filter(|f| f.scripts.contains(&"Jpan")).map(CraftFace::name).collect();
         let families: Vec<FontFamily> = stack.definitions.families.keys().cloned().collect();
         for family in families {
@@ -345,20 +347,7 @@ pub fn font_definitions() -> FontDefinitions {
 }
 
 fn font_definitions_on(platform: FontPolicyPlatform) -> FontDefinitions {
-    let mut definitions = font_stack_on(platform, crate::i18n::Lang::EN.code(), false).definitions;
-    let egui = FontDefinitions::default();
-    for (family, chain) in &mut definitions.families {
-        let tail = egui.families.get(family).or_else(|| egui.families.get(&FontFamily::Proportional));
-        for name in tail.into_iter().flatten() {
-            if let Some(data) = egui.font_data.get(name)
-                && !chain.contains(name)
-            {
-                definitions.font_data.entry(name.clone()).or_insert_with(|| Arc::clone(data));
-                chain.push(name.clone());
-            }
-        }
-    }
-    definitions
+    font_stack_on(platform, crate::i18n::Lang::EN.code(), false).flat_definitions()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -377,14 +366,6 @@ fn primary_font_tweak(platform: FontPolicyPlatform, name: &str) -> FontTweak {
         tweak.hinting_target = HintingTarget::Smooth(SmoothHinting { symmetric_rendering: false, ..SmoothHinting::default() });
     }
     tweak
-}
-
-/// `data` set to sit on the interface's baseline when it is a fallback (#1676): without this, egui
-/// centres a fallback face's line box on Inter's, so Chinese next to Latin in one label sits higher
-/// or lower than the Latin by a few percent of the font size, depending on the installed face.
-pub(crate) fn on_interface_baseline(mut data: FontData) -> FontData {
-    data.tweak.set_baseline_fallback(true);
-    data
 }
 
 pub fn regular(size: f32) -> FontId {
@@ -570,29 +551,38 @@ mod tests {
         )
     }
 
-    /// The vertical position of each glyph of `text` laid out by egui at `size` points, with Inter
-    /// first and `fallback` after it.
-    fn glyph_tops(fallback: FontData, size: f32, text: &str) -> Vec<f32> {
-        let mut defs = FontDefinitions::empty();
-        defs.font_data.insert("Inter".into(), Arc::new(FontData::from_static(pdfcraft_fonts::INTER_REGULAR)));
-        defs.font_data.insert("fallback".into(), Arc::new(fallback));
-        defs.families.insert(FontFamily::Proportional, vec!["Inter".into(), "fallback".into()]);
-        let mut fonts = Fonts::new(TextOptions::default(), defs);
-        let g = galley(&mut fonts, FontFamily::Proportional, size, 1.0, text);
+    fn glyph_tops(fonts: &mut Fonts, size: f32, text: &str) -> Vec<f32> {
+        let g = galley(fonts, FontFamily::Proportional, size, 1.0, text);
         g.rows[0].glyphs.iter().map(|gl| gl.pos.y).collect()
     }
 
     #[test]
-    fn fallback_faces_share_the_interface_baseline() {
+    fn installed_faces_share_the_interface_baseline() {
         // Dancing Script's metrics differ from Inter's the way a Chinese face's do (by 0.044 em),
-        // and it has letters Inter doesn't (Ǆ), which egui then takes from it.
-        let dancing: &'static [u8] = include_bytes!("../../../assets/fonts/DancingScript.ttf");
+        // and it has a letter no embedded face has (Ǆ), which egui then takes from it.
+        let dancing = || FontData::from_static(include_bytes!("../../../assets/fonts/DancingScript.ttf"));
         let size = 100.0;
         // As egui lays it out by itself, Ǆ sits ~4 pt off H's baseline: the bug (#1676).
-        let raw = glyph_tops(FontData::from_static(dancing), size, "HǄ");
+        let mut defs = FontDefinitions::empty();
+        defs.font_data.insert("Inter".into(), Arc::new(FontData::from_static(pdfcraft_fonts::INTER_REGULAR)));
+        defs.font_data.insert("fallback".into(), Arc::new(dancing()));
+        defs.families.insert(FontFamily::Proportional, vec!["Inter".into(), "fallback".into()]);
+        let raw = glyph_tops(&mut Fonts::new(TextOptions::default(), defs), size, "HǄ");
         assert!((raw[1] - raw[0]).abs() > 3.0, "the test fonts must differ: {raw:?}");
-        let aligned = glyph_tops(on_interface_baseline(FontData::from_static(dancing)), size, "HǄ");
-        assert_eq!(aligned[1], aligned[0], "{aligned:?}");
+
+        let mut installed = FaceList::default();
+        installed.insert("installed", dancing());
+        installed.set_chain(FontFamily::Proportional, vec!["installed".into()]);
+        let stack = font_stack_with(FontPolicyPlatform::Other, "de", Some((installed, None)));
+        let width = |mut fonts: Fonts| galley(&mut fonts, FontFamily::Proportional, size, 1.0, "Ǆ").size().x;
+        assert_ne!(width(stack.fonts(true)), width(stack.fonts(false)), "the installed face draws Ǆ");
+        let aligned = glyph_tops(&mut stack.fonts(true), size, "HǄ");
+        assert_eq!(aligned[1], aligned[0], "an installed face: {aligned:?}");
+
+        let stack = font_stack_with(FontPolicyPlatform::Other, "zh-hans", Some((FaceList::default(), Some(dancing()))));
+        assert!(stack.chain(&FontFamily::Proportional).iter().any(|n| n == SYSTEM_HAN));
+        let aligned = glyph_tops(&mut stack.fonts(false), size, "HǄ");
+        assert_eq!(aligned[1], aligned[0], "the installed Chinese face: {aligned:?}");
     }
 
     #[test]

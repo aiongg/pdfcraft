@@ -199,22 +199,30 @@ fn chinese_ui_uses_an_installed_chinese_face() {
     }
 }
 
-/// Widgets are as tall in a Latin interface after a language switch as at startup; an Arabic
+/// Latin widgets keep egui's 20 px height under PdfCraft's 5 px button padding, whether the theme
+/// is applied before or after the fonts are installed, and after a language switch; an Arabic
 /// interface with an Arabic face makes them taller to fit its rows, and switching back undoes it.
 #[test]
 fn language_switch_keeps_the_widget_height() {
-    let ctx = egui::Context::default();
-    theme::install_fonts(&ctx);
-    theme::apply(&ctx, theme::ThemeKind::default());
-    let height = || ctx.global_style().spacing.interact_size.y;
-    let startup = height();
-    theme::install_fonts_for(&ctx, "de");
-    assert_eq!(height(), startup);
-    if embedded("Arab") {
-        theme::install_fonts_for(&ctx, "ar");
-        assert!(height() > startup, "{} vs {startup}", height());
+    let installed_first = egui::Context::default();
+    theme::install_fonts(&installed_first);
+    theme::apply(&installed_first, theme::ThemeKind::default());
+    let applied_first = egui::Context::default();
+    theme::apply(&applied_first, theme::ThemeKind::default());
+    theme::install_fonts(&applied_first);
+    for ctx in [installed_first, applied_first] {
+        ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
+        let height = || ctx.global_style().spacing.interact_size.y;
+        assert_eq!(ctx.global_style().spacing.button_padding.y, 5.0);
+        assert_eq!(height(), 20.0);
         theme::install_fonts_for(&ctx, "de");
-        assert_eq!(height(), startup);
+        assert_eq!(height(), 20.0);
+        if embedded("Arab") {
+            theme::install_fonts_for(&ctx, "ar");
+            assert!(height() > 20.0, "{}", height());
+            theme::install_fonts_for(&ctx, "de");
+            assert_eq!(height(), 20.0);
+        }
     }
 }
 
