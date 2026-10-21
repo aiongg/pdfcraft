@@ -4,7 +4,7 @@
 use std::sync::{Arc, OnceLock};
 
 use craft_fonts_build::EmbeddedFace;
-use craft_ui::fonts::{CraftFace, FaceList, Family, I18nScripts, Stack, SystemFonts, UiFonts};
+use craft_ui::fonts::{CraftFace, Emoji, FaceList, Family, I18nScripts, Stack, SystemFonts, UiFonts};
 
 use egui::epaint::text::{FontTweak, HintingTarget, SmoothHinting};
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Response, Stroke, Vec2, Visuals};
@@ -251,6 +251,7 @@ fn font_stack_with(platform: FontPolicyPlatform, language: &str, installed: Opti
         .family(Family::named("medium").weight(500))
         .family(Family::named("semibold").weight(600))
         .craft_faces(craft_faces())
+        .emoji(emoji())
         .languages(&codes)
         .ui_language(language);
     let (fonts, han) = match installed {
@@ -281,28 +282,36 @@ fn font_stack_with(platform: FontPolicyPlatform, language: &str, installed: Opti
     stack
 }
 
-/// The interface's CJK faces: craft-fonts' interface faces cut to the characters of the catalogs
-/// (`build.rs`). Empty unless built with `CRAFT_FONTS_DIR`.
-static UI_CJK_FACES: &[EmbeddedFace] = include!(concat!(env!("OUT_DIR"), "/ui_craft_fonts.rs"));
+/// The interface's own craft-fonts faces (`build.rs`): the CJK cuts to the catalogs' characters,
+/// the other scripts only the interface draws, symbols and emoji. Empty unless built with
+/// `CRAFT_FONTS_DIR`.
+static UI_FACES: &[EmbeddedFace] = include!(concat!(env!("OUT_DIR"), "/ui_craft_fonts.rs"));
 
-/// Script tags of CJK faces, which the interface takes from [`UI_CJK_FACES`] only.
-const CJK_SCRIPTS: [&str; 6] = ["Hans", "Hant", "Hant-HK", "Jpan", "Kore", "Hani"];
+/// ISO 15924 `Zsye`, the emoji faces' script tag.
+const EMOJI: &str = "Zsye";
 
-/// The craft-fonts faces of the interface (empty unless built with `CRAFT_FONTS_DIR`): the CJK cuts,
-/// then the other scripts' whole faces from [`pdfcraft_fonts::CRAFT_FONTS`], which documents use
-/// too, so they are embedded once.
+/// The craft-fonts text faces of the interface (empty unless built with `CRAFT_FONTS_DIR`): its own
+/// faces but emoji, then the non-CJK faces of [`pdfcraft_fonts::CRAFT_FONTS`] (Arabic, Thai), which
+/// documents use too, so they are embedded once. CJK text takes only the cuts.
 pub fn craft_faces() -> &'static [CraftFace] {
     static FACES: OnceLock<Vec<CraftFace>> = OnceLock::new();
     FACES.get_or_init(|| {
-        let others = pdfcraft_fonts::CRAFT_FONTS.iter().filter(|f| !CJK_SCRIPTS.iter().any(|s| f.covers(s))).map(|f| CraftFace {
-            family: f.family,
-            style: f.style,
-            scripts: f.scripts,
-            bytes: f.bytes,
-            index: 0,
-        });
-        UI_CJK_FACES.iter().copied().map(CraftFace::from).chain(others).collect()
+        let own = UI_FACES.iter().filter(|f| !f.has_script(EMOJI));
+        let documents = pdfcraft_fonts::CRAFT_FONTS.iter().filter(|f| !f.is_cjk());
+        own.chain(documents).copied().map(CraftFace::from).collect()
     })
+}
+
+/// The interface's emoji faces, asked after the installed fonts: Noto Color Emoji, then the
+/// monochrome Noto Emoji. None on the web or without craft-fonts.
+fn emoji() -> Emoji {
+    let face = |colour: bool| {
+        UI_FACES
+            .iter()
+            .find(|f| f.has_script(EMOJI) && f.family.contains("Color") == colour)
+            .map(|f| FontData { index: f.index, ..FontData::from_static(f.bytes) })
+    };
+    Emoji { color: face(true), monochrome: face(false), ..Emoji::default() }
 }
 
 /// Faces installed on this machine, read at runtime and never embedded (AGENTS.md §1.4).

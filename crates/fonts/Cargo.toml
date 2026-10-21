@@ -15,3 +15,9 @@ skrifa = "0.44"
 # Arabic shaping for text written into PDFs; already in the tree via egui, on the same read-fonts.
 harfrust = "0.12"
 unicode-bidi = "0.3"
+# The type of the craft-fonts table build.rs writes.
+craft-fonts-build = { workspace = true }
+
+[build-dependencies]
+# Embeds the document fonts the app names (build.rs).
+craft-fonts-build = { workspace = true }

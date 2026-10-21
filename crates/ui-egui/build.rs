@@ -8,9 +8,10 @@
 //!
 //! A missing or malformed file gives empty tables (or no names) and a warning.
 //!
-//! It also embeds the interface's CJK faces from the optional craft-fonts build input
+//! It also embeds the interface's faces from the optional craft-fonts build input
 //! (`CRAFT_FONTS_DIR`) as `ui_craft_fonts.rs`: craft-fonts' interface faces (`role ui`), cut to the
-//! characters of the catalogs in `src/i18n` ([`ui_fonts`]).
+//! characters of the catalogs in `src/i18n`, and the other faces only the interface draws with
+//! ([`ui_fonts`]).
 
 use std::fmt::Write as _;
 
@@ -33,14 +34,19 @@ fn main() {
 
 include!("../fonts/src/barred.rs");
 
-/// The interface's CJK faces: craft-fonts' interface faces that AGENTS.md §1.1 allows, cut to the
-/// characters of every catalog (each face gets every catalog's characters). The interface's other
-/// scripts use the whole faces of `pdfcraft_fonts::CRAFT_FONTS`, which documents need anyway.
+include!("../fonts/src/families.rs");
+
+/// The interface's own craft-fonts faces: the interface faces (`role ui`) that AGENTS.md §1.1
+/// allows, cut to the characters of every catalog (each face gets every catalog's characters),
+/// and the interface families of `families.rs`, whole. The interface shares the document families
+/// (Arabic, Thai) with `pdfcraft_fonts::CRAFT_FONTS`, so they are embedded once. The web build
+/// keeps only the cuts.
 fn ui_fonts() {
-    let catalogs = catalogs();
+    let wasm = craft_fonts_build::target_is_wasm();
     let embedded = craft_fonts_build::Embed::new()
-        .subset_to(catalogs)
-        .filter(|face| {
+        .for_ui()
+        .subset_to(catalogs())
+        .filter(move |face| {
             let scripts: Vec<&str> = face.scripts.iter().map(String::as_str).collect();
             if barred(&face.family, &scripts) {
                 if face.is_ui() {
@@ -48,8 +54,9 @@ fn ui_fonts() {
                 }
                 return false;
             }
-            face.is_ui() && face.is_cjk()
+            face.is_ui() || (!wasm && INTERFACE_FAMILIES.contains(&face.family.as_str()))
         })
+        .embedded_elsewhere(DOCUMENT_FAMILIES)
         .write("ui_craft_fonts.rs");
     if let Err(e) = embedded {
         println!("cargo::error={e}");

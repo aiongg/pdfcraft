@@ -2812,8 +2812,8 @@ mod tests {
     #[test]
     fn fallback_face_moves_on_when_the_best_face_lacks_a_character() {
         static JPAN: &[&str] = &["Jpan"];
-        let mincho = CraftFont { family: "Mincho", style: "Regular", scripts: JPAN, bytes: b"" };
-        let gothic = CraftFont { family: "Gothic", style: "Regular", scripts: JPAN, bytes: b"" };
+        let mincho = CraftFont { family: "Mincho", style: "Regular", scripts: JPAN, index: 0, bytes: b"" };
+        let gothic = CraftFont { family: "Gothic", style: "Regular", scripts: JPAN, index: 0, bytes: b"" };
         let faces = [&mincho, &gothic];
         // Only the Gothic face has the Cyrillic letter.
         let has = |face: &CraftFont, ch: char| ch.is_ascii() || face.family == "Gothic";
@@ -2828,7 +2828,7 @@ mod tests {
     #[test]
     fn hebrew_and_japanese_fallback_shards_are_recognized_as_ours() {
         static HEBR: &[&str] = &["Hebr"];
-        let face = CraftFont { family: "FakeHebrew", style: "Regular", scripts: HEBR, bytes: b"" };
+        let face = CraftFont { family: "FakeHebrew", style: "Regular", scripts: HEBR, index: 0, bytes: b"" };
         let glyph = |code, ch| Type3Glyph { code, ch, path: b"0 0 0 0 0 0 d1\nf\n".to_vec(), width: 0.5 };
         let mut doc = Document::new_empty();
         let mut fonts = Dict::new();

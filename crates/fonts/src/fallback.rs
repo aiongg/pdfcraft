@@ -182,7 +182,7 @@ pub fn substitute(req: &Request<'_>) -> Substitution {
     }
     if let Some(script) = req.ordering.and_then(script_for) {
         // A script we hold a face for; otherwise there is no honest substitute to offer.
-        return match crate::CRAFT_FONTS.iter().find(|f| f.covers(script)) {
+        return match crate::CRAFT_FONTS.iter().find(|f| f.has_script(script)) {
             Some(f) => at(Face::Craft(f), Why::ScriptFace),
             None => at(Face::None, Why::NoFaceForScript),
         };
@@ -320,7 +320,7 @@ mod tests {
         // craft-fonts is an optional build input, so both outcomes are correct -- but they must be
         // distinguishable, and neither may be a silent Latin stand-in.
         let s = substitute(&req("SomeJapaneseFont", false, 0, Some("Japan1")));
-        if crate::CRAFT_FONTS.iter().any(|f| f.covers("Jpan")) {
+        if crate::CRAFT_FONTS.iter().any(|f| f.has_script("Jpan")) {
             assert_eq!(s.why, Why::ScriptFace);
             assert!(matches!(s.face, Face::Craft(_)));
             assert!(s.face_name().is_some_and(|n| !n.is_empty()));

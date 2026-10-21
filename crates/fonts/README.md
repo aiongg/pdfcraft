@@ -19,14 +19,18 @@ Today it holds what generated appearances need without a font program:
   `set_undrawn_mark` (`UNDRAWN_MARK`, read back by `undrawn_mark`) so the edit is reported and
   flattening refuses. `script_missing` names what the typed-signature script font and its Inter fallback both lack.
 
-It also holds the fonts of the optional [craft-fonts](https://github.com/storytold/craft-fonts)
-build input. `build.rs` embeds them as `CRAFT_FONTS` when the build sets
-`CRAFT_FONTS_DIR=<checkout>` (and fails if it can't while `CRAFT_FONTS_REQUIRED=1`, as releases
-set). The faces are whole: they draw text written into PDFs, the renderer's Japanese substitutes,
-and the interface's non-CJK scripts. The interface's CJK faces are cuts to its catalogs'
-characters, which `crates/ui-egui/build.rs` embeds. Both tables leave out the faces AGENTS.md §1.1
-bars (`src/barred.rs`: Adobe's Source families, and every Noto face for a CJK script). Without
-that variable `CRAFT_FONTS` is empty and everything below copes:
+It also holds the document fonts of the optional [craft-fonts](https://github.com/storytold/craft-fonts)
+build input. `build.rs` embeds them as `CRAFT_FONTS` (`craft_fonts_build::EmbeddedFace` values)
+when the build sets `CRAFT_FONTS_DIR=<checkout>`, and fails if it can't while
+`CRAFT_FONTS_REQUIRED=1`, as releases set. It embeds the families `src/families.rs` names for
+documents, whole: Shippori Mincho, BIZ UDMincho and BIZ UDPGothic (Japanese text written into
+PDFs and the renderer's Japanese substitutes), Noto Sans Arabic and Noto Sans Thai. The
+interface draws Arabic and Thai with them too; its other faces (CJK cuts to its catalogs'
+characters, Noto Sans, Georgian, Armenian, Ethiopic, symbols, maths and emoji) are embedded by
+`crates/ui-egui/build.rs`. A family joins the list when a document code path needs it (Noto Sans
+Hebrew and a Telugu face once craft-fonts has them). Both tables leave out the faces AGENTS.md
+§1.1 bars (`src/barred.rs`: Adobe's Source families, and every Noto face for a CJK script).
+Without that variable `CRAFT_FONTS` is empty and everything below copes:
 
 - `ui_japanese_fonts`: the `Jpan` faces, BIZ UDPGothic first (the renderer's Japanese substitutes).
 - `ui_chinese_fonts`: the `Hans` faces, in manifest order (without one,
@@ -74,7 +78,7 @@ only Gothic Regular, so it cannot preserve bold. No new font assets or changes t
 needed.
 
 wasm32 builds embed only BIZ UDPGothic Regular and any `Arab`, `Telu`, `Hebr` or `Thai` face, to keep the web build small: the web build
-currently has no Chinese face, so Chinese there still shows the replacement glyph.
+has no Chinese face, so Chinese there shows the replacement glyph.
 Font files are never
 committed here (`AGENTS.md` §1.4; team members: [craftrules `standards/fonts.md`](https://github.com/storytold/craftrules/blob/main/standards/fonts.md), internal).
 
