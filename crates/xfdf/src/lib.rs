@@ -246,6 +246,14 @@ fn nums_of(doc: &Document, o: Option<&Object>) -> Vec<f64> {
     o.map(|o| doc.resolve(o)).and_then(|a| a.as_array().map(|a| a.iter().filter_map(|x| doc.resolve(x).as_f64()).collect())).unwrap_or_default()
 }
 
+/// Whether a quad's four corners enclose any area: some three of them are not collinear.
+fn quad_has_area(q: &[f64; 8]) -> bool {
+    let [ax, ay, bx, by, cx, cy, dx, dy] = *q;
+    let cross = |(px, py): (f64, f64), (qx, qy): (f64, f64), (rx, ry): (f64, f64)| (qx - px) * (ry - py) - (qy - py) * (rx - px);
+    let (a, b, c, d) = ((ax, ay), (bx, by), (cx, cy), (dx, dy));
+    [cross(a, b, c), cross(a, b, d), cross(a, c, d), cross(b, c, d)].iter().any(|v| v.abs() > 0.0)
+}
+
 fn text_of(doc: &Document, d: &Dict, k: &[u8]) -> Option<String> {
     d.get(k).and_then(|o| match &*doc.resolve(o) {
         Object::String(s) => Some(s.to_text()),
@@ -1036,13 +1044,15 @@ fn place(doc: &mut Document, page_ref: ObjRef, mut d: Dict) -> Result<ObjRef, Da
         // without usable /QuadPoints removes its /Rect, which the outline is then drawn from.
         d.remove(b"CA");
         d.remove(b"ca");
-        let quads_drawable = d
-            .get(b"QuadPoints")
-            .and_then(Object::as_array)
-            .is_some_and(|q| !q.is_empty() && q.len() % 8 == 0 && q.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)));
+        let quads_drawable = d.get(b"QuadPoints").and_then(Object::as_array).is_some_and(|q| {
+            let v: Vec<f64> = q.iter().filter_map(Object::as_f64).filter(|v| v.is_finite()).collect();
+            let (quads, rest) = v.as_chunks::<8>();
+            v.len() == q.len() && rest.is_empty() && !quads.is_empty() && quads.iter().all(quad_has_area)
+        });
         if !quads_drawable {
-            // Quads the outline can't draw are replaced by the /Rect's, or dropped when there is
-            // no usable /Rect either; such a mark then removes nothing.
+            // Quads the outline can't draw, or any quad that encloses no area, are replaced by the
+            // /Rect's, or dropped when there is no usable /Rect either; such a mark then removes
+            // nothing.
             match nums_of(doc, d.get(b"Rect"))[..] {
                 [x0, y0, x1, y1] if [x0, y0, x1, y1].iter().all(|v| v.is_finite()) => {
                     let (l, r, b, t) = (x0.min(x1), x0.max(x1), y0.min(y1), y0.max(y1));

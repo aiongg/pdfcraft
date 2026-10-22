@@ -1717,3 +1717,37 @@ fn merged_spreadsheet_cells_never_start_a_formula() {
     assert_eq!(lines[0], "\"'=HYPERLINK(\"\"http://x\"\")\",Total,Plus,Balance,\"\tName\"");
     assert_eq!(lines[1], "'@SUM(A1),'-2+3,\"'\t+1+cmd\",-12.5,Ada");
 }
+
+fn imported_redact_mark(data: &[u8]) -> Dict {
+    let mut doc = blank();
+    assert_eq!(import(&mut doc, data).unwrap().comments, 1);
+    let page = pdfcraft_model::pages(&doc)[0].clone();
+    doc.resolve(page.dict.get(b"Annots").unwrap())
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|a| a.as_ref().and_then(|r| doc.get(r).as_dict().cloned()))
+        .find(|d| d.name(b"Subtype") == Some(b"Redact".as_slice()))
+        .unwrap()
+}
+
+#[test]
+fn an_imported_redaction_mark_with_zero_area_quads_falls_back_to_its_rect() {
+    let rect_quads = vec![60.0, 620.0, 560.0, 620.0, 60.0, 600.0, 560.0, 600.0];
+    let fdf = |quads: &str| {
+        format!(
+            "%FDF-1.2\n1 0 obj\n<< /FDF << /Annots [<< /Subtype /Redact /NM (r1) /Page 0 /Rect [60 600 560 620] /QuadPoints [{quads}] >>] >> >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n"
+        )
+    };
+    let cases = [
+        fdf("100 100 100 100 100 100 100 100").into_bytes(),
+        // A good quad beside one that is a line (all four corners collinear).
+        fdf("60 620 560 620 60 600 560 600 10 10 20 20 30 30 40 40").into_bytes(),
+        br#"<xfdf><annots><redact page="0" name="r1" rect="60,600,560,620" coords="5,5,5,5,5,5,5,5"/></annots></xfdf>"#.to_vec(),
+    ];
+    for data in cases {
+        let mark = imported_redact_mark(&data);
+        let quads: Vec<f64> = mark.get(b"QuadPoints").and_then(Object::as_array).unwrap().iter().filter_map(Object::as_f64).collect();
+        assert_eq!(quads, rect_quads, "zero-area quads were kept: {mark:?}");
+    }
+}
