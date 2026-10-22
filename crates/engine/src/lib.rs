@@ -232,6 +232,10 @@ pub struct DocId(pub u64);
 /// Undo/redo depth. Snapshots share unchanged data, so this is memory-cheap.
 const MAX_UNDO: usize = 100;
 
+/// The highest resolution a document that allows only low-resolution printing (Table 22, bit 12
+/// clear) is printed at.
+const LOW_RESOLUTION_PRINT_DPI: f64 = 150.0;
+
 /// The passwords that go with one state of a document (protection can change them).
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Keys {
@@ -4522,9 +4526,15 @@ impl Session {
         if !doc.allows_printing() {
             return Err(EditError::NotPermitted("printing"));
         }
+        // Table 22, bit 12 clear: only a low-level representation may be printed, so the pages
+        // always go as pictures, at no more than the low resolution.
+        let low_res = doc.permissions().is_some_and(|p| !p.print_high_quality()).then(|| print::Raster {
+            dpi: settings.raster.map_or(LOW_RESOLUTION_PRINT_DPI, |r| r.dpi.min(LOW_RESOLUTION_PRINT_DPI)),
+            grayscale: settings.raster.is_some_and(|r| r.grayscale),
+        });
         // Print as image: the pages used become pictures first, then the picture document is
         // imposed in their place (its page k is the k-th distinct source page used).
-        if let Some(raster) = &settings.raster {
+        if let Some(raster) = low_res.as_ref().or(settings.raster.as_ref()) {
             let mut distinct: Vec<usize> = Vec::new();
             for &p in &settings.pages {
                 if !distinct.contains(&p) {
