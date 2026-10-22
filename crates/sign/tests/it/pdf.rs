@@ -1785,6 +1785,7 @@ fn a_document_timestamp_held_by_a_signature_field_is_checked_as_a_timestamp() {
     // Without trusting the TSA the stamp is intact but unknown, never "altered".
     let s = signatures(&open(&stamped), &stamped, &TrustStore::default()).into_iter().find(|s| s.signed).unwrap();
     assert_eq!(s.status, Status::Unknown, "{:?}", s.details);
+    assert_eq!(s.timestamp_time, None, "an untrusted authority's time is not a trusted time");
     assert!(!s.details.iter().any(|d| d.message.contains("altered or corrupted")), "{:?}", s.details);
     // A changed byte in what it covers is still caught, and reported as the timestamp's.
     let mut tampered = stamped.clone();
@@ -2514,6 +2515,7 @@ fn a_timestamp_from_a_certificate_not_issued_for_time_stamping_is_not_trusted_ti
     let trust = TrustStore { certs: vec![tsa.id.certificate.clone()] };
     let s = signatures(&open(&stamped), &stamped, &trust).into_iter().find(|s| s.doc_timestamp).unwrap();
     assert_eq!(s.status, Status::Unknown, "{:?}", s.details);
+    assert_eq!(s.timestamp_time, None, "{:?}", s.details);
     assert!(s.details.iter().any(|d| d.message.contains("not issued for time stamping")), "{:?}", s.details);
     let id = pkcs12::open(&data("ec-p256.p12"), "test").unwrap();
     let signed = pdfcraft_sign::sign_with_timestamp(&open(&fixture()), &id, &opts(), &tsa).unwrap();

@@ -448,9 +448,9 @@ pub struct SignatureInfo {
     pub digest: Option<DigestAlg>,
     pub algorithm: Option<String>,
     pub timestamp: bool,
-    /// RFC 3161 generation time, when the token was validated and (for a signature's embedded
-    /// token) its authority chains to the trust store. An untrusted token's time is never
-    /// used as the validation time.
+    /// RFC 3161 generation time, when the token covers what it stamps and its authority's
+    /// certificate, valid at that time and issued for time stamping, chains to the trust store.
+    /// An untrusted token's time is never used as the validation time.
     pub timestamp_time: Option<Time>,
     pub status: Status,
     pub modification: Modification,
@@ -1076,7 +1076,6 @@ fn validate_doc_timestamp(doc: &Document, bytes: &[u8], v: &Dict, info: &mut Sig
         Err(e) => return invalid(info, Detail::of("The timestamp token could not be read ({}).", Fill::Reason(e.to_string()))),
     };
     info.digest = Some(token.digest);
-    info.timestamp_time = Some(token.gen_time);
     info.algorithm = Some(format!("RFC 3161 timestamp ({})", token.digest.name()));
     let doc_digest = token.digest.digest(&[&bytes[..l0], &bytes[o1..covered]]);
     if doc_digest != token.imprint {
@@ -1093,6 +1092,16 @@ fn validate_doc_timestamp(doc: &Document, bytes: &[u8], v: &Dict, info: &mut Sig
             info.status = Status::Unknown;
             info.details.push(Detail::plain("The timestamp authority's certificate is not issued for time stamping."));
         }
+    }
+    // An untrusted TSA is not proof of anything, and neither is a trusted one whose certificate
+    // was not valid when it stamped (its detail is already recorded above) or is not issued for
+    // time stamping: only the remaining case makes the token's time trusted time.
+    let mut pool = crate::timestamp::token_certs(&contents);
+    pool.extend(trust.certs.iter().cloned());
+    let may_stamp = token.signer_certificate().is_some_and(|c| c.valid_at(token.gen_time) && c.may_timestamp());
+    let trusted_tsa = token.signer_certificate().is_some_and(|c| build_chain(&c, &pool, Some(token.gen_time)).iter().any(|x| trust.trusts(x)));
+    if trusted_tsa && may_stamp {
+        info.timestamp_time = Some(token.gen_time);
     }
     info.modification = if covered == bytes.len() || bytes[covered..].iter().all(|b| b.is_ascii_whitespace() || *b == 0) {
         Modification::None
@@ -1114,15 +1123,8 @@ fn validate_doc_timestamp(doc: &Document, bytes: &[u8], v: &Dict, info: &mut Sig
         }
     }
     if info.status != Status::Invalid {
-        // An untrusted TSA is not proof of anything: the verdict stays Unknown, like an
-        // ordinary signature from an unknown signer.
-        let mut pool = crate::timestamp::token_certs(&contents);
-        pool.extend(trust.certs.iter().cloned());
-        // A trusted authority whose certificate was not valid at the time it stamped proves
-        // nothing either (its detail is already recorded above): never upgrade that to Valid.
-        // Nor does one whose certificate is not issued for time stamping.
-        let may_stamp = token.signer_certificate().is_some_and(|c| c.valid_at(token.gen_time) && c.may_timestamp());
-        let trusted_tsa = token.signer_certificate().is_some_and(|c| build_chain(&c, &pool, Some(token.gen_time)).iter().any(|x| trust.trusts(x)));
+        // Without trusted time the verdict stays Unknown, like an ordinary signature from an
+        // unknown signer.
         if trusted_tsa && may_stamp {
             info.status = Status::Valid;
             info.details.push(Detail::plain("The timestamp token is valid and its authority is trusted."));
