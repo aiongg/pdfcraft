@@ -9,11 +9,16 @@ use pdfcraft_cos::{Algorithm, Auth, CosError, Document, NewEncryption, ObjRef, O
 const SECRET: &str = "BT /F1 18 Tf 20 100 Td (Secret page) Tj ET";
 
 fn fixture() -> Vec<u8> {
+    fixture_with("")
+}
+
+/// The fixture with `extra` added to the content stream's dictionary.
+fn fixture_with(extra: &str) -> Vec<u8> {
     let objs = [
         "<< /Type /Catalog /Pages 2 0 R /Metadata 6 0 R >>".to_string(),
         "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 300 200] >>".to_string(),
         "<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".to_string(),
-        format!("<< /Length {} >>\nstream\n{SECRET}\nendstream", SECRET.len()),
+        format!("<< /Length {}{extra} >>\nstream\n{SECRET}\nendstream", SECRET.len()),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
         "<< /Type /Metadata /Subtype /XML /Length 22 >>\nstream\n<x:xmpmeta>meta</x:xmpmeta>\nendstream".replace("22", "26"),
         "<< /Title (Quarterly numbers) >>".to_string(),
@@ -309,6 +314,43 @@ fn a_byte_range_does_not_exempt_an_annotation() {
         let note = back.get(back.root().unwrap()).as_dict().unwrap().reference(b"Test").unwrap();
         assert_eq!(back.get(note).as_dict().unwrap().get(b"Contents").unwrap().as_string().unwrap().bytes, b"Private note");
     }
+}
+
+/// Protecting a document puts every stream under the new handler. A stream that selects a
+/// crypt filter of its own loses the selector: the new `/Encrypt` defines only `/StdCF`, so an
+/// inherited name (or `/Identity`) would leave the stream in clear.
+#[test]
+fn protecting_drops_inherited_crypt_filter_selectors() {
+    for selector in [" /Filter /Crypt /DecodeParms << /Name /MyCF >>", " /Filter [/Crypt] /DecodeParms [<< /Name /Identity >>]", " /Filter /Crypt"] {
+        let mut doc = Document::open(Arc::new(fixture_with(selector))).unwrap();
+        assert_eq!(content(&doc), SECRET, "{selector}");
+        doc.set_encryption(&NewEncryption {
+            algorithm: Algorithm::Aes256,
+            user_password: "",
+            owner_password: "owner",
+            permissions: -1,
+            encrypt_metadata: true,
+            seed: [7; 32],
+        })
+        .unwrap();
+        let bytes = write_full(&doc, &SaveOptions::default()).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("Secret page"), "{selector}: stream encrypted");
+        assert_eq!(content(&Document::open(Arc::new(bytes.clone())).unwrap()), SECRET, "{selector}");
+        assert!(hayro_syntax::Pdf::new(bytes).is_ok(), "{selector}");
+    }
+    // Under the handler the document was opened with, `/Identity` is the author's choice (a
+    // stream meant to stay readable) and is kept.
+    let mut doc = Document::open(Arc::new(protect(Algorithm::Aes128, "", "owner", -1))).unwrap();
+    let catalog = doc.get(doc.root().unwrap()).as_dict().cloned().unwrap();
+    let pages = doc.get(catalog.reference(b"Pages").unwrap()).as_dict().cloned().unwrap();
+    let page = doc.resolve(&pages.get(b"Kids").unwrap().as_array().unwrap()[0]).as_dict().cloned().unwrap();
+    let contents = page.reference(b"Contents").unwrap();
+    let Object::Stream(mut s) = doc.get(contents).as_ref().clone() else { panic!("no content stream") };
+    s.dict.set(b"Filter".to_vec(), Object::name("Crypt"));
+    doc.set(contents, Object::Stream(s));
+    let saved = write_incremental(&doc, &SaveOptions::default()).unwrap();
+    assert!(String::from_utf8_lossy(&saved).contains("Secret page"), "written as the stream asks");
+    assert_eq!(content(&Document::open(Arc::new(saved)).unwrap()), SECRET);
 }
 
 #[test]
