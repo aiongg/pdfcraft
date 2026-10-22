@@ -6,15 +6,49 @@
 //! references to marked content that is now empty are dropped from the element.
 
 use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 
 use pdfcraft_cos::{Dict, Document, ObjRef, Object};
 
 use crate::RedactError;
 
-/// Each MCID's operators (serialized), and whether anything is still drawn inside it.
-fn by_mcid(doc: &Document, resources: &Dict, data: &[u8]) -> HashMap<i64, (Vec<u8>, bool)> {
-    let mut out: HashMap<i64, (Vec<u8>, bool)> = HashMap::new();
-    let mut stack: Vec<Option<i64>> = Vec::new();
+/// The marked content of one content stream. Every operator inside some MCID is serialized once
+/// into `ops`, and each MCID holds the ranges of `ops` its sequences span (marked-content
+/// operators are not written, so a sequence is one range however deeply it nests), with whether
+/// anything is drawn inside it. Copying the operators into every enclosing MCID instead would
+/// hold `depth` copies of nested content.
+#[derive(Default)]
+struct Marked {
+    ops: Vec<u8>,
+    ids: HashMap<i64, (Vec<Range<usize>>, bool)>,
+}
+
+impl Marked {
+    /// The bytes of `ranges`, which are ranges of `ops`.
+    fn bytes<'a>(&'a self, ranges: &'a [Range<usize>]) -> impl Iterator<Item = &'a u8> + 'a {
+        ranges.iter().flat_map(|r| self.ops.get(r.clone()).unwrap_or_default())
+    }
+}
+
+/// Most bytes [`touched`] compares for one stream. Nested sequences share their operators, so the
+/// comparisons can add up to the content's size times its nesting depth; past this, the MCIDs
+/// left are taken as changed (their descriptions go) rather than compared.
+const MAX_COMPARED: usize = 1 << 28;
+
+fn by_mcid(doc: &Document, resources: &Dict, data: &[u8]) -> Marked {
+    let mut out = Marked::default();
+    // Open sequences: the MCID with where its content starts in `ops` and the drawing operators
+    // written before it, or `None` for a sequence without one.
+    let mut stack: Vec<Option<(i64, usize, usize)>> = Vec::new();
+    let (mut open_ids, mut drawn) = (0usize, 0usize);
+    let close = |out: &mut Marked, open: Option<(i64, usize, usize)>, drawn: usize| {
+        if let Some((id, start, drawn_before)) = open {
+            let end = out.ops.len();
+            let e = out.ids.entry(id).or_default();
+            e.0.push(start..end);
+            e.1 |= drawn > drawn_before;
+        }
+    };
     for op in pdfcraft_content::parse(data).ops {
         match op.op.as_slice() {
             b"BDC" => {
@@ -28,9 +62,10 @@ fn by_mcid(doc: &Document, resources: &Dict, data: &[u8]) -> HashMap<i64, (Vec<u
                     _ => None,
                 };
                 if let Some(id) = id {
-                    out.entry(id).or_default();
+                    out.ids.entry(id).or_default();
+                    open_ids += 1;
                 }
-                stack.push(id);
+                stack.push(id.map(|id| (id, out.ops.len(), drawn)));
                 continue;
             }
             b"BMC" => {
@@ -38,10 +73,16 @@ fn by_mcid(doc: &Document, resources: &Dict, data: &[u8]) -> HashMap<i64, (Vec<u
                 continue;
             }
             b"EMC" => {
-                stack.pop();
+                if let Some(open) = stack.pop() {
+                    open_ids = open_ids.saturating_sub(usize::from(open.is_some()));
+                    close(&mut out, open, drawn);
+                }
                 continue;
             }
             _ => {}
+        }
+        if open_ids == 0 {
+            continue;
         }
         let draws = match op.op.as_slice() {
             b"Tj" | b"'" | b"\"" => op.operands.last().and_then(Object::as_string).is_some_and(|s| !s.bytes.is_empty()),
@@ -51,13 +92,12 @@ fn by_mcid(doc: &Document, resources: &Dict, data: &[u8]) -> HashMap<i64, (Vec<u
             b"f" | b"F" | b"f*" | b"B" | b"B*" | b"b" | b"b*" | b"S" | b"s" | b"sh" | b"Do" | b"BI" => true,
             _ => false,
         };
-        let mut bytes = Vec::new();
-        pdfcraft_content::write_op(&op, &mut bytes);
-        for id in stack.iter().flatten() {
-            let e = out.entry(*id).or_default();
-            e.0.extend_from_slice(&bytes);
-            e.1 |= draws;
-        }
+        pdfcraft_content::write_op(&op, &mut out.ops);
+        drawn += usize::from(draws);
+    }
+    // Sequences the stream leaves open run to its end.
+    while let Some(open) = stack.pop() {
+        close(&mut out, open, drawn);
     }
     out
 }
@@ -67,10 +107,17 @@ pub(crate) fn touched(doc: &Document, resources: &Dict, before: &[u8], after: &[
     let (b, a) = (by_mcid(doc, resources, before), by_mcid(doc, resources, after));
     let mut changed = HashSet::new();
     let mut empty = HashSet::new();
-    for (id, (ops, _)) in &b {
-        match a.get(id) {
+    let mut budget = MAX_COMPARED;
+    let len = |ranges: &[Range<usize>]| ranges.iter().map(|r| r.len()).fold(0usize, usize::saturating_add);
+    for (id, (old, _)) in &b.ids {
+        match a.ids.get(id) {
             Some((new, draws)) => {
-                if new != ops {
+                let n = len(old);
+                let same = n == len(new) && n <= budget && {
+                    budget -= n;
+                    b.bytes(old).eq(a.bytes(new))
+                };
+                if !same {
                     changed.insert(*id);
                 }
                 if !draws {
@@ -412,4 +459,11 @@ pub(crate) fn drop_object_refs_within(doc: &mut Document, gone: &HashSet<ObjRef>
         })?;
     }
     Ok(n)
+}
+
+/// Bytes held for comparing marked content, for tests that bound it.
+#[cfg(test)]
+pub(crate) fn retained_for_comparison(doc: &Document, resources: &Dict, data: &[u8]) -> usize {
+    let marked = by_mcid(doc, resources, data);
+    marked.ops.len() + marked.ids.values().map(|(ranges, _)| ranges.len() * std::mem::size_of::<Range<usize>>()).sum::<usize>()
 }

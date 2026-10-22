@@ -23,3 +23,33 @@ fn an_image_decoding_far_past_its_raster_is_removed_without_decoding_it_all() {
     let r = half_covered_image(&bomb);
     assert_eq!((r.images_removed, r.images_cleared), (1, 0), "{r:?}");
 }
+
+/// Marked content nested `depth` deep, each level with its own MCID, around `depth` drawing
+/// operators.
+fn nested_marked_content(depth: usize) -> Vec<u8> {
+    let mut data = Vec::new();
+    for id in 0..depth {
+        data.extend_from_slice(format!("/P <</MCID {id}>> BDC\n").as_bytes());
+    }
+    data.extend(b"0 0 1 1 re f\n".repeat(depth));
+    data.extend(b"EMC\n".repeat(depth));
+    data
+}
+
+#[test]
+fn comparing_deeply_nested_marked_content_holds_each_operator_once() {
+    let doc = one_page(b"", "", vec![]);
+    let data = nested_marked_content(2000);
+    let held = tags::retained_for_comparison(&doc, &Dict::new(), &data);
+    assert!(held <= 2 * data.len(), "{held} bytes held for {} bytes of content", data.len());
+}
+
+#[test]
+fn a_change_inside_nested_marked_content_touches_every_enclosing_mcid() {
+    let doc = one_page(b"", "", vec![]);
+    let before = b"/P <</MCID 0>> BDC /P <</MCID 1>> BDC BT (A) Tj ET EMC 0 0 1 1 re f EMC /P <</MCID 2>> BDC BT (B) Tj ET EMC";
+    let after = b"/P <</MCID 0>> BDC /P <</MCID 1>> BDC BT ET EMC 0 0 1 1 re f EMC /P <</MCID 2>> BDC BT (B) Tj ET EMC";
+    let (changed, empty) = tags::touched(&doc, &Dict::new(), before, after);
+    assert_eq!(changed, HashSet::from([0, 1]));
+    assert_eq!(empty, HashSet::from([1]));
+}
