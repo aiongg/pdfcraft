@@ -183,16 +183,19 @@ fn union(a: Option<[f64; 4]>, b: [f64; 4]) -> [f64; 4] {
 }
 
 /// Where the marked content `ids` is drawn on a page (images, forms and paths).
-fn content_bbox(doc: &Document, page: &Dict, ids: &HashSet<i64>) -> Option<[f64; 4]> {
+pub(crate) fn content_bbox(doc: &Document, page: &Dict, ids: &HashSet<i64>) -> Option<[f64; 4]> {
     let res = page.get(b"Resources").map(|r| doc.resolve(r)).and_then(|r| r.as_dict().cloned()).unwrap_or_default();
     let xobjects = res.get(b"XObject").map(|x| doc.resolve(x)).and_then(|x| x.as_dict().cloned()).unwrap_or_default();
     let props = page_properties(doc, page);
     let mut ctm = vec![Matrix([1.0, 0.0, 0.0, 1.0, 0.0, 0.0])];
+    // Whether each open marked-content sequence is one of `ids`, and how many of them are.
     let mut marks: Vec<bool> = Vec::new();
+    let mut matching = 0usize;
     let mut bbox = None;
     let mut path: Vec<(f64, f64)> = Vec::new();
     for op in pdfcraft_content::parse(&page_content(doc, page)).ops {
-        let inside = marks.iter().any(|m| *m);
+        crate::count_mark_reads(1);
+        let inside = matching > 0;
         let top = ctm.last().copied().unwrap_or(Matrix([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
         match op.op.as_slice() {
             b"q" => ctm.push(top),
@@ -207,9 +210,15 @@ fn content_bbox(doc: &Document, page: &Dict, ids: &HashSet<i64>) -> Option<[f64;
                 }
             }
             b"BMC" => marks.push(false),
-            b"BDC" => marks.push(bdc_mcid(doc, &props, &op).is_some_and(|n| ids.contains(&n))),
+            b"BDC" => {
+                let wanted = bdc_mcid(doc, &props, &op).is_some_and(|n| ids.contains(&n));
+                matching += usize::from(wanted);
+                marks.push(wanted);
+            }
             b"EMC" => {
-                marks.pop();
+                if marks.pop() == Some(true) {
+                    matching = matching.saturating_sub(1);
+                }
             }
             b"m" | b"l" => {
                 if let Some([x, y]) = op.nums::<2>() {

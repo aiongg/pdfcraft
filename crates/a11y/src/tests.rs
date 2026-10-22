@@ -1023,6 +1023,46 @@ fn glyph_by_tm(text: &str, size: f64, y: f64) -> String {
     ops + " ET"
 }
 
+/// Marked-content stack reads while `f` runs.
+fn mark_reads(f: impl FnOnce()) -> usize {
+    MARK_READS.with(|c| c.set(0));
+    f();
+    MARK_READS.with(|c| c.get())
+}
+
+/// Page content nesting `depth` unmarked `BMC` blocks around a marked one, with `ops` operators inside.
+fn deeply_nested_page(doc: &mut Document, depth: usize, ops: usize) -> pdfcraft_cos::Dict {
+    use pdfcraft_cos::{Dict, Stream};
+    let mut data = "/Figure << /MCID 0 >> BDC ".repeat(1);
+    data.push_str(&"/X BMC ".repeat(depth));
+    data.push_str(&"0 0 1 1 re f ".repeat(ops));
+    data.push_str(&"EMC ".repeat(depth + 1));
+    let content = doc.add(Stream::flate(Dict::new(), data.as_bytes()));
+    [(b"Contents".to_vec(), Object::Ref(content))].into_iter().collect()
+}
+
+#[test]
+fn marked_text_reads_its_enclosing_id_in_constant_steps() {
+    let mut doc = Document::new_empty();
+    let page = deeply_nested_page(&mut doc, 5_000, 5_000);
+    let reads = mark_reads(|| {
+        crate::headings::mcid_texts(&doc, &page);
+    });
+    // About 15 000 operators; a scan of the stack per operator reads millions of entries.
+    assert!(reads <= 4 * 15_000, "{reads} stack reads");
+}
+
+#[test]
+fn figure_bounds_read_the_marked_content_state_in_constant_steps() {
+    let mut doc = Document::new_empty();
+    let page = deeply_nested_page(&mut doc, 5_000, 5_000);
+    // No mark encloses figure 7, so a scan of the stack per operator reads all of it.
+    let reads = mark_reads(|| {
+        crate::alt::content_bbox(&doc, &page, &std::collections::HashSet::from([7]));
+    });
+    assert!(reads <= 4 * 15_000, "{reads} stack reads");
+}
+
 /// One tagged page whose H1 headings show `contents` (one marked-content sequence each).
 fn heading_page(contents: &[String]) -> Document {
     let marked: Vec<String> = contents.iter().enumerate().map(|(i, c)| format!("/H1 << /MCID {i} >> BDC {c} EMC")).collect();

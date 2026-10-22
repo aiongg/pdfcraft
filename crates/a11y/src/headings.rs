@@ -182,6 +182,7 @@ pub(crate) fn mcid_texts(doc: &Document, page: &Dict) -> HashMap<i64, String> {
     let res = sub(doc, page, b"Resources");
     let (fonts, props) = (sub(doc, &res, b"Font"), sub(doc, &res, b"Properties"));
     let mut metrics: HashMap<Vec<u8>, Metrics> = HashMap::new();
+    // The id each open marked-content sequence is in: its own, else the enclosing one's.
     let mut stack: Vec<Option<i64>> = Vec::new();
     let mut out: HashMap<i64, String> = HashMap::new();
     // Where each id's last glyph ended, in user space.
@@ -191,16 +192,20 @@ pub(crate) fn mcid_texts(doc: &Document, page: &Dict) -> HashMap<i64, String> {
     let mut unsaved = 0usize;
     let (mut tm, mut tlm) = (Matrix::IDENTITY, Matrix::IDENTITY);
     for op in pdfcraft_content::parse(&page_content(doc, page)).ops {
-        let id = stack.iter().rev().find_map(|m| *m);
+        crate::count_mark_reads(1);
+        let id = stack.last().copied().flatten();
         match op.op.as_slice() {
-            b"BMC" => stack.push(None),
-            b"BDC" => stack.push(match op.operands.get(1) {
-                Some(Object::Dict(d)) => d.get(b"MCID").and_then(Object::as_int),
-                Some(Object::Name(n)) => {
-                    props.get(n).map(|x| doc.resolve(x)).and_then(|x| x.as_dict().and_then(|d| d.get(b"MCID").and_then(Object::as_int)))
+            b"BMC" => stack.push(id),
+            b"BDC" => stack.push(
+                match op.operands.get(1) {
+                    Some(Object::Dict(d)) => d.get(b"MCID").and_then(Object::as_int),
+                    Some(Object::Name(n)) => {
+                        props.get(n).map(|x| doc.resolve(x)).and_then(|x| x.as_dict().and_then(|d| d.get(b"MCID").and_then(Object::as_int)))
+                    }
+                    _ => None,
                 }
-                _ => None,
-            }),
+                .or(id),
+            ),
             b"EMC" => {
                 stack.pop();
             }
