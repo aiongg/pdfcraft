@@ -87,14 +87,36 @@ fn sub(doc: &Document, d: &Dict, key: &[u8]) -> Option<Dict> {
     d.get(key).and_then(|o| doc.resolve(o).as_dict().cloned())
 }
 
-/// Entries of a name tree (`/Names` leaves, `/Kids` recursion), bounded against cycles.
-fn name_tree_len(doc: &Document, node: &Dict, depth: usize) -> usize {
-    if depth > 32 {
+/// The most name-tree nodes one count reads.
+const NAME_TREE_NODE_BUDGET: usize = 100_000;
+
+/// Entries of a name tree (`/Names` leaves, `/Kids` recursion). Each indirect node is read once,
+/// however many `/Kids` arrays list it, so shared or cyclic kids cost one step per node rather
+/// than one per path; depth and a total node budget bound the rest.
+fn name_tree_len(doc: &Document, node: &Dict) -> usize {
+    let (mut seen, mut visited) = (std::collections::HashSet::new(), 0);
+    name_tree_len_seen(doc, node, 0, &mut seen, &mut visited)
+}
+
+fn name_tree_len_seen(doc: &Document, node: &Dict, depth: usize, seen: &mut std::collections::HashSet<ObjRef>, visited: &mut usize) -> usize {
+    *visited += 1;
+    if depth > 32 || *visited > NAME_TREE_NODE_BUDGET {
         return 0;
     }
     let leaves = node.get(b"Names").and_then(|n| doc.resolve(n).as_array().map(|a| a.len() / 2)).unwrap_or(0);
     let kids = node.get(b"Kids").and_then(|k| doc.resolve(k).as_array().cloned()).unwrap_or_default();
-    leaves + kids.iter().filter_map(|k| doc.resolve(k).as_dict().cloned()).map(|k| name_tree_len(doc, &k, depth + 1)).sum::<usize>()
+    let mut n = leaves;
+    for k in &kids {
+        if let Object::Ref(r) = k
+            && !seen.insert(*r)
+        {
+            continue;
+        }
+        if let Some(kid) = doc.resolve(k).as_dict() {
+            n = n.saturating_add(name_tree_len_seen(doc, kid, depth + 1, seen, visited));
+        }
+    }
+    n
 }
 
 /// The most distinct outline items one count reads, over all levels together.
@@ -270,7 +292,7 @@ pub fn scan(doc: &Document) -> Vec<(Hidden, usize)> {
                     let xmp = usize::from(cat.contains(b"Metadata")) + pages.iter().filter(|p| p.dict.contains(b"Metadata")).count();
                     info + xmp
                 }
-                Hidden::Attachments => sub(doc, &names, b"EmbeddedFiles").map_or(0, |t| name_tree_len(doc, &t, 0)) + count_sub(b"FileAttachment"),
+                Hidden::Attachments => sub(doc, &names, b"EmbeddedFiles").map_or(0, |t| name_tree_len(doc, &t)) + count_sub(b"FileAttachment"),
                 Hidden::Comments => annots.iter().filter(|a| is_comment(a.name(b"Subtype").unwrap_or(b""))).count(),
                 Hidden::FormFields => pdfcraft_forms::fields(doc).len(),
                 Hidden::HiddenText => content_pass(&mut doc2, true, false, false).map(|(n, _)| n).unwrap_or(0),
@@ -285,7 +307,7 @@ pub fn scan(doc: &Document) -> Vec<(Hidden, usize)> {
                         + usize::from(cat.contains(b"AA"))
                         + pages.iter().filter(|p| p.dict.contains(b"AA")).count()
                         + annots.iter().filter(|a| a.contains(b"AA") || (a.name(b"Subtype") == Some(b"Widget") && a.contains(b"A"))).count()
-                        + sub(doc, &names, b"JavaScript").map_or(0, |t| name_tree_len(doc, &t, 0))
+                        + sub(doc, &names, b"JavaScript").map_or(0, |t| name_tree_len(doc, &t))
                 }
                 Hidden::PrivateData => usize::from(cat.contains(b"PieceInfo")) + pages.iter().filter(|p| p.dict.contains(b"PieceInfo")).count(),
             };

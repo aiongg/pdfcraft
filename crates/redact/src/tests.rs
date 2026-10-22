@@ -2472,3 +2472,25 @@ fn a_tj_surplus_arrays_undrawn_glyphs_are_not_seen_under_a_mark() {
     assert_eq!(under(&mut doc, 0, &[[45.0, 95.0, 50.0, 110.0]]), 0, "nothing is drawn past LASTARR's 35pt width");
     assert_eq!(under(&mut doc, 0, &[[10.0, 95.0, 45.0, 110.0]]), 7, "LASTARR's 7 glyphs, the one the page draws");
 }
+
+/// A name tree whose levels each list the next level twice: a walk that follows every path
+/// visits 2^levels nodes.
+#[test]
+fn a_name_tree_whose_nodes_share_kids_counts_each_entry_once() {
+    use crate::sanitize::{Hidden, scan};
+    let levels = 12;
+    let mut objs: Vec<Vec<u8>> = vec![
+        b"<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles 5 0 R >> >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Contents 4 0 R >>".to_vec(),
+        stream("", b"BT ET"),
+    ];
+    for k in 0..levels {
+        let next = 6 + k;
+        objs.push(format!("<< /Kids [{next} 0 R {next} 0 R] >>").into_bytes());
+    }
+    objs.push(b"<< /Names [(a.txt) << /Type /Filespec /F (a.txt) >>] >>".to_vec());
+    let doc = pdf(objs);
+    let counts: std::collections::HashMap<Hidden, usize> = scan(&doc).into_iter().collect();
+    assert_eq!(counts[&Hidden::Attachments], 1, "one entry, reached through 2^{levels} paths");
+}
