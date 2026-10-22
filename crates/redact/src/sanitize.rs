@@ -215,10 +215,13 @@ impl Held {
     }
 }
 
+/// Indirect objects that hold an owned entry, each with the role it was reached in.
+type Holders = Vec<(ObjRef, Held)>;
+
 /// The objects reachable from the catalog that hold one of `keys` outside a name map, and how
 /// many dictionaries hold each key. Each object is read at most once per [`Held`] role, so a
 /// shared or cyclic graph costs one step per object.
-fn owners(doc: &Document, keys: &[&[u8]]) -> Result<(Vec<usize>, Vec<(ObjRef, Held)>), RedactError> {
+fn owners(doc: &Document, keys: &[&[u8]]) -> Result<(Vec<usize>, Holders), RedactError> {
     let mut held = vec![0; keys.len()];
     let mut holders = Vec::new();
     let Some(root) = doc.root() else { return Ok((held, holders)) };
