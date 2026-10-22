@@ -529,8 +529,9 @@ pub(crate) fn unlink_doomed(doc: &mut Document, doomed: &[ObjRef], retired_prope
         }
     }
     // A surviving form can own the same old resource dictionary as a rewritten page. Its
-    // unused descriptions remain reachable too, even after every page holder is cleaned.
-    unlink_form_properties(doc, &holder_nodes, retired_properties)?;
+    // unused descriptions and doomed XObjects remain reachable too, even after every page
+    // holder is cleaned.
+    unlink_from_forms(doc, &holder_nodes, &doomed, retired_properties)?;
     Ok(())
 }
 
@@ -567,8 +568,11 @@ fn prune_retired_properties(doc: &Document, res: &mut Dict, names: &[Vec<u8>], c
     Ok(pruned)
 }
 
-fn unlink_form_properties(doc: &mut Document, holders: &[ObjRef], retired: &[Object]) -> Result<(), CosError> {
-    if retired.is_empty() {
+/// Unlink retired properties and `doomed` XObjects from the resources of the forms reachable from
+/// the page-tree `holders`, each unless the form's own content (or a form inheriting its
+/// resources) still uses the name. Fails closed when that cannot be determined.
+fn unlink_from_forms(doc: &mut Document, holders: &[ObjRef], doomed: &HashSet<ObjRef>, retired: &[Object]) -> Result<(), CosError> {
+    if retired.is_empty() && doomed.is_empty() {
         return Ok(());
     }
     let mut pending: Vec<Dict> = holders
@@ -593,7 +597,27 @@ fn unlink_form_properties(doc: &mut Document, holders: &[ObjRef], retired: &[Obj
             let Some(mut res) = form.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()) else { continue };
             let names: Vec<Vec<u8>> =
                 res_dict(doc, &res, b"Properties").iter().filter(|(_, value)| retired.contains(value)).map(|(name, _)| name.to_vec()).collect();
-            if !names.is_empty() && prune_retired_properties(doc, &mut res, &names, &[vec![form.decoded()?]])? {
+            let mut xo = res_dict(doc, &res, b"XObject");
+            let doomed_names: Vec<Vec<u8>> =
+                xo.iter().filter(|(_, v)| v.as_ref().is_some_and(|r| doomed.contains(&r))).map(|(n, _)| n.to_vec()).collect();
+            if names.is_empty() && doomed_names.is_empty() {
+                pending.push(res);
+                continue;
+            }
+            let data = form.decoded()?;
+            let mut pruned = false;
+            for name in doomed_names {
+                match content_draws(doc, std::slice::from_ref(&data), &xo, &name, 0, &mut HashSet::new()) {
+                    Some(true) => {}
+                    Some(false) => pruned |= xo.remove(&name).is_some(),
+                    None => return Err(CosError::Syntax { offset: 0, detail: "redaction could not fully inspect shared form resources".into() }),
+                }
+            }
+            if pruned {
+                res.set(b"XObject".to_vec(), Object::Dict(xo));
+            }
+            pruned |= prune_retired_properties(doc, &mut res, &names, &[vec![data]])?;
+            if pruned {
                 doc.update_dict(reference, |d| d.set(b"Resources".to_vec(), Object::Dict(res.clone())))?;
             }
             pending.push(res);
