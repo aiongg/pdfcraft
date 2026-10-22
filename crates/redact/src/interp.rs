@@ -74,6 +74,10 @@ pub(crate) struct Output {
     /// Apply mode met vertical-writing text (which it cannot remove) while a redaction region was
     /// in force: the operation must fail closed rather than leave that text under the mark.
     pub vertical: bool,
+    /// The content holds an inline image the renderer reads no image for
+    /// ([`pdfcraft_content::Parsed::ambiguous_images`]): what this scope placed after it may not
+    /// be what the page shows, so a redaction must not trust it.
+    pub ambiguous: bool,
     pub tag_changes: Vec<(ObjRef, ObjRef, HashSet<i64>, HashSet<i64>)>,
     pub error: Option<CosError>,
 }
@@ -789,6 +793,7 @@ fn process_from(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<u8>], 
     // next. Parse them joined, then give each operator back to the piece its keyword is in.
     let joined = Pieces::join(streams);
     let mut parsed = joined.parse();
+    out.ambiguous = parsed.ambiguous_images > 0;
     // A rewritten piece loses its comments, so keep where they began and ended: a comment that
     // ran on into the next piece still hides that piece's first line.
     let comment_edges = joined.comment_edges(&parsed);
@@ -1292,6 +1297,7 @@ fn xobject(
             scope.fonts = saved_fonts;
             out.residue += inner.residue;
             out.vertical |= inner.vertical;
+            out.ambiguous |= inner.ambiguous;
             out.doomed.extend_from_slice(&inner.doomed);
             out.retired_properties.extend(inner.retired_properties);
             out.tag_changes.extend(inner.tag_changes);

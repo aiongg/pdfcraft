@@ -405,6 +405,12 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         if out.vertical {
             return Err(RedactError::VerticalText(pi + 1));
         }
+        // An inline image the renderer reads no image for (no `EI` it accepts, or parameters it
+        // can't read): where the page's operators resume after it is a guess, so neither removal
+        // nor the verify pass can be trusted on this page.
+        if out.ambiguous {
+            return Err(RedactError::Unreadable(pi + 1));
+        }
         doomed_xobjects.extend_from_slice(&out.doomed);
         retired_properties.extend(out.retired_properties);
         let mut new_list = list.clone();

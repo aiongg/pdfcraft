@@ -2205,6 +2205,30 @@ fn the_renderer_check_refuses_text_still_shown_under_a_mark() {
     assert!(refused(&cos), "the labelled input stream was not checked");
 }
 
+/// Inline image data `7FEI 1 0 0 1 200 0 cm` holds an `EI` the renderer ends the image at, so it
+/// runs the `cm` and shows SECRET 200 pt to the right. Redaction reads the image the same way, so
+/// a mark drawn over the word as shown takes it out of the file.
+#[test]
+fn text_after_an_inline_image_is_redacted_where_the_page_shows_it() {
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let page = one_line_page(
+        "/Font << /F1 4 0 R >>",
+        "BI /W 1 /H 1 /CS /G /BPC 8 /F /AHx ID 7FEI 1 0 0 1 200 0 cm EI BT /F1 10 Tf 10 100 Td (SECRET) Tj ET",
+    );
+    let id = s.open("inline.pdf", None, Arc::new(page), None).unwrap();
+    mark_shown_text(&mut s, id, "SECRET");
+    s.apply(id, Edit::ApplyRedactions { pages: None }).unwrap();
+    assert!(!page_texts(&s, id).concat().contains("SECRET"));
+    let saved = s.save_bytes(id).unwrap();
+    let held = |d: &[u8]| d.windows(6).any(|w| w == b"SECRET");
+    assert!(!held(&saved), "the saved file holds the redacted word");
+    let reopened = pdfcraft_cos::Document::open(saved).unwrap();
+    assert!(
+        !reopened.scan_objects().any(|(_, o)| matches!(&*o, pdfcraft_cos::Object::Stream(st) if st.decoded().is_ok_and(|d| held(&d)))),
+        "a saved stream holds the redacted word"
+    );
+}
+
 /// A word whose font and size an ExtGState /Font entry (`gs`) sets is placed where the renderer
 /// draws it, so a mark drawn over it as displayed takes it out of the file.
 #[test]

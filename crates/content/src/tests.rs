@@ -102,10 +102,11 @@ fn unfiltered_inline_masks_default_to_one_bit_and_indexed_images_have_one_compon
         let parsed = inline_pixels(parameters.as_bytes(), b" EI ");
         assert_eq!(parsed.ops[1].inline.as_ref().unwrap().1, b" EI ");
         assert_eq!(parsed.ops.len(), 3);
-        // Indexed samples permit at most 8 bits, even though device spaces permit 16.
+        // Indexed samples permit at most 8 bits, even though device spaces permit 16, so the
+        // length is unknown, and the renderer takes the second `EI`.
         let invalid = parameters.replace("/W 4", "/W 2").replace("/BPC 8", "/BPC 16");
         let parsed = inline_pixels(invalid.as_bytes(), b" EI ");
-        assert!(parsed.ops[1].inline.as_ref().unwrap().1.is_empty());
+        assert_eq!(parsed.ops[1].inline.as_ref().unwrap().1, b" EI ");
     }
 }
 
@@ -127,7 +128,7 @@ fn unfiltered_inline_image_terminator_must_follow_its_samples() {
 }
 
 #[test]
-fn filtered_unknown_and_damaged_inline_images_keep_the_existing_fallback() {
+fn filtered_unknown_and_damaged_inline_images_end_where_the_renderer_ends_them() {
     for parameters in [
         b"/W 4 /H 1 /BPC 8 /CS /G /F /A85".as_slice(),
         b"/W 4 /H 1 /BPC 8 /CS /ResourceColor",
@@ -142,12 +143,20 @@ fn filtered_unknown_and_damaged_inline_images_keep_the_existing_fallback() {
         b"/W 9223372036854775807 /H 9223372036854775807 /BPC 16 /CS /CMYK",
         b"/W 9223372036854775807 /H 2 /BPC 8 /CS /G",
     ] {
+        // What follows the first `EI` (`!!~>`) does not read as content, so the renderer takes
+        // the later one.
         let parsed = inline_pixels(parameters, b"! EI !!~>");
-        assert_eq!(parsed.ops[1].inline.as_ref().unwrap().1, b"!", "{}", String::from_utf8_lossy(parameters));
+        let label = String::from_utf8_lossy(parameters);
+        assert_eq!(parsed.ops[1].inline.as_ref().unwrap().1, b"! EI !!~>", "{label}");
+        assert_eq!(parsed.ops.iter().map(|op| op.op.as_slice()).collect::<Vec<_>>(), [b"q".as_slice(), b"BI", b"Q"], "{label}");
+        assert_eq!(parsed.ambiguous_images, 0, "{label}");
     }
-    // A short payload still uses the tolerant recovery, including when there is no EI.
-    for src in [b"BI /W 4 /H 1 /BPC 8 /CS /G ID abc\nEI Q".as_slice(), b"BI /W 4 /H 1 /BPC 8 /CS /G ID abc"] {
-        assert_eq!(parse(src).ops[0].inline.as_ref().unwrap().1, b"abc");
+    // A short payload is read whole; without an `EI`, the renderer reads no image and this
+    // parser's end is a guess.
+    for (src, ambiguous) in [(b"BI /W 4 /H 1 /BPC 8 /CS /G ID abc\nEI Q".as_slice(), 0), (b"BI /W 4 /H 1 /BPC 8 /CS /G ID abc", 1)] {
+        let parsed = parse(src);
+        assert_eq!(parsed.ops[0].inline.as_ref().unwrap().1, b"abc");
+        assert_eq!(parsed.ambiguous_images, ambiguous);
     }
 }
 
@@ -457,5 +466,40 @@ fn ascii85_inline_image_does_not_terminate_at_gt_ei_inside_payload() {
         assert_eq!(names, [&b"BI"[..], b"Q", b"BT", b"Tf", b"Tj", b"ET"]);
         let (_, img) = p.ops[0].inline.as_ref().unwrap();
         assert_eq!(img, b"!!!!>EI !!~>");
+    }
+}
+
+/// The operators the renderer's tokenizer reads from `data`.
+fn renderer_operators(data: &[u8]) -> Vec<Vec<u8>> {
+    let mut iter = hayro_syntax::content::UntypedIter::new(data);
+    let mut out = Vec::new();
+    while let Some(instruction) = iter.next() {
+        out.push(instruction.operator.as_ref().to_vec());
+    }
+    out
+}
+
+/// Inline images end where the renderer ends them, so both read the same operators after one:
+/// an `EI` without whitespace before it in the data, upper-case text ending in "EI" after the
+/// image, and an `EI` inside compressed bytes (#3579).
+#[test]
+fn inline_images_end_where_the_renderer_ends_them() {
+    let flate: Vec<u8> = (0..FLATE_WITH_EI.len()).step_by(2).map(|i| u8::from_str_radix(&FLATE_WITH_EI[i..i + 2], 16).unwrap()).collect();
+    let mut stored = b"q BI /W 64 /H 1 /BPC 8 /CS /G /F /Fl ID ".to_vec();
+    stored.extend_from_slice(&flate);
+    stored.extend_from_slice(b"\nEI Q BT /F1 24 Tf 72 200 Td (AFTER) Tj ET");
+    let fixtures: [&[u8]; 6] = [
+        b"BI /W 1 /H 1 /CS /G /BPC 8 /F /AHx ID 7FEI 1 0 0 1 200 0 cm EI BT /F1 10 Tf 10 100 Td (SECRET) Tj ET",
+        b"BI /W 1 /H 1 /CS /G /BPC 8 /F /AHx ID 7F> EI BT /F1 10 Tf 10 100 Td (ZWEI) Tj (EIN FREI BEI) Tj ET",
+        b"q BI /W 2 /H 1 /CS /G /BPC 8 /F /AHx ID 7F7F> EI Q BT (DREI) Tj ET BI /W 1 /H 1 /CS /G /BPC 8 /F /AHx ID 00> EI",
+        b"BI /W 4 /H 1 /BPC 8 /CS /G /F /A85 ID ! EI !!~>\nEI Q",
+        b"q BI /W 4 /H 1 /BPC 8 /CS /G ID  EI \nEI Q",
+        &stored,
+    ];
+    for data in fixtures {
+        let parsed = parse(data);
+        let ours: Vec<Vec<u8>> = parsed.ops.iter().map(|op| op.op.clone()).collect();
+        assert_eq!(ours, renderer_operators(data), "{}", String::from_utf8_lossy(data));
+        assert_eq!((parsed.skipped, parsed.ambiguous_images), (0, 0), "{}", String::from_utf8_lossy(data));
     }
 }
