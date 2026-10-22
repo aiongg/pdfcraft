@@ -5709,8 +5709,8 @@ milestone = "M8"
 status = "shipped"
 commands = ["redact.apply"]
 tools = ["redact_apply"]
-evidence = ["crates/ui-egui/tests/it/redact.rs::marking_applying_and_clearing", "crates/engine/src/tests.rs::redaction_marks_apply_for_good_and_undo", "crates/automation/tests/it/automation.rs::redacting_through_tools", "crates/engine/src/tests.rs::redaction_is_refused_when_the_page_still_shows_text_under_a_mark", "crates/redact/src/tests.rs::redacted_xobjects_do_not_survive_through_inherited_or_shared_resources"]
-notes = "confirmation; one undo step; next save is a full rewrite. Refused, with nothing changed, when the page still shows text under a mark afterwards: text whose font is set through an ExtGState or taken by a form from its caller, some predefined CMaps and rotated Type 3 fonts are not removed yet, so those documents cannot be redacted. Removed images and forms are unlinked from page-tree resources (own, inherited or shared), not yet from a form's own resources, annotation appearances or patterns"
+evidence = ["crates/ui-egui/tests/it/redact.rs::marking_applying_and_clearing", "crates/engine/src/tests.rs::redaction_marks_apply_for_good_and_undo", "crates/automation/tests/it/automation.rs::redacting_through_tools", "crates/engine/src/tests.rs::the_renderer_check_refuses_text_still_shown_under_a_mark", "crates/redact/src/tests.rs::redacted_xobjects_do_not_survive_through_inherited_or_shared_resources"]
+notes = "confirmation; one undo step; next save is a full rewrite. Refused, with nothing changed, when the page still shows text under a mark afterwards: text in some predefined CMaps and rotated Type 3 fonts is not removed yet, so those documents cannot be redacted. Also refused on a page with an inline image the renderer reads no image for, since the operators after it can't be known. Removed images and forms are unlinked from page-tree resources (own, inherited or shared) and from surviving forms' resources, not yet from annotation appearances or patterns"
 
 [[feature]]
 id = "protect.redact-glyph-removal"
