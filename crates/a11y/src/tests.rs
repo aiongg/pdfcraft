@@ -1033,7 +1033,7 @@ fn mark_reads(f: impl FnOnce()) -> usize {
 /// Page content nesting `depth` unmarked `BMC` blocks around a marked one, with `ops` operators inside.
 fn deeply_nested_page(doc: &mut Document, depth: usize, ops: usize) -> pdfcraft_cos::Dict {
     use pdfcraft_cos::{Dict, Stream};
-    let mut data = "/Figure << /MCID 0 >> BDC ".repeat(1);
+    let mut data = "/Figure << /MCID 0 >> BDC ".to_string();
     data.push_str(&"/X BMC ".repeat(depth));
     data.push_str(&"0 0 1 1 re f ".repeat(ops));
     data.push_str(&"EMC ".repeat(depth + 1));

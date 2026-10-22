@@ -714,10 +714,10 @@ impl Metrics {
                             i += 2;
                         }
                         Some(c1) => {
-                            if let (Some(c1), Some(v)) = (c1.as_f64(), w.get(i + 2).and_then(|x| doc.resolve(x).as_f64())) {
-                                if ranges.len() < MAX_CMAP_ENTRIES {
-                                    ranges.push((c0, c1 as u32, v));
-                                }
+                            if let (Some(c1), Some(v)) = (c1.as_f64(), w.get(i + 2).and_then(|x| doc.resolve(x).as_f64()))
+                                && ranges.len() < MAX_CMAP_ENTRIES
+                            {
+                                ranges.push((c0, c1 as u32, v));
                             }
                             i += 3;
                         }
