@@ -165,6 +165,9 @@ const PROCESSED_EXTENSIONS: [&str; 11] = [
     "1.3.6.1.5.5.7.1.3",
 ];
 
+/// id-kp-timeStamping (RFC 5280 §4.2.1.12), required of a timestamp authority (RFC 3161 §2.3).
+const EKU_TIME_STAMPING: &str = "1.3.6.1.5.5.7.3.8";
+
 /// Extended key usages that allow signing documents: anyExtendedKeyUsage, emailProtection,
 /// codeSigning, documentSigning (RFC 9336), Adobe Authentic Documents and Microsoft document
 /// signing.
@@ -382,6 +385,18 @@ impl Certificate {
         } else {
             None
         }
+    }
+
+    /// Whether this certificate may stamp trusted time (RFC 3161 §2.3): its extended key usage
+    /// includes timeStamping, its key usage (if any) allows digital signatures or
+    /// non-repudiation, and it has no critical extension PdfCraft doesn't process. A certificate
+    /// issued for another purpose proves who signed, not when.
+    pub fn may_timestamp(&self) -> bool {
+        /// keyUsage bits 0 (digitalSignature) and 1 (nonRepudiation).
+        const SIGNING_BITS: u16 = 0b11;
+        self.extended_key_usage.as_ref().is_some_and(|e| e.iter().any(|o| o == EKU_TIME_STAMPING))
+            && self.key_usage.is_none_or(|u| u & SIGNING_BITS != 0)
+            && self.unknown_critical.is_empty()
     }
 
     /// [`signing_problem`](Self::signing_problem) as a clause that follows the certificate's

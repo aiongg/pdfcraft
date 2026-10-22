@@ -401,6 +401,7 @@ pub const WORDINGS: &[&str] = &[
     "The timestamp token could not be read ({}).",
     "The document has been altered or corrupted since the timestamp was applied.",
     "The timestamp authority's certificate was not valid at the time of timestamping.",
+    "The timestamp authority's certificate is not issued for time stamping.",
     "This document has not been modified since this timestamp was applied.",
     "The document has been modified since this timestamp was applied, but the changes are permitted ({}).",
     "The document has been altered since this timestamp was applied in ways it does not permit ({}).",
@@ -771,13 +772,16 @@ fn validate_into(doc: &Document, bytes: &[u8], trust: &TrustStore, v: &Dict, inf
                     // own claimed time, as without a timestamp.
                     let mut pool = crate::timestamp::token_certs(raw);
                     pool.extend(trust.certs.iter().cloned());
-                    let trusted_tsa = t
-                        .signer_certificate()
-                        .is_some_and(|c| c.valid_at(t.gen_time) && build_chain(&c, &pool, Some(t.gen_time)).iter().any(|x| trust.trusts(x)));
-                    if trusted_tsa {
+                    let tsa = t.signer_certificate();
+                    let trusted_tsa = tsa
+                        .as_ref()
+                        .is_some_and(|c| c.valid_at(t.gen_time) && build_chain(c, &pool, Some(t.gen_time)).iter().any(|x| trust.trusts(x)));
+                    if !trusted_tsa {
+                        unverified_time = Some(t.gen_time);
+                    } else if tsa.as_ref().is_some_and(Certificate::may_timestamp) {
                         info.timestamp_time = Some(t.gen_time);
                     } else {
-                        unverified_time = Some(t.gen_time);
+                        info.details.push(Detail::plain("The timestamp authority's certificate is not issued for time stamping."));
                     }
                 }
             }
@@ -1085,6 +1089,10 @@ fn validate_doc_timestamp(doc: &Document, bytes: &[u8], v: &Dict, info: &mut Sig
             info.status = Status::Unknown;
             info.details.push(Detail::plain("The timestamp authority's certificate was not valid at the time of timestamping."));
         }
+        if !cert.may_timestamp() {
+            info.status = Status::Unknown;
+            info.details.push(Detail::plain("The timestamp authority's certificate is not issued for time stamping."));
+        }
     }
     info.modification = if covered == bytes.len() || bytes[covered..].iter().all(|b| b.is_ascii_whitespace() || *b == 0) {
         Modification::None
@@ -1112,9 +1120,10 @@ fn validate_doc_timestamp(doc: &Document, bytes: &[u8], v: &Dict, info: &mut Sig
         pool.extend(trust.certs.iter().cloned());
         // A trusted authority whose certificate was not valid at the time it stamped proves
         // nothing either (its detail is already recorded above): never upgrade that to Valid.
-        let in_validity = token.signer_certificate().is_some_and(|c| c.valid_at(token.gen_time));
+        // Nor does one whose certificate is not issued for time stamping.
+        let may_stamp = token.signer_certificate().is_some_and(|c| c.valid_at(token.gen_time) && c.may_timestamp());
         let trusted_tsa = token.signer_certificate().is_some_and(|c| build_chain(&c, &pool, Some(token.gen_time)).iter().any(|x| trust.trusts(x)));
-        if trusted_tsa && in_validity {
+        if trusted_tsa && may_stamp {
             info.status = Status::Valid;
             info.details.push(Detail::plain("The timestamp token is valid and its authority is trusted."));
         } else if trusted_tsa {

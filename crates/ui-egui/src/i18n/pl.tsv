@@ -2523,6 +2523,7 @@ animation effects	Off	Wyłączone
 	The timestamp token could not be read ({}).	Nie udało się odczytać tokenu znacznika czasu ({}).
 	The document has been altered or corrupted since the timestamp was applied.	Dokument został zmieniony lub uszkodzony po dodaniu znacznika czasu.
 	The timestamp authority's certificate was not valid at the time of timestamping.	Certyfikat urzędu znacznika czasu nie był ważny w chwili oznaczania czasem.
+	The timestamp authority's certificate is not issued for time stamping.	Certyfikat urzędu znakowania czasem nie jest wystawiony do znakowania czasem.
 	This document has not been modified since this timestamp was applied.	Dokument nie był modyfikowany od dodania tego znacznika czasu.
 	The document has been modified since this timestamp was applied, but the changes are permitted ({}).	Dokument zmodyfikowano po dodaniu tego znacznika czasu, ale zmiany są dozwolone ({}).
 	The document has been altered since this timestamp was applied in ways it does not permit ({}).	Dokument zmieniono po dodaniu tego znacznika czasu w sposób, na który znacznik nie pozwala ({}).
