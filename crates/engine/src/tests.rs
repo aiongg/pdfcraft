@@ -4274,6 +4274,24 @@ fn actions_run_their_steps_on_files() {
     assert!(actions::run_on(&custom, "bad.pdf", Arc::new(b"nope".to_vec()), |_, _| {}).is_err());
 }
 
+/// A removal step that fails (here: a signed file can't be rewritten without its hidden data)
+/// fails the action, so the file is not passed on as cleaned.
+#[test]
+fn actions_fail_when_hidden_information_could_not_be_removed() {
+    let p12 = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../sign/tests/data/ec-p256.p12")).unwrap();
+    let digital_id = sign::pkcs12::open(&p12, "test").unwrap();
+    let mut s = Session::new().with_clock(|| 1_800_000_000);
+    let id = s.open("fixture.pdf", None, Arc::new(fixture(2)), None).unwrap();
+    s.apply(id, Edit::SetInfo { key: "Author".into(), value: "Private Name".into() }).unwrap();
+    let saved = s.save_bytes(id).unwrap();
+    s.mark_saved(id, saved, None).unwrap();
+    let signed = s.sign(id, &digital_id, SignOptions { page: 1, ..SignOptions::default() }).unwrap();
+    let built = actions::builtin();
+    let sanitize = built.iter().find(|a| a.name == "Sanitize Documents").unwrap();
+    let e = actions::run_on(sanitize, "signed.pdf", signed, |_, _| {}).map(|r| r.log).unwrap_err();
+    assert!(e.starts_with("Sanitize document:"), "{e}");
+}
+
 #[test]
 fn exporting_office_files_keeps_images() {
     let mut s = Session::new();
