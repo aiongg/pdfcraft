@@ -2,6 +2,7 @@
 //! with our reader and with an independent one (hayro-syntax's decryption). Also editing
 //! encrypted documents incrementally, changing and removing passwords, and permissions.
 
+use std::io::Write;
 use std::sync::Arc;
 
 use pdfcraft_cos::{Algorithm, Auth, CosError, Document, NewEncryption, ObjRef, Object, PdfString, SaveOptions, write_full, write_incremental};
@@ -214,11 +215,10 @@ fn unencrypted_metadata_is_left_readable() {
 #[test]
 fn qpdf_agrees() {
     let qpdf = pdfcraft_oracle::or_skip!(pdfcraft_oracle::qpdf());
-    let dir = std::env::temp_dir().join(format!("pdfcraft-enc-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
+    let dir = private_temp_dir("pdfcraft-enc");
     for alg in ALL {
         let path = dir.join(format!("{alg:?}.pdf"));
-        std::fs::write(&path, protect(alg, "user", "owner", -1)).unwrap();
+        std::fs::File::create_new(&path).and_then(|mut f| f.write_all(&protect(alg, "user", "owner", -1))).unwrap();
         for (pw, expect) in [("user", "user password"), ("owner", "owner password")] {
             let out = qpdf.command().arg(format!("--password={pw}")).arg("--show-encryption").arg(&path).output().unwrap();
             let text = String::from_utf8_lossy(&out.stdout);
@@ -228,6 +228,30 @@ fn qpdf_agrees() {
         }
     }
     let _ = std::fs::remove_dir_all(dir);
+}
+
+/// A new directory for oracle files, private to this user: an unpredictable name (`RandomState`
+/// is seeded by the operating system), created by this call or not at all.
+fn private_temp_dir(prefix: &str) -> std::path::PathBuf {
+    use std::hash::{BuildHasher, Hasher};
+    let mut name = std::collections::hash_map::RandomState::new().build_hasher();
+    name.write_u32(std::process::id());
+    let dir = std::env::temp_dir().join(format!("{prefix}-{:016x}", name.finish()));
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder.create(&dir).unwrap();
+    dir
+}
+
+/// Oracle files go in a directory this test created: another local account cannot have
+/// prepared it (or symlinks inside it) in advance.
+#[test]
+fn oracle_files_go_in_a_fresh_directory() {
+    let (a, b) = (private_temp_dir("pdfcraft-enc-probe"), private_temp_dir("pdfcraft-enc-probe"));
+    assert_ne!(a, b);
+    assert_eq!(std::fs::read_dir(&a).unwrap().count(), 0);
+    let _ = (std::fs::remove_dir(a), std::fs::remove_dir(b));
 }
 
 /// A signature dictionary's `/Contents` is never encrypted (§7.6.2): signers patch it in place
