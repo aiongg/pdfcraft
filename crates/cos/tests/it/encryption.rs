@@ -237,9 +237,14 @@ fn private_temp_dir(prefix: &str) -> std::path::PathBuf {
     let mut name = std::collections::hash_map::RandomState::new().build_hasher();
     name.write_u32(std::process::id());
     let dir = std::env::temp_dir().join(format!("{prefix}-{:016x}", name.finish()));
-    let mut builder = std::fs::DirBuilder::new();
     #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    let builder = {
+        let mut builder = std::fs::DirBuilder::new();
+        std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+        builder
+    };
+    #[cfg(not(unix))]
+    let builder = std::fs::DirBuilder::new();
     builder.create(&dir).unwrap();
     dir
 }
