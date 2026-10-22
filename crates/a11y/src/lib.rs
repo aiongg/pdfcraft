@@ -26,6 +26,8 @@ thread_local! {
     /// Marked-content stack entries read to decide which marks enclose an operator, for the tests
     /// that keep that constant per operator.
     static MARK_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Page content passes made to find figure bounds.
+    static BOUNDS_PASSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Counts `n` marked-content stack reads (tests only).
