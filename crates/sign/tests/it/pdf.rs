@@ -392,6 +392,11 @@ fn tsa_id() -> DigitalId {
 
 /// [`tsa_id`] with these extended key usages.
 fn tsa_id_with(ekus: &[&str]) -> DigitalId {
+    tsa_id_with_eku(ekus, true)
+}
+
+/// [`tsa_id`] with these extended key usages, in an extension marked critical or not.
+fn tsa_id_with_eku(ekus: &[&str], critical: bool) -> DigitalId {
     let key = pdfcraft_sign::PrivateKey::generate_p256().unwrap();
     let name = Name::build("Test TSA", "", "PdfCraft Tests", "", "US");
     let alg = key.preferred_digest();
@@ -400,7 +405,11 @@ fn tsa_id_with(ekus: &[&str]) -> DigitalId {
     let until = Time { year: 2036, ..from };
     let oids: Vec<Vec<u8>> = ekus.iter().map(|o| der::oid(o)).collect();
     let oids: Vec<&[u8]> = oids.iter().map(Vec::as_slice).collect();
-    let eku = der::seq(&[&der::oid("2.5.29.37"), &der::boolean(true), &der::octets(&der::seq(&oids))]);
+    let eku = if critical {
+        der::seq(&[&der::oid("2.5.29.37"), &der::boolean(true), &der::octets(&der::seq(&oids))])
+    } else {
+        der::seq(&[&der::oid("2.5.29.37"), &der::octets(&der::seq(&oids))])
+    };
     let tbs = der::seq(&[
         &der::explicit(0, &der::int(2)),
         &der::uint(&[0x31]),
@@ -2503,6 +2512,22 @@ fn switching_the_trailer_to_another_signed_catalog_is_not_permitted() {
     let s = signatures(&open(&switched), &switched, &trust).into_iter().find(|s| s.signed).expect("the signature is still listed");
     assert!(matches!(s.modification, Modification::Disallowed(_)), "{:?}", s.modification);
     assert_eq!(s.status, Status::Invalid, "{:?}", s.details);
+}
+
+/// RFC 3161 §2.3 requires a timestamp authority's extended key usage to be critical. A trusted
+/// certificate whose time-stamping purpose sits in a non-critical extension stamps nothing
+/// trusted.
+#[test]
+fn a_timestamp_authority_with_a_non_critical_extended_key_usage_is_not_trusted_time() {
+    let tsa =
+        TestTsa { id: tsa_id_with_eku(&["1.3.6.1.5.5.7.3.8"], false), time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 } };
+    assert!(!tsa.id.certificate.may_timestamp());
+    assert!(tsa_id().certificate.may_timestamp());
+    let stamped = pdfcraft_sign::timestamp_document(&open(&fixture()), &tsa, "D:20261006120000Z").unwrap();
+    let trust = TrustStore { certs: vec![tsa.id.certificate.clone()] };
+    let s = signatures(&open(&stamped), &stamped, &trust).into_iter().find(|s| s.doc_timestamp).unwrap();
+    assert_eq!((s.status, s.timestamp_time), (Status::Unknown, None), "{:?}", s.details);
+    assert!(s.details.iter().any(|d| d.message.contains("not issued for time stamping")), "{:?}", s.details);
 }
 
 /// Only a certificate issued for time stamping makes trusted time. A trusted certificate issued

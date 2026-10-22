@@ -135,6 +135,8 @@ pub struct Certificate {
     pub authority_key_id: Option<Vec<u8>>,
     /// Extended key usage OIDs (2.5.29.37), when present.
     pub extended_key_usage: Option<Vec<String>>,
+    /// Whether the extended key usage extension is marked critical.
+    pub extended_key_usage_critical: bool,
     /// OCSP responder URLs from the Authority Information Access (1.3.6.1.5.5.7.1.1).
     pub ocsp_urls: Vec<String>,
     /// CRL distribution point URLs (2.5.29.31).
@@ -187,6 +189,7 @@ struct Extensions {
     subject_key_id: Option<Vec<u8>>,
     authority_key_id: Option<Vec<u8>>,
     extended_key_usage: Option<Vec<String>>,
+    extended_key_usage_critical: bool,
     ocsp_urls: Vec<String>,
     crl_urls: Vec<String>,
 }
@@ -319,6 +322,9 @@ impl Certificate {
                 if critical && !PROCESSED_EXTENSIONS.contains(&o.as_str()) {
                     unknown_critical.push(o.clone());
                 }
+                if o == "2.5.29.37" {
+                    ext.extended_key_usage_critical = critical;
+                }
                 // A malformed or unreadable extension must never reject the whole certificate:
                 // unreadable ones are skipped and the fields they carry keep their defaults.
                 ext.read(o.as_str(), value);
@@ -332,6 +338,7 @@ impl Certificate {
             subject_key_id,
             authority_key_id,
             extended_key_usage,
+            extended_key_usage_critical,
             ocsp_urls,
             crl_urls,
         } = ext;
@@ -353,6 +360,7 @@ impl Certificate {
             subject_key_id,
             authority_key_id,
             extended_key_usage,
+            extended_key_usage_critical,
             ocsp_urls,
             crl_urls,
             version,
@@ -388,13 +396,14 @@ impl Certificate {
     }
 
     /// Whether this certificate may stamp trusted time (RFC 3161 §2.3): its extended key usage
-    /// includes timeStamping, its key usage (if any) allows digital signatures or
+    /// is marked critical and includes timeStamping, its key usage (if any) allows digital signatures or
     /// non-repudiation, and it has no critical extension PdfCraft doesn't process. A certificate
     /// issued for another purpose proves who signed, not when.
     pub fn may_timestamp(&self) -> bool {
         /// keyUsage bits 0 (digitalSignature) and 1 (nonRepudiation).
         const SIGNING_BITS: u16 = 0b11;
-        self.extended_key_usage.as_ref().is_some_and(|e| e.iter().any(|o| o == EKU_TIME_STAMPING))
+        self.extended_key_usage_critical
+            && self.extended_key_usage.as_ref().is_some_and(|e| e.iter().any(|o| o == EKU_TIME_STAMPING))
             && self.key_usage.is_none_or(|u| u & SIGNING_BITS != 0)
             && self.unknown_critical.is_empty()
     }
