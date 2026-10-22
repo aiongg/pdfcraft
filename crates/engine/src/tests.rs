@@ -1311,6 +1311,12 @@ fn copy_restricted_documents_refuse_extraction_unless_opened_by_the_owner() {
     let oid = s.open("r.pdf", None, bytes, Some("owner")).unwrap();
     assert!(s.get(oid).unwrap().allows_copying());
     assert!(extracting.iter().all(|c| enabled(&s, oid, c)));
+    // Comparing reads both documents' text out, into the result, the report and the comments.
+    let refused = || Err(EditError::NotPermitted("copying text and images"));
+    assert_eq!((s.compare(id, oid).map(|_| ()), s.compare(oid, id).map(|_| ())), (refused(), refused()));
+    assert_eq!(s.compare_report(oid, id).map(|_| ()), refused());
+    assert!(s.compare(oid, oid).is_ok());
+    assert_eq!(s.mark_differences(id, oid).map(|_| ()), refused());
     // Unencrypted documents allow everything.
     let (s, plain) = session_with(1);
     assert!(s.get(plain).unwrap().check_copying().is_ok() && extracting.iter().all(|c| enabled(&s, plain, c)));
