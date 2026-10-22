@@ -254,7 +254,7 @@ fn content_pass(doc: &mut Document, text: bool, layers: bool, write: bool) -> Re
             let mut cleaned_page = page.dict.clone();
             cleaned_page.set(b"Contents".to_vec(), Object::Array(new_list.clone()));
             let (_, page_content) = page_streams(doc, &cleaned_page, pi)?;
-            let mut res = resources;
+            let mut res = resources.clone();
             if !out.xobjects.is_empty() || !out.replaced.is_empty() {
                 let mut xo = res.get(b"XObject").and_then(|x| doc.resolve(x).as_dict().cloned()).unwrap_or_default();
                 // A full save keeps whatever is still referenced: unlink the originals this page no
@@ -270,6 +270,17 @@ fn content_pass(doc: &mut Document, text: bool, layers: bool, write: bool) -> Re
                 d.set(b"Contents".to_vec(), Object::Array(new_list));
                 d.set(b"Resources".to_vec(), Object::Dict(res));
             })?;
+            // Tags must not describe or point at what the page no longer shows.
+            let (changed_ids, empty_ids) = crate::tags::touched(
+                doc,
+                &resources,
+                pdfcraft_content::Pieces::join(&data).data(),
+                pdfcraft_content::Pieces::join(&page_content).data(),
+            );
+            crate::tags::clean(doc, page.obj, None, &changed_ids, &empty_ids)?;
+        }
+        for (old, new, changed, empty) in out.tag_changes {
+            crate::tags::clean(doc, page.obj, Some((old, new)), &changed, &empty)?;
         }
     }
     // What a page no longer draws must not stay reachable through an inherited or shared

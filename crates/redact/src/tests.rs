@@ -2549,3 +2549,31 @@ fn removing_form_fields_takes_hidden_widgets_and_their_values_out_of_the_file() 
     assert_no_secret(&doc, b"LEAK_");
     assert!(annots_of(&doc, &pdfcraft_model::pages(&doc).swap_remove(0).dict).is_empty());
 }
+
+/// Removing hidden text cleans the structure tree as redaction does: the elements describing the
+/// removed text lose their descriptions, and a reference into a rewritten Form points at the copy.
+#[test]
+fn removing_hidden_text_cleans_the_structure_tree() {
+    use crate::sanitize::{Hidden, remove_hidden};
+    let mut doc = one_page(
+        b"/P <</MCID 0>> BDC BT /F1 10 Tf 3 Tr 10 200 Td (SECRET) Tj ET EMC /P <</MCID 1>> BDC BT /F1 10 Tf 0 Tr 10 100 Td (Public) Tj ET EMC /Fm Do",
+        "/XObject << /Fm 7 0 R >>",
+        vec![
+            stream(
+                "/Type /XObject /Subtype /Form /BBox [0 0 300 300] /Resources << /Font << /F1 5 0 R >> >>",
+                b"/P <</MCID 0>> BDC BT /F1 10 Tf 3 Tr 10 150 Td (FORMSECRET) Tj ET EMC",
+            ),
+            b"<< /Type /StructTreeRoot /K 9 0 R >>".to_vec(),
+            b"<< /S /Document /P 8 0 R /K [10 0 R 11 0 R 12 0 R] >>".to_vec(),
+            b"<< /S /P /P 9 0 R /Pg 3 0 R /ActualText (LEAK_PAGE_TAG) /K 0 >>".to_vec(),
+            b"<< /S /P /P 9 0 R /Pg 3 0 R /ActualText (Public) /K 1 >>".to_vec(),
+            b"<< /S /P /P 9 0 R /Pg 3 0 R /Alt (LEAK_FORM_TAG) /K << /Type /MCR /Pg 3 0 R /Stm 7 0 R /MCID 0 >> >>".to_vec(),
+        ],
+    );
+    doc.update_dict(doc.root().unwrap(), |d| d.set(b"StructTreeRoot".to_vec(), Object::Ref(ObjRef::new(8, 0)))).unwrap();
+    doc.update_dict(ObjRef::new(3, 0), |d| d.set(b"StructParents".to_vec(), Object::Int(0))).unwrap();
+    remove_hidden(&mut doc, &[Hidden::HiddenText]).unwrap();
+    assert_no_secret(&doc, b"LEAK_");
+    assert_no_secret(&doc, b"SECRET");
+    assert!(doc.get(ObjRef::new(11, 0)).as_dict().unwrap().contains(b"ActualText"), "untouched content keeps its tags");
+}
