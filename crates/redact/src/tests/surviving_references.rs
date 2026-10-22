@@ -3,7 +3,7 @@
 use super::*;
 
 /// Whether `secret` survives a full save of `doc`, in the file's bytes or in a decoded stream.
-fn full_save_holds(doc: &Document, secret: &[u8]) -> bool {
+pub(super) fn full_save_holds(doc: &Document, secret: &[u8]) -> bool {
     let bytes = write_full(doc, &SaveOptions::default()).unwrap();
     let found = |data: &[u8]| data.windows(secret.len()).any(|w| w == secret);
     if found(&bytes) {

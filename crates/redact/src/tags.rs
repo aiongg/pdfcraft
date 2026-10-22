@@ -183,20 +183,21 @@ pub(crate) fn clean_within(
     // also from the parent tree and the ID tree: one listed only there still owns marked content
     // (#3302). The stack pops /K first, so an element reached through /K gets the page it inherits
     // from its ancestors before a tree reaches it without one.
-    let mut todo: Vec<(Object, Option<ObjRef>)> =
-        [&b"IDTree"[..], b"ParentTree", b"K"].iter().filter_map(|key| root.get(key).cloned()).map(|k| (k, None)).collect();
+    let mut todo: Vec<(Object, Option<ObjRef>, Above)> =
+        [&b"IDTree"[..], b"ParentTree", b"K"].iter().filter_map(|key| root.get(key).cloned()).map(|k| (k, None, Above::default())).collect();
     let mut seen = HashSet::new();
     let mut pages = HashMap::new();
+    let mut parents = Parents::new();
     let mut hits: Vec<(ObjRef, Dict, Option<ObjRef>, bool)> = Vec::new();
     // Whether marked content `x` (a kid on page `pg`) is one this cleanup must change.
     let touches = |doc: &Document, x: &Object, pg: Option<ObjRef>| {
         mcid_of(doc, x, pg, page, stream).is_some_and(|m| stream.is_some() || changed.contains(&m) || empty.contains(&m))
     };
-    while let Some((k, pg)) = todo.pop() {
+    while let Some((k, pg, above)) = todo.pop() {
         match k {
-            Object::Array(a) => todo.extend(a.into_iter().map(|x| (x, pg))),
+            Object::Array(a) => todo.extend(a.into_iter().map(|x| (x, pg, above))),
             // A number or name tree node written in place.
-            Object::Dict(d) if !d.contains(b"S") => todo.extend(tree_node_entries(&d).into_iter().map(|x| (x, pg))),
+            Object::Dict(d) if !d.contains(b"S") => todo.extend(tree_node_entries(&d).into_iter().map(|x| (x, pg, above))),
             // An element written in place: its kids are followed, but if it owns marked content
             // this cleanup changes, only rewriting what holds it could change it.
             Object::Dict(d) => {
@@ -208,9 +209,11 @@ pub(crate) fn clean_within(
                 if kids.iter().any(|x| touches(doc, x, pg)) {
                     return Err(RedactError::Tags);
                 }
-                todo.extend(kids.into_iter().map(|x| (x, pg)));
+                let above = above.through(&d);
+                todo.extend(kids.into_iter().map(|x| (x, pg, above)));
             }
             Object::Ref(r) => {
+                parents.record(r, above);
                 if !seen.insert(r) {
                     continue;
                 }
@@ -219,13 +222,13 @@ pub(crate) fn clean_within(
                 }
                 let object = doc.get(r);
                 if let Object::Array(a) = &*object {
-                    todo.extend(a.iter().cloned().map(|x| (x, pg)));
+                    todo.extend(a.iter().cloned().map(|x| (x, pg, above)));
                     continue;
                 }
                 let Some(d) = object.as_dict().cloned() else { continue };
                 if !d.contains(b"S") {
                     // A parent tree or ID tree node: its values may be elements.
-                    todo.extend(tree_node_entries(&d).into_iter().map(|x| (x, pg)));
+                    todo.extend(tree_node_entries(&d).into_iter().map(|x| (x, pg, above)));
                     continue;
                 }
                 let pg = match d.get(b"Pg").and_then(Object::as_ref).or(pg) {
@@ -238,11 +241,12 @@ pub(crate) fn clean_within(
                 if sensitive || remap {
                     hits.push((r, d.clone(), pg, sensitive));
                 }
-                todo.extend(kids.into_iter().map(|x| (x, pg)));
+                todo.extend(kids.into_iter().map(|x| (x, pg, Above::element(r))));
             }
             _ => {}
         }
     }
+    let sensitive: Vec<ObjRef> = hits.iter().filter(|h| h.3).map(|h| h.0).collect();
     let mut n = 0;
     for (r, d, pg, sensitive) in hits {
         let kids = d.get(b"K").map(|k| doc.resolve(k));
@@ -291,7 +295,86 @@ pub(crate) fn clean_within(
         })?;
         n += usize::from(sensitive && doc.get(r).as_dict() != Some(&d));
     }
+    // An element above may describe the changed content too (`/ActualText` on a span's parent
+    // covers the span, §14.9.4).
+    n += clear_ancestors(doc, &sensitive, &parents, limit)?;
     Ok(n)
+}
+
+/// Where the walk reached an object from: the nearest element above it that is an object of its
+/// own, and whether an element written in place between them carries a description (which only
+/// rewriting the object holding it could remove).
+#[derive(Clone, Copy, Default)]
+struct Above {
+    element: Option<ObjRef>,
+    described_in_place: bool,
+}
+
+impl Above {
+    fn element(r: ObjRef) -> Self {
+        Self { element: Some(r), described_in_place: false }
+    }
+
+    /// Below an element written in place.
+    fn through(self, d: &Dict) -> Self {
+        Self { described_in_place: self.described_in_place || DESCRIPTIONS.iter().any(|k| d.contains(k)), ..self }
+    }
+}
+
+/// The keys of an element that describe its content.
+const DESCRIPTIONS: [&[u8]; 3] = [b"Alt", b"ActualText", b"E"];
+
+/// Each element's parents as the walk found them: through `/K`, which `/P` may not agree with.
+struct Parents(HashMap<ObjRef, Vec<Above>>);
+
+impl Parents {
+    fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    fn record(&mut self, r: ObjRef, above: Above) {
+        if above.element.is_some() || above.described_in_place {
+            self.0.entry(r).or_default().push(above);
+        }
+    }
+}
+
+/// Remove the descriptions of every element above `elements`, through both `/P` and the walk's
+/// `parents`; returns how many elements changed. [`RedactError::Tags`] when an element written in
+/// place above them carries one, or when there are more than `limit` ancestors.
+fn clear_ancestors(doc: &mut Document, elements: &[ObjRef], parents: &Parents, limit: usize) -> Result<usize, RedactError> {
+    let mut todo: Vec<ObjRef> = elements.to_vec();
+    let mut seen: HashSet<ObjRef> = elements.iter().copied().collect();
+    let mut cleared = 0;
+    while let Some(r) = todo.pop() {
+        let mut up: Vec<ObjRef> = doc.get(r).as_dict().and_then(|d| d.get(b"P")).and_then(Object::as_ref).into_iter().collect();
+        for above in parents.0.get(&r).into_iter().flatten() {
+            if above.described_in_place {
+                return Err(RedactError::Tags);
+            }
+            up.extend(above.element);
+        }
+        for a in up {
+            if !seen.insert(a) {
+                continue;
+            }
+            if seen.len() > limit {
+                return Err(RedactError::Tags);
+            }
+            // The structure tree root (no /S) ends the climb.
+            let Some(d) = doc.get(a).as_dict().filter(|d| d.contains(b"S")).cloned() else { continue };
+            if DESCRIPTIONS.iter().any(|k| d.contains(k)) {
+                doc.update_dict(a, |e| {
+                    for key in DESCRIPTIONS {
+                        e.remove(key);
+                    }
+                })?;
+                cleared += 1;
+            }
+            todo.push(a);
+        }
+    }
+    Ok(cleared)
 }
 
 /// The page an element inherits (§14.7.4.4): the nearest `/Pg` among its ancestors, following
@@ -384,12 +467,14 @@ pub(crate) fn drop_object_refs_within(doc: &mut Document, gone: &HashSet<ObjRef>
     };
     // Elements are reached from the root's /K, and also from the parent tree and the ID tree:
     // one listed only there (left behind by an editor, say) still points at its annotation.
-    let mut todo: Vec<Object> = [&b"K"[..], b"ParentTree", b"IDTree"].iter().filter_map(|key| root.get(key).cloned()).collect();
+    let mut todo: Vec<(Object, Above)> =
+        [&b"K"[..], b"ParentTree", b"IDTree"].iter().filter_map(|key| root.get(key).cloned()).map(|k| (k, Above::default())).collect();
     let mut seen = HashSet::new();
+    let mut parents = Parents::new();
     let mut hits: Vec<ObjRef> = Vec::new();
-    while let Some(k) = todo.pop() {
+    while let Some((k, above)) = todo.pop() {
         match k {
-            Object::Array(a) => todo.extend(a),
+            Object::Array(a) => todo.extend(a.into_iter().map(|x| (x, above))),
             // A structure element written in place: its kids are followed; one that tags a
             // removed annotation can't be changed here (see above).
             Object::Dict(d) if d.contains(b"S") => {
@@ -397,11 +482,13 @@ pub(crate) fn drop_object_refs_within(doc: &mut Document, gone: &HashSet<ObjRef>
                 if kids.iter().any(|x| refers_to(doc, x, gone)) {
                     return Err(RedactError::Tags);
                 }
-                todo.extend(kids);
+                let above = above.through(&d);
+                todo.extend(kids.into_iter().map(|x| (x, above)));
             }
             // A number or name tree node written in place (§7.9.6, §7.9.7): its values and kids.
-            Object::Dict(d) => todo.extend(tree_node_entries(&d)),
+            Object::Dict(d) => todo.extend(tree_node_entries(&d).into_iter().map(|x| (x, above))),
             Object::Ref(r) => {
+                parents.record(r, above);
                 if !seen.insert(r) {
                     continue;
                 }
@@ -410,26 +497,26 @@ pub(crate) fn drop_object_refs_within(doc: &mut Document, gone: &HashSet<ObjRef>
                 }
                 let object = doc.get(r);
                 if let Object::Array(a) = &*object {
-                    todo.extend(a.iter().cloned());
+                    todo.extend(a.iter().cloned().map(|x| (x, above)));
                     continue;
                 }
                 let Some(d) = object.as_dict() else { continue };
                 if !d.contains(b"S") {
                     // A parent tree or ID tree node: its values may be elements.
-                    todo.extend(tree_node_entries(d));
+                    todo.extend(tree_node_entries(d).into_iter().map(|x| (x, above)));
                     continue;
                 }
                 let kids = kids_of(doc, d);
                 if kids.iter().any(|x| refers_to(doc, x, gone)) {
                     hits.push(r);
                 }
-                todo.extend(kids);
+                todo.extend(kids.into_iter().map(|x| (x, Above::element(r))));
             }
             _ => {}
         }
     }
     let mut n = 0;
-    for r in hits {
+    for &r in &hits {
         let Some(d) = doc.get(r).as_dict().cloned() else { continue };
         let kids = d.get(b"K").map(|k| doc.resolve(k));
         let array = kids.as_ref().is_some_and(|k| matches!(&**k, Object::Array(_)));
@@ -449,15 +536,15 @@ pub(crate) fn drop_object_refs_within(doc: &mut Document, gone: &HashSet<ObjRef>
             } else {
                 e.remove(b"K");
             }
-            // An element left with nothing to tag keeps no text describing what it tagged:
-            // a link's alternate text often repeats the URL, an annotation's its comment.
-            if keep.is_empty() {
-                for key in [&b"Alt"[..], b"ActualText", b"T", b"E"] {
-                    e.remove(key);
-                }
+            // An element that lost an annotation keeps no text describing it, even with other
+            // kids left: a link's alternate text often repeats the URL, an annotation's its
+            // comment. Elements above it may describe it too.
+            for key in [&b"Alt"[..], b"ActualText", b"T", b"E"] {
+                e.remove(key);
             }
         })?;
     }
+    clear_ancestors(doc, &hits, &parents, limit)?;
     Ok(n)
 }
 
