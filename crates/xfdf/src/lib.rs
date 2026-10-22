@@ -246,6 +246,15 @@ fn nums_of(doc: &Document, o: Option<&Object>) -> Vec<f64> {
     o.map(|o| doc.resolve(o)).and_then(|a| a.as_array().map(|a| a.iter().filter_map(|x| doc.resolve(x).as_f64()).collect())).unwrap_or_default()
 }
 
+/// A `/Rect` of exactly four finite numbers; any other entry makes the whole rectangle unusable.
+fn rect_strict(doc: &Document, o: Option<&Object>) -> Option<[f64; 4]> {
+    let num = |x: &Object| doc.resolve(x).as_f64().filter(|v| v.is_finite());
+    match doc.resolve(o?).as_array()?.as_slice() {
+        [x0, y0, x1, y1] => Some([num(x0)?, num(y0)?, num(x1)?, num(y1)?]),
+        _ => None,
+    }
+}
+
 /// Whether a quad's four corners enclose any area: some three of them are not collinear.
 fn quad_has_area(q: &[f64; 8]) -> bool {
     let [ax, ay, bx, by, cx, cy, dx, dy] = *q;
@@ -1053,8 +1062,8 @@ fn place(doc: &mut Document, page_ref: ObjRef, mut d: Dict) -> Result<ObjRef, Da
             // Quads the outline can't draw, or any quad that encloses no area, are replaced by the
             // /Rect's, or dropped when there is no usable /Rect either; such a mark then removes
             // nothing.
-            match nums_of(doc, d.get(b"Rect"))[..] {
-                [x0, y0, x1, y1] if [x0, y0, x1, y1].iter().all(|v| v.is_finite()) => {
+            match rect_strict(doc, d.get(b"Rect")) {
+                Some([x0, y0, x1, y1]) => {
                     let (l, r, b, t) = (x0.min(x1), x0.max(x1), y0.min(y1), y0.max(y1));
                     d.set(b"QuadPoints".to_vec(), arr(&[l, t, r, t, l, b, r, b]));
                 }

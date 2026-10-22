@@ -1751,3 +1751,10 @@ fn an_imported_redaction_mark_with_zero_area_quads_falls_back_to_its_rect() {
         assert_eq!(quads, rect_quads, "zero-area quads were kept: {mark:?}");
     }
 }
+
+#[test]
+fn an_imported_redaction_rect_with_a_non_number_is_not_used() {
+    let fdf = b"%FDF-1.2\n1 0 obj\n<< /FDF << /Annots [<< /Subtype /Redact /NM (r1) /Page 0 /Rect [0 0 /Bad 100 100] >>] >> >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
+    let mark = imported_redact_mark(fdf);
+    assert!(mark.get(b"QuadPoints").is_none(), "quads were drawn from a malformed /Rect: {mark:?}");
+}
