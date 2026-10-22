@@ -205,6 +205,9 @@ fn content_pass(doc: &mut Document, text: bool, layers: bool, write: bool) -> Re
             if write {
                 return Err(RedactError::Unreadable(pi + 1));
             }
+            // Content that can't be read may hide anything: count it so the removal runs and
+            // refuses the page, instead of a zero count skipping it.
+            total += 1;
             continue;
         };
         let resources = page.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();

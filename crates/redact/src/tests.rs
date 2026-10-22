@@ -2494,3 +2494,23 @@ fn a_name_tree_whose_nodes_share_kids_counts_each_entry_once() {
     let counts: std::collections::HashMap<Hidden, usize> = scan(&doc).into_iter().collect();
     assert_eq!(counts[&Hidden::Attachments], 1, "one entry, reached through 2^{levels} paths");
 }
+
+/// Page content that stops decoding at its start (`z` inside an ASCII85 group) while the rest of
+/// the stream draws hidden text. A tolerant decode reads nothing, counts nothing and keeps the
+/// stream; sanitizing must refuse instead.
+#[test]
+fn hidden_text_in_content_that_stops_decoding_is_refused() {
+    use crate::sanitize::{Hidden, remove_hidden, sanitize};
+    let encoded: &[u8] = br"!!z6<#'\7PQ#?0Ha>,+>Y->EZd(j+>PW)+B2ko-rWQ%;FOP6+B3(u78s~>";
+    let fresh = || {
+        let mut doc = one_page(b"", "", vec![stream("/Filter /ASCII85Decode", encoded)]);
+        doc.update_dict(ObjRef::new(3, 0), |d| d.set(b"Contents".to_vec(), Object::Ref(ObjRef::new(7, 0)))).unwrap();
+        doc
+    };
+    let mut doc = fresh();
+    let out = remove_hidden(&mut doc, &[Hidden::HiddenText]);
+    assert!(matches!(out, Err(RedactError::Unreadable(1))), "{out:?}");
+    let mut doc = fresh();
+    let out = sanitize(&mut doc);
+    assert!(matches!(out, Err(RedactError::Unreadable(1))), "{out:?}");
+}
