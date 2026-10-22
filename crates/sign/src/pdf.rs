@@ -1286,6 +1286,11 @@ fn classify_changes(doc: &Document, old: Option<Document>, p: Option<u8>) -> Mod
             disallowed.push(what);
         }
     }
+    // The trailer chooses the catalog. A later revision that points it at another catalog (one
+    // already in the signed file, so no object changes) shows another document.
+    if doc.root() != old.root() {
+        disallowed.push(kind::STRUCTURE);
+    }
     for num in doc.object_numbers() {
         if same_place(num) {
             continue;

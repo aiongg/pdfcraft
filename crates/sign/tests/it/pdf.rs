@@ -2471,3 +2471,27 @@ fn rewritten_page_resources_are_page_content_whatever_keys_they_carry() {
         s.modification
     );
 }
+
+/// A later revision that only points the trailer at another catalog already in the signed file
+/// shows a different document while every signed object is unchanged. That is not permitted.
+#[test]
+fn switching_the_trailer_to_another_signed_catalog_is_not_permitted() {
+    let base = fixture_with(
+        b"<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [6 0 R] >> >>",
+        &[
+            b"<< /Type /Catalog /Pages 8 0 R /AcroForm << /Fields [6 0 R] >> >>",
+            b"<< /Type /Pages /Kids [9 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 8 0 R /MediaBox [0 0 300 300] /Contents 10 0 R /Resources << /Font << /F1 5 0 R >> >> /Annots [6 0 R] >>",
+            b"<< /Length 44 >>\nstream\nBT /F1 14 Tf 20 250 Td (Contract void) Tj ET\nendstream",
+        ],
+    );
+    let id = pkcs12::open(&data("ec-p256.p12"), "test").unwrap();
+    let trust = TrustStore { certs: vec![id.certificate.clone()] };
+    let signed = pdfcraft_sign::sign(&open(&base), &id, &SignOptions { field: Some("Approval".into()), rect: None, ..opts() }).unwrap();
+    let s = signatures(&open(&signed), &signed, &trust).into_iter().find(|s| s.signed).unwrap();
+    assert_eq!(s.status, Status::Valid, "{:?}", s.details);
+    let switched = edit_after(&signed, |doc| doc.trailer_mut().set(b"Root".to_vec(), oref(7)));
+    let s = signatures(&open(&switched), &switched, &trust).into_iter().find(|s| s.signed).expect("the signature is still listed");
+    assert!(matches!(s.modification, Modification::Disallowed(_)), "{:?}", s.modification);
+    assert_eq!(s.status, Status::Invalid, "{:?}", s.details);
+}
