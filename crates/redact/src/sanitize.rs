@@ -92,28 +92,38 @@ const NAME_TREE_NODE_BUDGET: usize = 100_000;
 
 /// Entries of a name tree (`/Names` leaves, `/Kids` recursion). Each indirect node is read once,
 /// however many `/Kids` arrays list it, so shared or cyclic kids cost one step per node rather
-/// than one per path; depth and a total node budget bound the rest.
+/// than one per path. Every `/Kids` entry the walk does not descend into (a repeated reference or
+/// a non-dictionary) costs a step as well, so a long `/Kids` array of repeats cannot outrun the
+/// budget. Depth and a total step budget bound the rest.
 fn name_tree_len(doc: &Document, node: &Dict) -> usize {
     let (mut seen, mut visited) = (std::collections::HashSet::new(), 0);
     name_tree_len_seen(doc, node, 0, &mut seen, &mut visited)
 }
 
 fn name_tree_len_seen(doc: &Document, node: &Dict, depth: usize, seen: &mut std::collections::HashSet<ObjRef>, visited: &mut usize) -> usize {
-    *visited += 1;
+    *visited = visited.saturating_add(1);
     if depth > 32 || *visited > NAME_TREE_NODE_BUDGET {
         return 0;
     }
     let leaves = node.get(b"Names").and_then(|n| doc.resolve(n).as_array().map(|a| a.len() / 2)).unwrap_or(0);
-    let kids = node.get(b"Kids").and_then(|k| doc.resolve(k).as_array().cloned()).unwrap_or_default();
     let mut n = leaves;
-    for k in &kids {
-        if let Object::Ref(r) = k
-            && !seen.insert(*r)
-        {
-            continue;
+    let kids = node.get(b"Kids").map(|k| doc.resolve(k));
+    for k in kids.as_deref().and_then(Object::as_array).map_or(&[][..], Vec::as_slice) {
+        if *visited > NAME_TREE_NODE_BUDGET {
+            break;
         }
-        if let Some(kid) = doc.resolve(k).as_dict() {
-            n = n.saturating_add(name_tree_len_seen(doc, kid, depth + 1, seen, visited));
+        let held;
+        let kid = match k {
+            Object::Ref(r) if !seen.insert(*r) => None,
+            Object::Ref(r) => {
+                held = doc.get(*r);
+                held.as_dict()
+            }
+            other => other.as_dict(),
+        };
+        match kid {
+            Some(kid) => n = n.saturating_add(name_tree_len_seen(doc, kid, depth + 1, seen, visited)),
+            None => *visited = visited.saturating_add(1),
         }
     }
     n
