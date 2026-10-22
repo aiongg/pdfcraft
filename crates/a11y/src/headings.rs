@@ -285,17 +285,17 @@ pub(crate) fn mcid_texts(doc: &Document, page: &Dict) -> HashMap<i64, String> {
             };
             for (code, len) in m.codes(&s.bytes) {
                 let trm = tm.then(&gs.ctm);
+                // A glyph's text is only built while its id still takes more.
                 if let Some(id) = id
+                    && out.get(&id).is_none_or(|t| t.len() < MAX_TITLE * 4)
                     && let Some(glyph) = m.text_of(code)
                 {
                     let text = out.entry(id).or_default();
-                    if text.len() < MAX_TITLE * 4 {
-                        let breaks = ends.get(&id).is_some_and(|end| new_word(&trm, *end, gs.size, gs.scale));
-                        if breaks && !text.is_empty() && !text.ends_with(' ') && !glyph.starts_with(' ') {
-                            text.push(' ');
-                        }
-                        text.push_str(&glyph);
+                    let breaks = ends.get(&id).is_some_and(|end| new_word(&trm, *end, gs.size, gs.scale));
+                    if breaks && !text.is_empty() && !text.ends_with(' ') && !glyph.starts_with(' ') {
+                        text.push(' ');
                     }
+                    text.push_str(&glyph);
                 }
                 let advance = m.width(code) * gs.size + gs.char_spacing + if m.is_space(code, len) { gs.word_spacing } else { 0.0 };
                 tm = Matrix::translate(advance * gs.scale, 0.0).then(&tm);

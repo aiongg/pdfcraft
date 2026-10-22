@@ -905,9 +905,13 @@ impl Metrics {
     }
 }
 
-/// The UTF-16 code units of CMap hex bytes.
+/// Most UTF-16 units kept from one ToUnicode destination: the CMap format allows destinations of up
+/// to 512 bytes, and every glyph a sequential range covers builds its text from the whole of one.
+const MAX_DESTINATION_UNITS: usize = 256;
+
+/// The UTF-16 code units of CMap hex bytes, at most [`MAX_DESTINATION_UNITS`] of them.
 fn code_units(b: &[u8]) -> Vec<u16> {
-    b.chunks(2).map(|c| u16::from_be_bytes([c[0], *c.get(1).unwrap_or(&0)])).collect()
+    b.chunks(2).take(MAX_DESTINATION_UNITS).map(|c| u16::from_be_bytes([c[0], *c.get(1).unwrap_or(&0)])).collect()
 }
 
 /// UTF-16BE (with surrogates) from CMap hex bytes.
@@ -1261,6 +1265,20 @@ mod tests {
     use pdfcraft_cos::{Dict, Document, Object, Stream};
 
     use super::*;
+
+    /// Every glyph of a sequential range builds its text from the destination, so a long one is cut
+    /// to the CMap limit once, when it is read.
+    #[test]
+    fn unicode_destinations_are_cut_to_the_cmap_limit() {
+        let long = "0041".repeat(4096);
+        let cmap = format!("2 beginbfrange <0010> <0020> <{long}> <0030> <0030> [<{long}>] endbfrange 1 beginbfchar <0040> <{long}> endbfchar");
+        let mut u = Unicode::default();
+        parse_to_unicode(cmap.as_bytes(), &mut u);
+        for code in [0x10, 0x20, 0x30, 0x40] {
+            let text = u.text(code).unwrap_or_default();
+            assert!(!text.is_empty() && text.len() <= MAX_DESTINATION_UNITS * 3, "code {code:#x}: {} bytes", text.len());
+        }
+    }
 
     /// A font whose ranges cover a few low codes keeps tables that size, not a fixed 64k-entry one.
     #[test]
