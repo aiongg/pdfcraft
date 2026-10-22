@@ -981,7 +981,7 @@ fn recovered_render_password(cos: &pdfcraft_cos::Document) -> Option<String> {
 ///
 /// Redaction decides what lies under a mark from the positions its own interpreter computes, and
 /// its verify pass reuses them. Where they differ from the renderer's (a standard font without
-/// /Widths, whose advances the interpreter approximates; a CMap, or a font set outside `Tf`,
+/// /Widths, whose advances the interpreter approximates; a CMap
 /// that it reads differently), a mark drawn over the text as displayed lies over glyphs the
 /// interpreter believes are elsewhere: they stay in the file and nothing notices. The renderer is
 /// what the user saw when placing the marks, so it is asked. `after` is written as a save would

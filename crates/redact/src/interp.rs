@@ -690,6 +690,34 @@ fn prune_form_resources(doc: &Document, res: &mut Dict, content: &[Vec<u8>]) -> 
     Ok(())
 }
 
+/// The font, writing direction and size an ExtGState's `/Font [font size]` entry sets, as `Tf`
+/// would (ISO 32000-2 §8.4.5); `None` when `name` sets no font. The metrics are cached with the
+/// fonts `Tf` names, under a key no resource name can take (a name cannot hold a null byte).
+fn extgstate_font(
+    doc: &Document,
+    scope: &mut Scope<'_>,
+    ext_gstates: &Dict,
+    name: &[u8],
+    fallback: &Rc<Metrics>,
+) -> Option<(Rc<Metrics>, bool, f64)> {
+    let state = doc.resolve(ext_gstates.get(name)?).as_dict().cloned()?;
+    let entry = doc.resolve(state.get(b"Font")?).as_array().cloned()?;
+    let [font, size] = entry.as_slice() else { return None };
+    let size = doc.resolve(size).as_f64()?;
+    let font_dict = doc.resolve(font).as_dict().cloned();
+    let vertical = font_dict.as_ref().is_some_and(|d| is_vertical(doc, d));
+    let key = [b"\0".as_slice(), name].concat();
+    let metrics = match scope.fonts.get(&key) {
+        Some(m) => m.clone(),
+        None => {
+            let m = font_dict.as_ref().map(|d| Rc::new(Metrics::from_dict(doc, d))).unwrap_or_else(|| fallback.clone());
+            scope.fonts.insert(key, m.clone());
+            m
+        }
+    };
+    Some((metrics, vertical, size))
+}
+
 /// One glyph of a shown string.
 struct Glyph {
     bytes: std::ops::Range<usize>,
@@ -700,11 +728,9 @@ struct Glyph {
 
 /// Process a scope's content streams (state flows from one stream to the next).
 pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<u8>], resources: &Dict, ctm: Matrix) -> Output {
-    let mut out = Output::default();
-    let fallback = Rc::new(Metrics::fallback());
-    let mut gs = Gs {
+    let gs = Gs {
         ctm,
-        font: fallback.clone(),
+        font: Rc::new(Metrics::fallback()),
         vertical: false,
         size: 0.0,
         char_spacing: 0.0,
@@ -714,9 +740,19 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
         leading: 0.0,
         rise: 0.0,
     };
+    process_from(doc, scope, streams, resources, gs)
+}
+
+/// [`process`] from graphics state `gs`: a form XObject starts with its caller's, text state
+/// included (ISO 32000-2 §8.10.1), so text it shows without setting a font of its own is placed
+/// with the caller's font, size and spacing, as the renderer places it.
+fn process_from(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<u8>], resources: &Dict, mut gs: Gs) -> Output {
+    let mut out = Output::default();
+    let fallback = Rc::new(Metrics::fallback());
     let mut stack: Vec<Gs> = Vec::new();
     let (mut tm, mut tlm) = (Matrix::IDENTITY, Matrix::IDENTITY);
     let fonts_res = res_dict(doc, resources, b"Font");
+    let ext_gstates = res_dict(doc, resources, b"ExtGState");
     let mut xobjects = res_dict(doc, resources, b"XObject");
     // The current path: its operators, its bounding box in user space, and whether it clips.
     let mut path: Vec<Op> = Vec::new();
@@ -863,6 +899,11 @@ pub(crate) fn process(doc: &mut Document, scope: &mut Scope<'_>, streams: &[Vec<
                                 m
                             }
                         };
+                    }
+                }
+                b"gs" => {
+                    if let Some((font, vertical, size)) = op.name(0).and_then(|n| extgstate_font(doc, scope, &ext_gstates, n, &fallback)) {
+                        (gs.font, gs.vertical, gs.size) = (font, vertical, size);
                     }
                 }
                 b"Tc" => gs.char_spacing = op.num(0).unwrap_or(0.0),
@@ -1222,7 +1263,7 @@ fn xobject(
             let res = own.clone().unwrap_or_else(|| resources.clone());
             let saved_fonts = std::mem::take(&mut scope.fonts);
             scope.depth += 1;
-            let inner = process(doc, scope, std::slice::from_ref(&data), &res, fctm);
+            let inner = process_from(doc, scope, std::slice::from_ref(&data), &res, Gs { ctm: fctm, ..gs.clone() });
             scope.depth -= 1;
             scope.fonts = saved_fonts;
             out.residue += inner.residue;

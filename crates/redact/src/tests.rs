@@ -2463,6 +2463,7 @@ fn unused_descriptions_in_shared_or_inherited_resources_are_retired() {
 
 mod property_retirement;
 mod surviving_references;
+mod text_state;
 
 /// `[(FIRSTARR)] [(LASTARR)] TJ` is malformed (a surplus array operand), but the operator still
 /// draws only the one immediately before it (LASTARR, 7 glyphs, 35 pt wide from x = 10) -- not
