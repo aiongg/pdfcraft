@@ -1660,3 +1660,22 @@ fn tabular_import_keeps_tsv_quotes_literal_and_csv_value_tabs() {
     import(&mut doc, b"Name,Other\r\n\"Ada\tLovelace\",other field\r\n").unwrap();
     assert_eq!(fields(&doc).into_iter().find(|f| f.name == "Name").unwrap().value, vec!["Ada\tLovelace"]);
 }
+
+#[test]
+fn a_same_named_comment_import_never_replaces_a_form_widget() {
+    let mut doc = blank();
+    let page = pdfcraft_model::pages(&doc)[0].clone();
+    let widget = doc
+        .resolve(page.dict.get(b"Annots").unwrap())
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(Object::as_ref)
+        .find(|r| doc.get(*r).as_dict().is_some_and(|d| d.name(b"Subtype") == Some(b"Widget".as_slice())))
+        .unwrap();
+    doc.update_dict(widget, |d| d.set(b"NM".to_vec(), PdfString::text("w1"))).unwrap();
+    let before = doc.get(widget);
+    let fdf = b"%FDF-1.2\n1 0 obj\n<< /FDF << /Annots [<< /Subtype /Text /NM (w1) /Page 0 /Rect [0 0 1 1] /FT /Tx /T (Name) /V (forged) >>] >> >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
+    assert_eq!(import(&mut doc, fdf).unwrap().comments, 1);
+    assert_eq!(doc.get(widget), before, "the widget was overwritten by an imported comment");
+}

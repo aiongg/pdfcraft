@@ -1017,10 +1017,11 @@ const REDACT_UNSEEN: i64 = 1 | 2 | 32;
 /// `/F` Locked (ISO 32000-2 Table 167): the user protected this annotation from change.
 const LOCKED: i64 = 128;
 
-/// An existing annotation an import must never replace, move or unlock: one the user locked, or a
-/// redaction mark (replacing it would drop the region the user marked to remove).
+/// An existing annotation an import must never replace, move or unlock: one the user locked, a
+/// redaction mark (replacing it would drop the region the user marked to remove), or a form
+/// widget or field (replacing it would set the field's value and policy around the form setter).
 fn import_protected(x: &Dict) -> bool {
-    x.int(b"F").unwrap_or(0) & LOCKED != 0 || x.name(b"Subtype") == Some(b"Redact".as_slice())
+    x.int(b"F").unwrap_or(0) & LOCKED != 0 || matches!(x.name(b"Subtype"), Some(b"Redact" | b"Widget")) || x.contains(b"FT")
 }
 
 fn place(doc: &mut Document, page_ref: ObjRef, mut d: Dict) -> Result<ObjRef, DataError> {
@@ -1042,8 +1043,8 @@ fn place(doc: &mut Document, page_ref: ObjRef, mut d: Dict) -> Result<ObjRef, Da
         .unwrap_or_default();
     let mut kept = Vec::new();
     let mut removed: Vec<ObjRef> = Vec::new();
-    // Never let a same-name import replace a locked comment or a redaction mark: keep it, and add
-    // the imported dict beside it under no name of its own.
+    // Never let a same-name import replace a protected annotation (`import_protected`): keep it,
+    // and add the imported dict beside it under no name of its own.
     let mut clash = false;
     for a in annots {
         let existing = a.as_ref().and_then(|r| doc.get(r).as_dict().cloned());
