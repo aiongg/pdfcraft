@@ -1287,6 +1287,10 @@ pub fn data_values(bytes: &[u8]) -> Result<Vec<(String, Vec<String>)>, DataError
 
 /// Merge Data Files into Spreadsheet: one CSV row per file, one column per field name (in the
 /// order they first appear).
+///
+/// The names and values come from other people's files, and spreadsheet programs evaluate a cell
+/// that starts with `=`, `+`, `-` or `@` (after any leading whitespace) as a formula. Such a cell
+/// is written with a leading `'`, which keeps it text; a plain number such as `-12.5` is not.
 pub fn merge_csv(files: &[Vec<(String, Vec<String>)>]) -> String {
     let mut columns: Vec<&str> = Vec::new();
     for f in files {
@@ -1296,7 +1300,19 @@ pub fn merge_csv(files: &[Vec<(String, Vec<String>)>]) -> String {
             }
         }
     }
-    let q = |s: &str| if s.contains([',', '"', '\n', '\r', '\t']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s.to_string() };
+    let literal = |s: &str| {
+        let t = s.trim_start();
+        let formula = match t.chars().next() {
+            Some('=' | '@') => true,
+            Some('+' | '-') => !t.parse::<f64>().is_ok_and(f64::is_finite),
+            _ => false,
+        };
+        if formula { format!("'{s}") } else { s.to_string() }
+    };
+    let q = |s: &str| {
+        let s = literal(s);
+        if s.contains([',', '"', '\n', '\r', '\t']) { format!("\"{}\"", s.replace('"', "\"\"")) } else { s }
+    };
     let mut out = columns.iter().map(|c| q(c)).collect::<Vec<_>>().join(",");
     out.push('\n');
     for f in files {

@@ -1702,3 +1702,18 @@ fn an_imported_rect_only_or_transparent_redaction_mark_is_drawn_for_review() {
         assert!(mark.get(b"CA").is_none() && mark.get(b"ca").is_none(), "the mark can be drawn transparent: {mark:?}");
     }
 }
+
+#[test]
+fn merged_spreadsheet_cells_never_start_a_formula() {
+    let row = vec![
+        ("=HYPERLINK(\"http://x\")".to_string(), vec!["@SUM(A1)".to_string()]),
+        ("Total".to_string(), vec!["-2+3".to_string()]),
+        ("Plus".to_string(), vec!["\t+1+cmd".to_string()]),
+        ("Balance".to_string(), vec!["-12.5".to_string()]),
+        ("\tName".to_string(), vec!["Ada".to_string()]),
+    ];
+    let csv = merge_csv(&[row]);
+    let lines: Vec<&str> = csv.lines().collect();
+    assert_eq!(lines[0], "\"'=HYPERLINK(\"\"http://x\"\")\",Total,Plus,Balance,\"\tName\"");
+    assert_eq!(lines[1], "'@SUM(A1),'-2+3,\"'\t+1+cmd\",-12.5,Ada");
+}
