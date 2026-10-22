@@ -341,7 +341,8 @@ pub fn remove_hidden(doc: &mut Document, which: &[Hidden]) -> Result<Vec<(Hidden
     // Every annotation the pages list now: whatever is no longer listed at the end (flattened
     // widgets included) leaves the structure tree too.
     let listed_before = listed_annotations(doc);
-    if which.contains(&Hidden::FormFields) && count(Hidden::FormFields) > 0 {
+    let fields = which.contains(&Hidden::FormFields) && count(Hidden::FormFields) > 0;
+    if fields {
         // Fields without appearances get one first, so their values stay visible.
         for f in pdfcraft_forms::fields(doc) {
             if f.widgets.iter().any(|w| !doc.get(w.obj).as_dict().is_some_and(|d| d.contains(b"AP"))) {
@@ -354,10 +355,12 @@ pub fn remove_hidden(doc: &mut Document, which: &[Hidden]) -> Result<Vec<(Hidden
             d.remove(b"AcroForm");
         })?;
     }
-    // Annotations: comments, attachments, links, actions.
+    // Annotations: comments, attachments, links, actions, and the widgets flattening kept (hidden
+    // ones, and ones with nothing to draw), which still hold their field's value and parent.
     let drop_annot = |a: &Dict| -> bool {
         let s = a.name(b"Subtype").unwrap_or(b"");
         (which.contains(&Hidden::Comments) && is_comment(s))
+            || (fields && s == b"Widget")
             || (which.contains(&Hidden::Attachments) && s == b"FileAttachment")
             || (which.contains(&Hidden::LinksActionsScripts) && s == b"Link")
     };
@@ -374,7 +377,9 @@ pub fn remove_hidden(doc: &mut Document, which: &[Hidden]) -> Result<Vec<(Hidden
         let mut kept = Vec::new();
         for a in list {
             let Some(r) = a.as_ref() else {
-                kept.push(a);
+                if !doc.resolve(&a).as_dict().is_some_and(drop_annot) {
+                    kept.push(a);
+                }
                 continue;
             };
             let d = doc.get(r).as_dict().cloned().unwrap_or_default();

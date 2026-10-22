@@ -2514,3 +2514,38 @@ fn hidden_text_in_content_that_stops_decoding_is_refused() {
     let out = sanitize(&mut doc);
     assert!(matches!(out, Err(RedactError::Unreadable(1))), "{out:?}");
 }
+
+/// An array of references to objects `nums` (generation 0).
+fn ref_array(nums: &[u32]) -> Object {
+    Object::Array(nums.iter().map(|&n| Object::Ref(ObjRef::new(n, 0))).collect())
+}
+
+/// An interactive form dictionary listing fields `nums`.
+fn fields_dict(nums: &[u32]) -> Object {
+    let mut d = Dict::new();
+    d.set(b"Fields".to_vec(), ref_array(nums));
+    Object::Dict(d)
+}
+
+/// Flattening keeps hidden widgets (they draw nothing); removing form fields must still take them
+/// and their values, and their parent field's value, out of the file.
+#[test]
+fn removing_form_fields_takes_hidden_widgets_and_their_values_out_of_the_file() {
+    use crate::sanitize::{Hidden, remove_hidden};
+    let mut doc = one_page(
+        b"BT /F1 10 Tf 10 100 Td (Visible) Tj ET",
+        "",
+        vec![
+            // 7 a hidden terminal field merged with its widget, 8 a parent field, 9 its hidden widget
+            b"<< /Type /Annot /Subtype /Widget /FT /Tx /T (own) /V (LEAK_WIDGET_VALUE) /F 2 /Rect [10 200 150 220] /AP << /N 10 0 R >> >>".to_vec(),
+            b"<< /FT /Tx /T (parent) /V (LEAK_PARENT_VALUE) /Kids [9 0 R] >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Widget /Parent 8 0 R /F 32 /Rect [10 230 150 250] /AP << /N 10 0 R >> >>".to_vec(),
+            stream("/Type /XObject /Subtype /Form /BBox [0 0 140 20]", b"0 g"),
+        ],
+    );
+    doc.update_dict(doc.root().unwrap(), |d| d.set(b"AcroForm".to_vec(), fields_dict(&[7, 8]))).unwrap();
+    doc.update_dict(ObjRef::new(3, 0), |d| d.set(b"Annots".to_vec(), ref_array(&[7, 9]))).unwrap();
+    remove_hidden(&mut doc, &[Hidden::FormFields]).unwrap();
+    assert_no_secret(&doc, b"LEAK_");
+    assert!(annots_of(&doc, &pdfcraft_model::pages(&doc).swap_remove(0).dict).is_empty());
+}
