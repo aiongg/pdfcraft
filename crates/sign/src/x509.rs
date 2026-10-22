@@ -492,7 +492,8 @@ pub fn subject_of(raw: &[u8]) -> Option<Name> {
 }
 
 /// The chain from `leaf` up through `pool`, as far as issuers can be found and may issue: each
-/// issuer's key verifies the certificate below it, it is a CA allowed to sign certificates, its
+/// issuer's key verifies the certificate below it, it is a CA allowed to sign certificates, it
+/// has no critical extension PdfCraft doesn't process (unless it is self-signed), its
 /// `pathLenConstraint` allows the CA certificates below it, and (when `at` is given) it was valid
 /// then. Stops at a self-signed certificate. Certificates embedded in a document are in `pool`
 /// too, so an ordinary end-entity certificate must never be accepted as an issuer.
@@ -522,6 +523,10 @@ pub fn build_chain_noted<'a>(leaf: &'a Certificate, pool: &'a [Certificate], at:
             // two names where it needs them.
             let why = if !c.may_issue() {
                 Some("The certificate of {} is not a CA certificate that may issue certificates, so it is not used to vouch for {}.")
+            } else if !c.unknown_critical.is_empty() && !c.is_self_signed() {
+                // What such an extension limits (name constraints, policy constraints) would
+                // go unchecked. A self-signed root's extensions are the trust store's business.
+                Some("The certificate of {} has critical extensions PdfCraft does not recognize, so it is not used to vouch for {}.")
             } else if c.path_len.is_some_and(|n| below > n as usize) {
                 Some("The certificate of {} does not allow this many CA certificates below it (path length), so it is not used to vouch for {}.")
             } else if at.is_some_and(|t| !c.valid_at(t)) {
