@@ -1679,3 +1679,26 @@ fn a_same_named_comment_import_never_replaces_a_form_widget() {
     assert_eq!(import(&mut doc, fdf).unwrap().comments, 1);
     assert_eq!(doc.get(widget), before, "the widget was overwritten by an imported comment");
 }
+
+#[test]
+fn an_imported_rect_only_or_transparent_redaction_mark_is_drawn_for_review() {
+    let xfdf = br#"<xfdf><annots><redact page="0" name="r1" rect="60,600,560,620" opacity="0"/></annots></xfdf>"#;
+    let fdf = b"%FDF-1.2\n1 0 obj\n<< /FDF << /Annots [<< /Subtype /Redact /NM (r1) /Page 0 /Rect [60 600 560 620] /CA 0 /ca 0 >>] >> >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
+    for data in [xfdf.as_slice(), fdf.as_slice()] {
+        let mut doc = blank();
+        assert_eq!(import(&mut doc, data).unwrap().comments, 1);
+        let page = pdfcraft_model::pages(&doc)[0].clone();
+        let mark = doc
+            .resolve(page.dict.get(b"Annots").unwrap())
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|a| a.as_ref().and_then(|r| doc.get(r).as_dict().cloned()))
+            .find(|d| d.name(b"Subtype") == Some(b"Redact".as_slice()))
+            .unwrap();
+        assert_eq!(nums_of(&doc, mark.get(b"QuadPoints")), vec![60.0, 620.0, 560.0, 620.0, 60.0, 600.0, 560.0, 600.0]);
+        let ap = mark.get(b"AP").map(|a| doc.resolve(a)).and_then(|a| a.as_dict().cloned());
+        assert!(ap.is_some_and(|ap| ap.get(b"N").is_some()), "the mark has no review appearance: {mark:?}");
+        assert!(mark.get(b"CA").is_none() && mark.get(b"ca").is_none(), "the mark can be drawn transparent: {mark:?}");
+    }
+}

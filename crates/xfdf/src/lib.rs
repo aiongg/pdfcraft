@@ -1032,6 +1032,27 @@ fn place(doc: &mut Document, page_ref: ObjRef, mut d: Dict) -> Result<ObjRef, Da
         if f & REDACT_UNSEEN != 0 {
             d.set(b"F".to_vec(), Object::Int(f & !REDACT_UNSEEN));
         }
+        // Its review outline is drawn opaque, and from the area it removes: applying a mark
+        // without usable /QuadPoints removes its /Rect, which the outline is then drawn from.
+        d.remove(b"CA");
+        d.remove(b"ca");
+        let quads_drawable = d
+            .get(b"QuadPoints")
+            .and_then(Object::as_array)
+            .is_some_and(|q| !q.is_empty() && q.len() % 8 == 0 && q.iter().all(|v| v.as_f64().is_some_and(f64::is_finite)));
+        if !quads_drawable {
+            // Quads the outline can't draw are replaced by the /Rect's, or dropped when there is
+            // no usable /Rect either; such a mark then removes nothing.
+            match nums_of(doc, d.get(b"Rect"))[..] {
+                [x0, y0, x1, y1] if [x0, y0, x1, y1].iter().all(|v| v.is_finite()) => {
+                    let (l, r, b, t) = (x0.min(x1), x0.max(x1), y0.min(y1), y0.max(y1));
+                    d.set(b"QuadPoints".to_vec(), arr(&[l, t, r, t, l, b, r, b]));
+                }
+                _ => {
+                    d.remove(b"QuadPoints");
+                }
+            }
+        }
     }
     let nm = d.get(b"NM").and_then(|n| n.as_string().map(|s| s.to_text()));
     let annots: Vec<Object> = doc
