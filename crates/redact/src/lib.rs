@@ -139,6 +139,10 @@ pub struct Report {
     /// The form was an AcroForm+XFA form and its `/XFA` packets (which still held redacted field
     /// values, and from which a relayout could rebuild them) were removed.
     pub xfa_removed: bool,
+    /// The content streams this apply added to draw the marks' boxes and labels. They are the
+    /// only streams a check for text left under the marks may skip: an input stream labelled
+    /// like an overlay (`/PCMark /Redaction`) is checked like any other.
+    pub overlays: Vec<ObjRef>,
 }
 
 fn rect_of(doc: &Document, o: Option<&Object>) -> Option<[f64; 4]> {
@@ -570,7 +574,7 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
     // 4. The boxes.
     for (pi, content) in overlays {
         if !content.is_empty() {
-            pdfcraft_edit::stamp(doc, pi, "Redaction", content)?;
+            report.overlays.push(pdfcraft_edit::stamp(doc, pi, "Redaction", content)?);
         }
     }
 
@@ -584,13 +588,9 @@ pub fn apply(doc: &mut Document, pages: Option<&[usize]>) -> Result<Report, Reda
         let page = pdfcraft_model::pages(doc).swap_remove(pi);
         let rects: Vec<[f64; 4]> = page_marks.iter().flat_map(|m| m.rects.iter().copied()).collect();
         let (list, data) = page_streams(doc, &page.dict, pi)?;
-        // The overlay stream (last) draws text of its own: the overlay label is allowed.
-        let original: Vec<Vec<u8>> = list
-            .iter()
-            .zip(data)
-            .filter(|(o, _)| doc.resolve(o).as_dict().and_then(|d| d.name(b"PCMark")) != Some(b"Redaction"))
-            .map(|(_, d)| d)
-            .collect();
+        // The overlay stream draws text of its own: the overlay label is allowed.
+        let original: Vec<Vec<u8>> =
+            list.iter().zip(data).filter(|(o, _)| !o.as_ref().is_some_and(|r| report.overlays.contains(&r))).map(|(_, d)| d).collect();
         let resources = page.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
         let mut scratch = Report::default();
         let mut scope = Scope::new(&rects, Mode::Verify, &mut scratch);

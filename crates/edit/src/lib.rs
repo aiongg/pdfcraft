@@ -17,7 +17,7 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-use pdfcraft_cos::{Dict, Document, Object, Stream};
+use pdfcraft_cos::{Dict, Document, ObjRef, Object, Stream};
 use pdfcraft_fonts::{helvetica_width, literal, win_ansi};
 
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -601,7 +601,7 @@ fn isolation(doc: &Document, list: &[Object]) -> Isolation {
 /// Put a mark's content on a page: behind (with the behind-marks at the start) or on top
 /// (appended, after wrapping the original content in q/Q).
 fn place(doc: &mut Document, page: &pdfcraft_model::Page, kind: MarkKind, content: Vec<u8>, behind: bool) -> Result<(), EditError> {
-    place_tagged(doc, page, kind.tag(), content, behind)
+    place_tagged(doc, page, kind.tag(), content, behind).map(drop)
 }
 
 /// Put content on a page, tagged `tag` (see [`place`]). On top, whatever graphics state the
@@ -609,7 +609,8 @@ fn place(doc: &mut Document, page: &pdfcraft_model::Page, kind: MarkKind, conten
 /// content appended after an earlier PdfCraft wrapper by another tool (#3084): the stretch of
 /// content that leaves state set is wrapped in q/Q, once. Any known unfinished marked-content
 /// sequences are closed at the end too, so hidden optional content cannot hide the new mark.
-fn place_tagged(doc: &mut Document, page: &pdfcraft_model::Page, tag: &str, content: Vec<u8>, behind: bool) -> Result<(), EditError> {
+/// Returns the new content stream.
+fn place_tagged(doc: &mut Document, page: &pdfcraft_model::Page, tag: &str, content: Vec<u8>, behind: bool) -> Result<ObjRef, EditError> {
     let mut list = contents(doc, page)?;
     // The behind-marks at the start: backgrounds in the order added, then watermarks.
     let behind_kinds = [MarkKind::Background.tag(), MarkKind::Watermark.tag()];
@@ -625,7 +626,8 @@ fn place_tagged(doc: &mut Document, page: &pdfcraft_model::Page, tag: &str, cont
             Isolation::Unknown { unclosed, marked } => (behind_marks < list.len()).then_some((behind_marks, unclosed, marked)),
         }
     };
-    let mark = Object::Ref(doc.add(Object::Stream(Stream::flate(tagged(tag), &content))));
+    let mark_ref = doc.add(Object::Stream(Stream::flate(tagged(tag), &content)));
+    let mark = Object::Ref(mark_ref);
     if behind {
         // Right after the backgrounds already there, so a new background is painted over the
         // older ones (#3591) and a watermark over all of them. Not after the watermarks: on a
@@ -646,7 +648,7 @@ fn place_tagged(doc: &mut Document, page: &pdfcraft_model::Page, tag: &str, cont
         list.push(mark);
     }
     doc.update_dict(page.obj, |d| d.set(b"Contents".to_vec(), Object::Array(list)))?;
-    Ok(())
+    Ok(mark_ref)
 }
 
 /// Put content tagged `tag` first inside the q/Q wrapper, so it applies to the page's original
@@ -664,7 +666,8 @@ fn place_inside_wrapper(doc: &mut Document, page: &pdfcraft_model::Page, tag: &s
 /// Draw `content` on top of a page (0-based) as permanent page content, with standard Helvetica
 /// available as `/PCHelv`. The stream is tagged `tag` (not a mark kind, so Remove never takes
 /// it away); the original content is wrapped in q/Q first. Used for applied redaction boxes.
-pub fn stamp(doc: &mut Document, page: usize, tag: &str, content: Vec<u8>) -> Result<(), EditError> {
+/// Returns the new content stream.
+pub fn stamp(doc: &mut Document, page: usize, tag: &str, content: Vec<u8>) -> Result<ObjRef, EditError> {
     let all = page_list(doc);
     check(&[page], all.len())?;
     add_resources(doc, &all[page], None, Some(&content))?;

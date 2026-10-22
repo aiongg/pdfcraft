@@ -2138,12 +2138,17 @@ fn setting_the_calculation_order_recalculates_and_undoes() {
 /// One 612×300 page with the content stream `body`. Object 4 is Helvetica; `resources` is what
 /// the page's /Resources holds.
 fn one_line_page(resources: &str, body: &str) -> Vec<u8> {
+    one_line_page_with(resources, "", body)
+}
+
+/// [`one_line_page`] with `stream_entries` added to the content stream's dictionary.
+fn one_line_page_with(resources: &str, stream_entries: &str, body: &str) -> Vec<u8> {
     let objs = [
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
         "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 612 300] >>".to_string(),
         format!("<< /Type /Page /Parent 2 0 R /Resources << {resources} >> /Contents 5 0 R >>"),
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>".to_string(),
-        format!("<< /Length {} >>\nstream\n{body}\nendstream", body.len()),
+        format!("<< /Length {} {stream_entries} >>\nstream\n{body}\nendstream", body.len()),
     ];
     let mut out = b"%PDF-1.7\n".to_vec();
     let mut offsets = Vec::new();
@@ -2199,6 +2204,33 @@ fn redaction_is_refused_when_the_page_still_shows_text_under_a_mark() {
     s.apply(id, Edit::ApplyRedactions { pages: None }).unwrap();
     let shown = page_texts(&s, id).swap_remove(0);
     assert!(shown.starts_with("Public words then") && shown.ends_with("and more") && !shown.contains("SECRET42"), "{shown}");
+}
+
+/// Only the overlay a redaction adds is left out of the renderer's check. A page whose own content
+/// stream calls itself a redaction overlay (`/PCMark /Redaction`) is checked like any other.
+#[test]
+fn a_content_stream_labelled_as_a_redaction_overlay_is_still_checked() {
+    let line = "Public words then SECRET42 and more";
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let forged = one_line_page_with(
+        "/ExtGState << /GS1 << /Type /ExtGState /Font [4 0 R 16] >> >>",
+        "/PCMark /Redaction",
+        &format!("BT /GS1 gs 20 150 Td ({line}) Tj ET"),
+    );
+    let id = s.open("forged.pdf", None, Arc::new(forged), None).unwrap();
+    mark_shown_text(&mut s, id, "SECRET42");
+    let applied = s.apply(id, Edit::ApplyRedactions { pages: None });
+    if applied.is_ok() {
+        assert!(!page_texts(&s, id).concat().contains("SECRET42"), "the page still shows the redacted word");
+        let saved = s.save_bytes(id).unwrap();
+        let held = |d: &[u8]| d.windows(8).any(|w| w == b"SECRET42");
+        assert!(!held(&saved), "the saved file holds the redacted word");
+        let reopened = pdfcraft_cos::Document::open(saved).unwrap();
+        assert!(
+            !reopened.scan_objects().any(|(_, o)| matches!(&*o, pdfcraft_cos::Object::Stream(st) if st.decoded().is_ok_and(|d| held(&d)))),
+            "a saved stream holds the redacted word"
+        );
+    }
 }
 
 #[test]
