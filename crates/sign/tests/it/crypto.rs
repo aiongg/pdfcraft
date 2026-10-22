@@ -482,7 +482,8 @@ fn a_responder_that_copies_the_issuers_name_does_not_answer_for_it() {
     let issuer = &id.certificate;
     let (this, next) = (mid_june(), Time { year: 2026, month: 7, day: 15, hour: 12, minute: 0, second: 0 });
     let key = pdfcraft_sign::PrivateKey::generate_p256().unwrap();
-    let impostor = Certificate::self_signed(&issuer.subject, &key, Time { year: 2026, month: 1, day: 1, hour: 0, minute: 0, second: 0 }, 5, &[9]).unwrap();
+    let impostor =
+        Certificate::self_signed(&issuer.subject, &key, Time { year: 2026, month: 1, day: 1, hour: 0, minute: 0, second: 0 }, 5, &[9]).unwrap();
     assert_eq!(impostor.subject.raw, issuer.subject.raw);
     let cert_id = der::seq(&[
         &DigestAlg::Sha1.algorithm(),

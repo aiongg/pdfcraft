@@ -435,10 +435,7 @@ impl TimestampAuthority for TestTsa {
 #[test]
 fn signing_with_a_timestamp_embeds_a_verified_rfc3161_token() {
     let id = pkcs12::open(&data("ec-p256.p12"), "test").unwrap();
-    let tsa = TestTsa {
-        id: tsa_id(),
-        time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 },
-    };
+    let tsa = TestTsa { id: tsa_id(), time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 } };
     let signed = pdfcraft_sign::sign_with_timestamp(&open(&fixture()), &id, &opts(), &tsa).unwrap();
     assert!(signed.starts_with(&fixture()), "still an incremental update");
     let anchor = id.chain.first().cloned().unwrap_or_else(|| id.certificate.clone());
@@ -474,10 +471,7 @@ fn a_malformed_timestamp_response_fails_signing_without_a_file() {
 
 #[test]
 fn a_document_timestamp_covers_the_file_and_validates() {
-    let tsa = TestTsa {
-        id: tsa_id(),
-        time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 },
-    };
+    let tsa = TestTsa { id: tsa_id(), time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 } };
     let stamped = pdfcraft_sign::timestamp_document(&open(&fixture()), &tsa, "D:20261006120000Z").unwrap();
     assert!(stamped.starts_with(&fixture()), "an incremental update");
     let trust_tsa = TrustStore { certs: vec![tsa.id.certificate.clone()] };
@@ -511,10 +505,7 @@ fn a_document_timestamp_covers_the_file_and_validates() {
 
 #[test]
 fn cached_discovery_still_validates_current_timestamp_bytes_ranges_and_trust() {
-    let tsa = TestTsa {
-        id: tsa_id(),
-        time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 },
-    };
+    let tsa = TestTsa { id: tsa_id(), time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 } };
     let mut source = open(&fixture());
     source
         .update_dict(source.root().unwrap(), |d| {
@@ -590,10 +581,7 @@ fn embedding_ltv_evidence_adds_a_dss_and_keeps_signatures_valid() {
 fn sign_then_ltv_then_timestamp_makes_a_b_lta_file() {
     use pdfcraft_sign::dss::{self, Evidence};
     let id = pkcs12::open(&data("ec-p256.p12"), "test").unwrap();
-    let tsa = TestTsa {
-        id: tsa_id(),
-        time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 },
-    };
+    let tsa = TestTsa { id: tsa_id(), time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 } };
     let signed = pdfcraft_sign::sign(&open(&fixture()), &id, &opts()).unwrap();
     let ltv = dss::embed(&open(&signed), &Evidence { certs: vec![id.certificate.raw.clone()], ocsps: Vec::new(), crls: Vec::new() }).unwrap();
     let lta = pdfcraft_sign::timestamp_document(&open(&ltv), &tsa, "D:20261006120000Z").unwrap();
@@ -1563,10 +1551,7 @@ fn an_untrusted_timestamp_does_not_set_the_validation_time() {
     let id = pkcs12::open(&data("ec-p256.p12"), "test").unwrap();
     // The TSA claims 2027 (inside the signer's validity) but is not trusted; the signer's own
     // clock says 2040, after the certificate expired.
-    let tsa = TestTsa {
-        id: tsa_id(),
-        time: Time { year: 2027, month: 1, day: 1, hour: 0, minute: 0, second: 0 },
-    };
+    let tsa = TestTsa { id: tsa_id(), time: Time { year: 2027, month: 1, day: 1, hour: 0, minute: 0, second: 0 } };
     let late = SignOptions { date: "D:20400101120000Z".into(), ..opts() };
     let signed = pdfcraft_sign::sign_with_timestamp(&open(&fixture()), &id, &late, &tsa).unwrap();
     let anchor = id.chain.first().cloned().unwrap_or_else(|| id.certificate.clone());
@@ -1785,10 +1770,7 @@ fn fixture_timestamped_in_a_field(tsa: &TestTsa) -> Vec<u8> {
 
 #[test]
 fn a_document_timestamp_held_by_a_signature_field_is_checked_as_a_timestamp() {
-    let tsa = TestTsa {
-        id: tsa_id(),
-        time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 },
-    };
+    let tsa = TestTsa { id: tsa_id(), time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 } };
     let stamped = fixture_timestamped_in_a_field(&tsa);
     let trust = TrustStore { certs: vec![tsa.id.certificate.clone()] };
     let all = signatures(&open(&stamped), &stamped, &trust);
@@ -1833,10 +1815,7 @@ fn a_field_timestamp_from_a_trusted_tsa_outside_its_validity_is_not_valid() {
 
 #[test]
 fn a_standalone_timestamp_typed_sig_by_an_older_writer_is_still_a_timestamp() {
-    let tsa = TestTsa {
-        id: tsa_id(),
-        time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 },
-    };
+    let tsa = TestTsa { id: tsa_id(), time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 } };
     let stamped = pdfcraft_sign::timestamp_document(&open(&fixture()), &tsa, "D:20261006120000Z").unwrap();
     let s = signatures(&open(&stamped), &stamped, &TrustStore::default()).into_iter().find(|s| s.doc_timestamp).unwrap();
     assert_eq!(s.status, Status::Unknown, "{:?}", s.details);
@@ -2067,10 +2046,7 @@ fn signing_waits_for_a_pending_security_change_to_be_saved() {
 
 #[test]
 fn encrypted_documents_take_a_document_timestamp() {
-    let tsa = TestTsa {
-        id: tsa_id(),
-        time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 },
-    };
+    let tsa = TestTsa { id: tsa_id(), time: Time { year: 2026, month: 10, day: 6, hour: 12, minute: 0, second: 0 } };
     let base = protected(pdfcraft_cos::Algorithm::Aes128, FILL_AND_SIGN_ONLY);
     let stamped = pdfcraft_sign::timestamp_document(&open_pw(&base, None), &tsa, "D:20261006120000Z").unwrap();
     assert!(stamped.starts_with(&base));

@@ -348,13 +348,15 @@ fn an_unreadable_extended_key_usage_allows_no_purpose() {
 fn an_issuer_with_an_unprocessed_critical_extension_does_not_vouch() {
     let name_constraints = ext("2.5.29.30", &der::seq(&[]));
     let r = root();
-    let constrained = issue("Name Constrained CA", Some(&r), FOREVER, &[basic_constraints(true, None), key_usage(KEY_CERT_SIGN), name_constraints.clone()]);
+    let constrained =
+        issue("Name Constrained CA", Some(&r), FOREVER, &[basic_constraints(true, None), key_usage(KEY_CERT_SIGN), name_constraints.clone()]);
     let l = end_entity("Outside Its Names", &constrained);
     let pool = [constrained.cert.clone(), r.cert.clone()];
     let (chain, why) = build_chain_noted(&l.cert, &pool, None);
     assert_eq!(names(&chain), ["Outside Its Names"]);
     assert!(why.is_some_and(|w| w.message.contains("critical extensions")), "the reason is reported");
-    let constrained_root = issue("Name Constrained Root", None, FOREVER, &[basic_constraints(true, None), key_usage(KEY_CERT_SIGN), name_constraints]);
+    let constrained_root =
+        issue("Name Constrained Root", None, FOREVER, &[basic_constraints(true, None), key_usage(KEY_CERT_SIGN), name_constraints]);
     let i = ca("Under Constrained Root", &constrained_root, None);
     let l = end_entity("Leaf", &i);
     let pool = [i.cert.clone(), constrained_root.cert.clone()];
