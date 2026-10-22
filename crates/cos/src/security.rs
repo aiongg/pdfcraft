@@ -88,10 +88,17 @@ fn named_crypt_filter(dict: &Dict) -> Option<Vec<u8>> {
 /// whose `/Contents` is never encrypted (ISO 32000-2 §7.6.2, §12.8.1): the signer writes a
 /// placeholder, hashes the file around it and patches the value in place, so encrypting it
 /// would make signing impossible. Identified as other readers do: by `/Type`, or by a string
-/// `/Contents` alongside an array `/ByteRange` (`/Type` is optional).
+/// `/Contents` alongside an array `/ByteRange` (`/Type` is optional). A signature dictionary
+/// has no `/Subtype`; a dictionary with one (an annotation, whose `/Contents` is the comment
+/// text) or with another `/Type` is never exempt, whatever else it carries.
 fn is_signature_dict(d: &Dict) -> bool {
-    matches!(d.name(b"Type"), Some(b"Sig" | b"DocTimeStamp"))
-        || (matches!(d.get(b"Contents"), Some(Object::String(_))) && matches!(d.get(b"ByteRange"), Some(Object::Array(_))))
+    if d.get(b"Subtype").is_some() {
+        return false;
+    }
+    match d.get(b"Type") {
+        Some(_) => matches!(d.name(b"Type"), Some(b"Sig" | b"DocTimeStamp")),
+        None => matches!(d.get(b"Contents"), Some(Object::String(_))) && matches!(d.get(b"ByteRange"), Some(Object::Array(_))),
+    }
 }
 
 /// Decrypt (`decrypt = true`) or encrypt every string and stream in an indirect object,

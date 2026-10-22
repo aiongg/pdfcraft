@@ -279,6 +279,38 @@ fn signature_contents_stay_unencrypted() {
     }
 }
 
+/// Only a signature dictionary keeps its `/Contents` in clear. An annotation that carries a
+/// `/ByteRange` (or even `/Type /Sig`) is still an annotation, and its comment is encrypted.
+#[test]
+fn a_byte_range_does_not_exempt_an_annotation() {
+    for (ty, subtype) in [(Some("Annot"), "Text"), (None, "FreeText"), (Some("Sig"), "Text")] {
+        let mut doc = Document::open(Arc::new(fixture())).unwrap();
+        let mut note = pdfcraft_cos::Dict::new();
+        if let Some(ty) = ty {
+            note.set(b"Type".to_vec(), Object::name(ty));
+        }
+        note.set(b"Subtype".to_vec(), Object::name(subtype));
+        note.set(b"Contents".to_vec(), PdfString::literal(b"Private note".to_vec()));
+        note.set(b"ByteRange".to_vec(), Object::Array(Vec::new()));
+        let note = doc.add(Object::Dict(note));
+        doc.update_dict(doc.root().unwrap(), |c| c.set(b"Test".to_vec(), Object::Ref(note))).unwrap();
+        doc.set_encryption(&NewEncryption {
+            algorithm: Algorithm::Aes256,
+            user_password: "",
+            owner_password: "owner",
+            permissions: -1,
+            encrypt_metadata: true,
+            seed: [3; 32],
+        })
+        .unwrap();
+        let bytes = write_full(&doc, &SaveOptions { object_streams: false, ..SaveOptions::default() }).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("Private note"), "{ty:?} {subtype}: comment encrypted");
+        let back = Document::open(Arc::new(bytes)).unwrap();
+        let note = back.get(back.root().unwrap()).as_dict().unwrap().reference(b"Test").unwrap();
+        assert_eq!(back.get(note).as_dict().unwrap().get(b"Contents").unwrap().as_string().unwrap().bytes, b"Private note");
+    }
+}
+
 #[test]
 fn a_nonpositive_crypt_filter_length_reads_as_the_default_key_length() {
     // A V4 crypt filter's /Length counts bytes (≤ 32) or bits. A zero or negative value is
