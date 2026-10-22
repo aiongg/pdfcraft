@@ -2577,3 +2577,97 @@ fn removing_hidden_text_cleans_the_structure_tree() {
     assert_no_secret(&doc, b"SECRET");
     assert!(doc.get(ObjRef::new(11, 0)).as_dict().unwrap().contains(b"ActualText"), "untouched content keeps its tags");
 }
+
+/// One page drawing image /Im (object 7) and form /Fm (object 8), with `extra` objects from 9 on.
+fn owners_fixture(image: &str, form: &str, extra: Vec<Vec<u8>>) -> Document {
+    let mut objs = vec![
+        stream(&format!("/Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 {image}"), b"\x80"),
+        stream(&format!("/Type /XObject /Subtype /Form /BBox [0 0 10 10] {form}"), b"0 0 5 5 re f"),
+    ];
+    objs.extend(extra);
+    one_page(b"BT /F1 10 Tf 10 100 Td (Visible) Tj ET q 10 0 0 10 0 0 cm /Im Do Q /Fm Do", "/XObject << /Im 7 0 R /Fm 8 0 R >>", objs)
+}
+
+/// Removing one category and saving leaves none of `secret` in the file, and the scan counted it.
+fn removes_from_every_owner(mut doc: Document, h: crate::sanitize::Hidden, secret: &[u8]) {
+    use crate::sanitize::{remove_hidden, scan};
+    let counts: std::collections::HashMap<_, usize> = scan(&doc).into_iter().collect();
+    assert!(counts[&h] > 0, "{h:?} is counted");
+    remove_hidden(&mut doc, &[h]).unwrap();
+    assert_no_secret(&doc, secret);
+    assert!(scan(&reopen(&doc)).into_iter().all(|(k, n)| k != h || n == 0 || h == crate::sanitize::Hidden::Metadata));
+}
+
+#[test]
+fn private_data_of_a_form_xobject_is_removed() {
+    let doc = owners_fixture("", "/PieceInfo << /App << /Private (LEAK_PRIVATE) >> >>", vec![]);
+    removes_from_every_owner(doc, crate::sanitize::Hidden::PrivateData, b"LEAK_");
+}
+
+#[test]
+fn metadata_of_an_image_is_removed() {
+    let doc = owners_fixture("/Metadata 9 0 R", "", vec![stream("/Type /Metadata /Subtype /XML", b"<x:xmpmeta>LEAK_XMP</x:xmpmeta>")]);
+    removes_from_every_owner(doc, crate::sanitize::Hidden::Metadata, b"LEAK_");
+}
+
+#[test]
+fn a_pages_associated_files_are_removed_with_attachments() {
+    let mut doc = owners_fixture(
+        "",
+        "",
+        vec![b"<< /Type /Filespec /F (a.txt) /AFRelationship /Data /EF << /F 10 0 R >> >>".to_vec(), stream("/Type /EmbeddedFile", b"LEAK_ATTACHED")],
+    );
+    doc.update_dict(ObjRef::new(3, 0), |d| d.set(b"AF".to_vec(), ref_array(&[9]))).unwrap();
+    removes_from_every_owner(doc, crate::sanitize::Hidden::Attachments, b"LEAK_");
+}
+
+#[test]
+fn a_fields_own_actions_are_removed_with_links_actions_and_scripts() {
+    let mut doc = owners_fixture(
+        "",
+        "",
+        vec![
+            b"<< /FT /Tx /T (total) /AA << /C << /S /JavaScript /JS (LEAK_SCRIPT) >> >> /Kids [10 0 R] >>".to_vec(),
+            b"<< /Type /Annot /Subtype /Widget /Parent 9 0 R /Rect [10 200 150 220] >>".to_vec(),
+        ],
+    );
+    doc.update_dict(doc.root().unwrap(), |d| d.set(b"AcroForm".to_vec(), fields_dict(&[9]))).unwrap();
+    doc.update_dict(ObjRef::new(3, 0), |d| d.set(b"Annots".to_vec(), ref_array(&[10]))).unwrap();
+    removes_from_every_owner(doc, crate::sanitize::Hidden::LinksActionsScripts, b"LEAK_");
+}
+
+/// Resource names are chosen by the producer: a font named like an owned entry stays.
+#[test]
+fn a_resource_named_like_an_owned_entry_is_kept() {
+    let mut doc = one_page(
+        b"BT /AF 10 Tf 10 100 Td (Visible) Tj ET",
+        "",
+        vec![b"<< /Type /Filespec /F (a.txt) /EF << /F 8 0 R >> >>".to_vec(), stream("/Type /EmbeddedFile", b"LEAK_ATTACHED")],
+    );
+    doc.update_dict(ObjRef::new(3, 0), |d| {
+        let mut fonts = Dict::new();
+        fonts.set(b"AF".to_vec(), Object::Ref(ObjRef::new(5, 0)));
+        let mut res = Dict::new();
+        res.set(b"Font".to_vec(), Object::Dict(fonts));
+        d.set(b"Resources".to_vec(), Object::Dict(res));
+        d.set(b"AF".to_vec(), ref_array(&[7]));
+    })
+    .unwrap();
+    removes_from_every_owner(doc.clone(), crate::sanitize::Hidden::Attachments, b"LEAK_");
+    crate::sanitize::remove_hidden(&mut doc, &[crate::sanitize::Hidden::Attachments]).unwrap();
+    let page = pdfcraft_model::pages(&doc).swap_remove(0);
+    let res = doc.resolve(page.dict.get(b"Resources").unwrap()).as_dict().cloned().unwrap();
+    assert!(res.get(b"Font").and_then(|f| f.as_dict()).is_some_and(|f| f.contains(b"AF")));
+    assert!(!page.dict.contains(b"AF"));
+}
+
+/// Owners written in place deeper than the sweep follows are refused, not skipped.
+#[test]
+fn owners_nested_too_deeply_are_refused() {
+    use crate::sanitize::{Hidden, remove_hidden};
+    let nested = format!("{}<< /AA << /O << /S /JavaScript /JS (LEAK_DEEP) >> >> >>{}", "[".repeat(100), "]".repeat(100));
+    let mut doc = one_page(b"BT ET", "", vec![format!("<< /Deep {nested} >>").into_bytes()]);
+    doc.update_dict(ObjRef::new(3, 0), |d| d.set(b"PieceInfo".to_vec(), Object::Ref(ObjRef::new(7, 0)))).unwrap();
+    let out = remove_hidden(&mut doc, &[Hidden::LinksActionsScripts]);
+    assert!(matches!(out, Err(RedactError::TooDeep)), "{out:?}");
+}

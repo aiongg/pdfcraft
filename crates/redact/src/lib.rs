@@ -64,6 +64,10 @@ pub enum RedactError {
         "the document's tags can't be cleaned completely (an element written in place, or a structure tree too large or too deep to follow); the operation was refused"
     )]
     Tags,
+    /// Objects written in place nest deeper than hidden information is followed, so its removal
+    /// could not be shown complete.
+    #[error("the document's objects nest too deeply to remove hidden information completely; the operation was refused")]
+    TooDeep,
     #[error(transparent)]
     Edit(#[from] pdfcraft_edit::EditError),
     #[error(transparent)]

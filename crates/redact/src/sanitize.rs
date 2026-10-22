@@ -15,7 +15,7 @@ use crate::{RedactError, Report, annots_of, listed_annotations, page_streams};
 pub enum Hidden {
     /// Document information (`/Info`) and XMP metadata streams.
     Metadata,
-    /// Embedded files and file attachment annotations.
+    /// Embedded files, associated files (`/AF`) and file attachment annotations.
     Attachments,
     /// Comments and markup annotations (with their pop-ups).
     Comments,
@@ -163,6 +163,148 @@ fn outline_len_seen(
     n
 }
 
+/// Entries that hold a category's data wherever they appear, not only on the catalog and pages:
+/// XMP on images, fonts and Forms, private data on Forms, associated files on pages and
+/// annotations, additional actions on fields.
+const OWNED: [(Hidden, &[u8]); 4] =
+    [(Hidden::Metadata, b"Metadata"), (Hidden::PrivateData, b"PieceInfo"), (Hidden::Attachments, b"AF"), (Hidden::LinksActionsScripts, b"AA")];
+
+/// Keys whose dictionary values map names a producer chooses to objects (resources, glyph
+/// procedures, named destinations, role and class maps, private data by application). A name
+/// there may be spelt like an owned entry (a font called `/AF`), so these maps are walked but
+/// never stripped.
+const NAME_MAPS: [&[u8]; 14] = [
+    b"Font",
+    b"XObject",
+    b"ExtGState",
+    b"ColorSpace",
+    b"Pattern",
+    b"Shading",
+    b"Properties",
+    b"CharProcs",
+    b"Dests",
+    b"RoleMap",
+    b"ClassMap",
+    b"Colorants",
+    b"Schema",
+    b"PieceInfo",
+];
+
+/// How deep the owner sweep follows dictionaries and arrays written in place.
+const MAX_DIRECT_DEPTH: usize = 64;
+
+/// What a dictionary is to the owner sweep.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum Held {
+    /// An object that may own an entry of [`OWNED`].
+    Owner,
+    /// A [`NAME_MAPS`] map: its keys are names, its values owners.
+    Map,
+    /// An appearance dictionary (`/AP`): its dictionary values map appearance states.
+    Appearances,
+}
+
+impl Held {
+    fn child(self, key: &[u8]) -> Held {
+        match self {
+            Held::Owner if NAME_MAPS.contains(&key) => Held::Map,
+            Held::Owner if key == b"AP" => Held::Appearances,
+            Held::Appearances => Held::Map,
+            _ => Held::Owner,
+        }
+    }
+}
+
+/// The objects reachable from the catalog that hold one of `keys` outside a name map, and how
+/// many dictionaries hold each key. Each object is read at most once per [`Held`] role, so a
+/// shared or cyclic graph costs one step per object.
+fn owners(doc: &Document, keys: &[&[u8]]) -> Result<(Vec<usize>, Vec<(ObjRef, Held)>), RedactError> {
+    let mut held = vec![0; keys.len()];
+    let mut holders = Vec::new();
+    let Some(root) = doc.root() else { return Ok((held, holders)) };
+    let mut next = vec![(root, Held::Owner)];
+    let mut seen = std::collections::HashSet::new();
+    while let Some((r, role)) = next.pop() {
+        if !seen.insert((r, role)) {
+            continue;
+        }
+        if find_owned(&doc.get(r), role, keys, &mut held, &mut next, 0)? {
+            holders.push((r, role));
+        }
+    }
+    Ok((held, holders))
+}
+
+/// Counts the dictionaries in `o` (and what it holds in place) that hold one of `keys`, and
+/// queues the indirect objects it names. Returns whether any key was found.
+fn find_owned(o: &Object, role: Held, keys: &[&[u8]], held: &mut [usize], next: &mut Vec<(ObjRef, Held)>, depth: usize) -> Result<bool, RedactError> {
+    if depth > MAX_DIRECT_DEPTH {
+        return Err(RedactError::TooDeep);
+    }
+    let (d, role) = match o {
+        Object::Ref(r) => {
+            next.push((*r, role));
+            return Ok(false);
+        }
+        Object::Array(a) => {
+            let mut found = false;
+            for v in a {
+                found |= find_owned(v, Held::Owner, keys, held, next, depth + 1)?;
+            }
+            return Ok(found);
+        }
+        Object::Dict(d) => (d, role),
+        // A stream's dictionary is never a name map.
+        Object::Stream(s) => (&s.dict, Held::Owner),
+        _ => return Ok(false),
+    };
+    let mut found = false;
+    if role != Held::Map {
+        for (i, k) in keys.iter().enumerate() {
+            if d.contains(k)
+                && let Some(n) = held.get_mut(i)
+            {
+                *n = n.saturating_add(1);
+                found = true;
+            }
+        }
+    }
+    for (k, v) in d.iter() {
+        found |= find_owned(v, role.child(k), keys, held, next, depth + 1)?;
+    }
+    Ok(found)
+}
+
+/// Removes `keys` from `o` and from what it holds in place, outside name maps. [`owners`] has
+/// already refused anything nested past the depth limit.
+fn strip_owned(o: &mut Object, role: Held, keys: &[&[u8]], depth: usize) {
+    if depth > MAX_DIRECT_DEPTH {
+        return;
+    }
+    let (d, role) = match o {
+        Object::Array(a) => {
+            for v in a {
+                strip_owned(v, Held::Owner, keys, depth + 1);
+            }
+            return;
+        }
+        Object::Dict(d) => (d, role),
+        Object::Stream(s) => (&mut s.dict, Held::Owner),
+        _ => return,
+    };
+    if role != Held::Map {
+        for k in keys {
+            d.remove(k);
+        }
+    }
+    let names: Vec<Vec<u8>> = d.iter().filter(|(_, v)| matches!(v, Object::Array(_) | Object::Dict(_))).map(|(k, _)| k.clone()).collect();
+    for k in names {
+        if let Some(v) = d.get_mut(&k) {
+            strip_owned(v, role.child(&k), keys, depth + 1);
+        }
+    }
+}
+
 /// A comment as the comments list sees it, less file attachments (removed with Attachments) and
 /// redaction marks.
 fn is_comment(subtype: &[u8]) -> bool {
@@ -296,6 +438,11 @@ pub fn scan(doc: &Document) -> Vec<(Hidden, usize)> {
     let annots: Vec<Dict> = pages.iter().flat_map(|p| annots_of(doc, &p.dict)).filter_map(|a| doc.resolve(&a).as_dict().cloned()).collect();
     let count_sub = |s: &[u8]| annots.iter().filter(|a| a.name(b"Subtype") == Some(s)).count();
     let names = sub(doc, &cat, b"Names").unwrap_or_default();
+    let owned_keys: Vec<&[u8]> = OWNED.iter().map(|o| o.1).collect();
+    // A graph nested too deeply to walk counts as holding everything, so the removal runs and
+    // refuses it.
+    let held = owners(doc, &owned_keys).map_or_else(|_| vec![1; OWNED.len()], |o| o.0);
+    let owned = |h: Hidden| OWNED.iter().position(|o| o.0 == h).and_then(|i| held.get(i)).copied().unwrap_or(0);
     let mut doc2 = doc.clone();
     HIDDEN
         .into_iter()
@@ -303,10 +450,13 @@ pub fn scan(doc: &Document) -> Vec<(Hidden, usize)> {
             let n = match h {
                 Hidden::Metadata => {
                     let info = doc.trailer().get(b"Info").and_then(|i| doc.resolve(i).as_dict().map(|d| d.len())).unwrap_or(0);
-                    let xmp = usize::from(cat.contains(b"Metadata")) + pages.iter().filter(|p| p.dict.contains(b"Metadata")).count();
-                    info + xmp
+                    info + owned(Hidden::Metadata)
                 }
-                Hidden::Attachments => sub(doc, &names, b"EmbeddedFiles").map_or(0, |t| name_tree_len(doc, &t)) + count_sub(b"FileAttachment"),
+                Hidden::Attachments => {
+                    sub(doc, &names, b"EmbeddedFiles").map_or(0, |t| name_tree_len(doc, &t))
+                        + count_sub(b"FileAttachment")
+                        + owned(Hidden::Attachments)
+                }
                 Hidden::Comments => annots.iter().filter(|a| is_comment(a.name(b"Subtype").unwrap_or(b""))).count(),
                 Hidden::FormFields => pdfcraft_forms::fields(doc).len(),
                 Hidden::HiddenText => content_pass(&mut doc2, true, false, false).map(|(n, _)| n).unwrap_or(0),
@@ -318,12 +468,11 @@ pub fn scan(doc: &Document) -> Vec<(Hidden, usize)> {
                 Hidden::LinksActionsScripts => {
                     count_sub(b"Link")
                         + usize::from(cat.get(b"OpenAction").is_some_and(|a| doc.resolve(a).as_dict().is_some()))
-                        + usize::from(cat.contains(b"AA"))
-                        + pages.iter().filter(|p| p.dict.contains(b"AA")).count()
-                        + annots.iter().filter(|a| a.contains(b"AA") || (a.name(b"Subtype") == Some(b"Widget") && a.contains(b"A"))).count()
+                        + owned(Hidden::LinksActionsScripts)
+                        + annots.iter().filter(|a| !a.contains(b"AA") && a.name(b"Subtype") == Some(b"Widget") && a.contains(b"A")).count()
                         + sub(doc, &names, b"JavaScript").map_or(0, |t| name_tree_len(doc, &t))
                 }
-                Hidden::PrivateData => usize::from(cat.contains(b"PieceInfo")) + pages.iter().filter(|p| p.dict.contains(b"PieceInfo")).count(),
+                Hidden::PrivateData => owned(Hidden::PrivateData),
             };
             (h, n)
         })
@@ -406,23 +555,11 @@ pub fn remove_hidden(doc: &mut Document, which: &[Hidden]) -> Result<Vec<(Hidden
             }
             kept.push(a);
         }
-        let private = which.contains(&Hidden::PrivateData);
-        let metadata = which.contains(&Hidden::Metadata);
-        let actions = which.contains(&Hidden::LinksActionsScripts);
         doc.update_dict(p.obj, |d| {
             if kept.is_empty() {
                 d.remove(b"Annots");
             } else {
                 d.set(b"Annots".to_vec(), Object::Array(kept));
-            }
-            if private {
-                d.remove(b"PieceInfo");
-            }
-            if metadata {
-                d.remove(b"Metadata");
-            }
-            if actions {
-                d.remove(b"AA");
             }
         })?;
     }
@@ -438,14 +575,12 @@ pub fn remove_hidden(doc: &mut Document, which: &[Hidden]) -> Result<Vec<(Hidden
     for &h in which {
         match h {
             Hidden::Metadata => {
-                cat.remove(b"Metadata");
                 doc.trailer_mut().remove(b"Info");
             }
             Hidden::Attachments => {
                 if let Some(n) = names.as_mut() {
                     n.remove(b"EmbeddedFiles");
                 }
-                cat.remove(b"AF");
             }
             Hidden::Bookmarks => {
                 cat.remove(b"Outlines");
@@ -457,13 +592,9 @@ pub fn remove_hidden(doc: &mut Document, which: &[Hidden]) -> Result<Vec<(Hidden
                 if cat.get(b"OpenAction").is_some_and(|a| doc.resolve(a).as_dict().is_some()) {
                     cat.remove(b"OpenAction");
                 }
-                cat.remove(b"AA");
                 if let Some(n) = names.as_mut() {
                     n.remove(b"JavaScript");
                 }
-            }
-            Hidden::PrivateData => {
-                cat.remove(b"PieceInfo");
             }
             Hidden::HiddenLayers if !off.is_empty() => {
                 // The off layers leave the configuration (their content is gone already).
@@ -494,6 +625,16 @@ pub fn remove_hidden(doc: &mut Document, which: &[Hidden]) -> Result<Vec<(Hidden
         cat.set(b"Names".to_vec(), Object::Dict(n));
     }
     doc.set(root, Object::Dict(cat));
+    // Metadata, private data, associated files and additional actions on every object that
+    // still owns them (the catalog and pages included).
+    let keys: Vec<&[u8]> = OWNED.iter().filter(|o| which.contains(&o.0)).map(|o| o.1).collect();
+    if !keys.is_empty() {
+        for (r, role) in owners(doc, &keys)?.1 {
+            let mut o = (*doc.get(r)).clone();
+            strip_owned(&mut o, role, &keys, 0);
+            doc.set(r, o);
+        }
+    }
     if done.is_empty() {
         return Err(RedactError::NothingToApply);
     }
