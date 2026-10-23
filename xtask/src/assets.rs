@@ -231,7 +231,8 @@ pub fn check(root: &Path, m: &Manifest, repo_files: &[String], lock: &BTreeSet<(
     // (which must be clean-room, never taken from a product's string tables).
     let visual = |kind: &str| matches!(kind, "icon" | "image" | "font" | "logo" | "cursor" | "video" | "translation");
     // Typefaces under the SIL Open Font License are allowed whoever designed them (AGENTS.md §1.1).
-    let ofl_font = |kind: &str, licence: &str| kind == "font" && licence_ids(licence).all(|id| id == "OFL-1.1");
+    let ofl_font =
+        |kind: &str, licence: &str| kind == "font" && licence_ids(licence).next().is_some() && licence_ids(licence).all(|id| id == "OFL-1.1");
     let licence_ok = |what: &str, licence: &str, problems: &mut Vec<String>| {
         for id in licence_ids(licence) {
             if !ALLOWED_LICENCES.contains(&id) {
@@ -539,6 +540,7 @@ mod tests {
         };
         assert!(check(&root(), &noto("OFL-1.1"), &[], &l).is_empty());
         assert!(check(&root(), &noto("MIT"), &[], &l).iter().any(|p| p.contains("forbidden")));
+        assert!(check(&root(), &noto(""), &[], &l).iter().any(|p| p.contains("forbidden")), "an empty licence is not OFL");
         let icon = Manifest { asset: vec![asset("assets/icons/x.svg", "Adobe Inc.", "icon", "OFL-1.1")], ..Default::default() };
         assert!(check(&root(), &icon, &[], &l).iter().any(|p| p.contains("from Adobe is forbidden")));
     }
