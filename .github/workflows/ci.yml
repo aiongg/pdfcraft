@@ -6,19 +6,23 @@ on:
   push:
     branches: [main]
   pull_request:
+    # `labeled` so that adding `full-ci` to an open PR starts a run with Windows in it.
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 # The token is only used to check out the code: no job writes to the repository.
 permissions:
   contents: read
 
-# A newer push to a PR branch cancels its older run; every push to main runs to the end.
+# A newer push to a PR branch cancels its older run; every push to main runs to the end. Adding
+# any label but `full-ci` gets a group of its own, so it neither runs the gate nor cancels a run.
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  group: ci-${{ github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'full-ci') && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gate:
+    if: github.event.action != 'labeled' || github.event.label.name == 'full-ci'
     # Tracks @main so suite-wide CI fixes reach every app without a PR in each repository.
     uses: storytold/craft-common-actions/.github/workflows/gate.yml@main
     with:
