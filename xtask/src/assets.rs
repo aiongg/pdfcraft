@@ -3,7 +3,8 @@
 //! `ATTRIBUTION.toml` lists every asset: committed or vendored files (`[[asset]]`), files that
 //! Cargo dependencies compile into PdfCraft (`[[bundled]]`), and files xtask downloads at build
 //! time (`[[fetched]]`). This gate fails when:
-//! - an asset-like file in the repository has no entry, or its SHA-256 differs;
+//! - an asset-like file in the repository has no entry, or its SHA-256 is missing or differs
+//!   (translation catalogs are project files and carry none);
 //! - a licence is not on the allowlist, or a declared licence file is missing;
 //! - an icon, image or font names Adobe as author or source, or an `adobe_data` entry is not on
 //!   the closed list approved in AGENTS.md §1.1;
@@ -48,6 +49,11 @@ pub const ADOBE_DATA_ALLOWED: &[(&str, &str)] = &[("hayro-cmap", "assets/cmaps.b
 /// `[[asset]]` entry with `adobe_data = true`, so its SHA-256 is checked and any change to the
 /// table has to be re-attested deliberately.
 pub const ADOBE_DATA_FILES: &[&str] = &["crates/fonts/src/std14_metrics.rs", "vendor/hayro-cmap/assets/cmaps.brotli"];
+
+/// Where the UI translation catalogs live. `kind = "translation"` entries for `.tsv` files here
+/// are project files under the project licence: they carry no `sha256`, because git history
+/// already records their provenance (AGENTS.md §1.3).
+pub const TRANSLATION_DIR: &str = "crates/ui-egui/src/i18n/";
 
 /// File extensions that count as assets wherever they appear in the repository.
 const ASSET_EXTENSIONS: &[&str] = &[
@@ -97,9 +103,18 @@ pub struct Asset {
     pub licence_file: String,
     pub kind: String,
     pub usage: String,
-    pub sha256: String,
+    /// Required for every entry except a translation catalog ([`Asset::is_translation_catalog`]).
+    #[serde(default)]
+    pub sha256: Option<String>,
     #[serde(default)]
     pub adobe_data: bool,
+}
+
+impl Asset {
+    /// A UI translation catalog: a project file whose entry carries no hash.
+    pub fn is_translation_catalog(&self) -> bool {
+        self.kind == "translation" && self.path.starts_with(TRANSLATION_DIR) && self.path.ends_with(".tsv")
+    }
 }
 
 #[derive(Deserialize)]
@@ -257,10 +272,18 @@ pub fn check(root: &Path, m: &Manifest, repo_files: &[String], lock: &BTreeSet<(
         if a.adobe_data && !(ADOBE_DATA_FILES.contains(&a.path.as_str()) && a.kind == "data") {
             problems.push(format!("{}: adobe_data is only allowed for the closed list in AGENTS.md §1.1", a.path));
         }
-        match std::fs::read(root.join(&a.path)) {
-            Ok(bytes) if sha256_hex(&bytes) == a.sha256 => {}
-            Ok(_) => problems.push(format!("{}: SHA-256 does not match ATTRIBUTION.toml (re-verify provenance, then update the entry)", a.path)),
-            Err(_) => problems.push(format!("{}: listed but missing", a.path)),
+        let catalog = a.is_translation_catalog();
+        match (std::fs::read(root.join(&a.path)), &a.sha256) {
+            (Err(_), _) => problems.push(format!("{}: listed but missing", a.path)),
+            (Ok(_), None) if catalog => {}
+            (Ok(_), Some(_)) if catalog => {
+                problems.push(format!("{}: translation catalogs carry no sha256 (AGENTS.md §1.3); remove it from the entry", a.path))
+            }
+            (Ok(_), None) => problems.push(format!("{}: sha256 is missing (only translation catalogs go without one)", a.path)),
+            (Ok(bytes), Some(hash)) if sha256_hex(&bytes) == *hash => {}
+            (Ok(_), Some(_)) => {
+                problems.push(format!("{}: SHA-256 does not match ATTRIBUTION.toml (re-verify provenance, then update the entry)", a.path))
+            }
         }
     }
     for f in repo_files {
@@ -378,7 +401,7 @@ pub fn render_markdown(m: &Manifest) -> String {
     s.push_str("<!-- Generated from ATTRIBUTION.toml by `cargo xtask assets --write`. Do not edit by hand. -->\n\n");
     s.push_str("Every asset PdfCraft includes, bundles or uses to build its published material, with its author, source and licence. ");
     s.push_str(
-        "The policy is in [AGENTS.md](AGENTS.md) §1. The machine-readable list, with SHA-256 hashes, is [ATTRIBUTION.toml](ATTRIBUTION.toml). ",
+        "The policy is in [AGENTS.md](AGENTS.md) §1. The machine-readable list, with the SHA-256 of every asset but the translation catalogs, is [ATTRIBUTION.toml](ATTRIBUTION.toml). ",
     );
     s.push_str("Licence texts are kept beside the assets and summarised in [NOTICE](NOTICE).\n\n");
     let esc = |t: &str| t.replace('|', "\\|");
@@ -463,7 +486,7 @@ mod tests {
             licence_file: "Cargo.toml".into(),
             kind: kind.into(),
             usage: "u".into(),
-            sha256: sha256_hex(&std::fs::read(root().join(path)).unwrap_or_default()),
+            sha256: Some(sha256_hex(&std::fs::read(root().join(path)).unwrap_or_default())),
             adobe_data: false,
         }
     }
@@ -530,6 +553,28 @@ mod tests {
         assert!(check(&root(), &m, &[], &lock(&[])).iter().any(|p| p.contains("from Adobe is forbidden")));
     }
 
+    /// One `[[asset]]` entry as ATTRIBUTION.toml spells it, with `extra` lines appended.
+    fn parsed(path: &str, kind: &str, extra: &str) -> Manifest {
+        let text = format!(
+            "[[asset]]\npath = \"{path}\"\ntitle = \"t\"\nauthor = \"a\"\nsource = \"s\"\nlicence = \"MIT\"\nlicence_file = \"Cargo.toml\"\nkind = \"{kind}\"\nusage = \"u\"\n{extra}"
+        );
+        toml::from_str(&text).unwrap()
+    }
+
+    /// Catalogs change in most UI PRs; a pinned hash would make every pair of them conflict.
+    #[test]
+    fn translation_catalogs_carry_no_hash_and_everything_else_does() {
+        let check_one = |m: Manifest| check(&root(), &m, &[], &lock(&[]));
+        let ja = "crates/ui-egui/src/i18n/ja.tsv";
+        assert_eq!(check_one(parsed(ja, "translation", "")), Vec::<String>::new());
+        let hash = format!("sha256 = \"{}\"\n", sha256_hex(&std::fs::read(root().join(ja)).unwrap()));
+        assert!(check_one(parsed(ja, "translation", &hash)).iter().any(|p| p.contains("carry no sha256")));
+        for (path, kind) in [("assets/fonts/Inter-Regular.ttf", "font"), (ja, "data"), ("Cargo.toml", "translation")] {
+            let p = check_one(parsed(path, kind, ""));
+            assert!(p.iter().any(|p| p.contains("sha256 is missing")), "{path} {kind}: {p:?}");
+        }
+    }
+
     #[test]
     fn adobe_ofl_fonts_are_allowed_and_other_adobe_fonts_rejected() {
         let l = lock(&[("noto", "1.0.0")]);
@@ -562,7 +607,7 @@ mod tests {
     #[test]
     fn changed_file_fails_hash_check() {
         let mut a = asset("assets/icons/x.svg", "Lucide", "icon", "ISC");
-        a.sha256 = "0".repeat(64);
+        a.sha256 = Some("0".repeat(64));
         let p = check(&root(), &Manifest { asset: vec![a], ..Default::default() }, &[], &lock(&[]));
         assert!(p.iter().any(|p| p.contains("SHA-256 does not match")), "{p:?}");
     }
