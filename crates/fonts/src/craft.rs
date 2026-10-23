@@ -319,8 +319,11 @@ mod tests {
     /// four Japanese faces of the pinned craft-fonts are 24.1 MB.
     #[test]
     fn only_the_japanese_cjk_faces_are_embedded_whole() {
-        let cjk = ["Hani", "Hans", "Hant", "Jpan", "Kore"];
-        let whole: Vec<_> = CRAFT_FONTS.iter().filter(|f| f.scripts.iter().any(|s| cjk.contains(s))).collect();
+        use crate::cjk_scripts::is_cjk_script;
+        // A tag can carry a region after the code: craft-fonts tags Noto Sans HK UI `Hant-HK`.
+        assert!(["Hant-HK", "Hans", "Jpan"].iter().all(|s| is_cjk_script(s)));
+        assert!(!["Latn", "Arab", "Hebr"].iter().any(|s| is_cjk_script(s)));
+        let whole: Vec<_> = CRAFT_FONTS.iter().filter(|f| f.scripts.iter().any(|s| is_cjk_script(s))).collect();
         for face in &whole {
             assert!(["Shippori Mincho", "BIZ UDPGothic", "BIZ UDMincho"].contains(&face.family), "{} is embedded", face.name());
         }
