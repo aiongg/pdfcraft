@@ -30,12 +30,6 @@ fn main() {
     }
 }
 
-/// The CJK families embedded whole: the Japanese faces documents and the renderer use.
-const WHOLE_CJK_FAMILIES: [&str; 3] = ["Shippori Mincho", "BIZ UDPGothic", "BIZ UDMincho"];
-
-/// Any other CJK face over this size is left out.
-const MAX_OTHER_CJK_BYTES: u64 = 4 << 20;
-
 /// One `CraftFont { .. }` initialiser per manifest line.
 fn craft_fonts(dir: &std::path::Path) -> Result<String, String> {
     let manifest = dir.join("fonts/manifest.txt");
@@ -51,7 +45,10 @@ fn craft_fonts(dir: &std::path::Path) -> Result<String, String> {
         // Whole CJK faces aren't embedded for size; interface CJK comes from cut faces once the app
         // moves to craft-fonts-build (storytold/craft-libs#213).
         let cjk = scripts.split(',').any(cjk_scripts::is_cjk_script);
-        if cjk && !WHOLE_CJK_FAMILIES.contains(family) && std::fs::metadata(dir.join(file)).is_ok_and(|m| m.len() > MAX_OTHER_CJK_BYTES) {
+        if cjk
+            && !cjk_scripts::WHOLE_CJK_FAMILIES.contains(family)
+            && std::fs::metadata(dir.join(file)).is_ok_and(|m| m.len() > cjk_scripts::MAX_OTHER_CJK_BYTES)
+        {
             continue;
         }
         // Arabic interface faces are small, so the web build keeps them too.

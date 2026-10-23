@@ -314,21 +314,24 @@ mod tests {
         assert_eq!(document_hebrew_font(false).is_some(), CRAFT_FONTS.iter().any(|f| f.covers("Hebr")));
     }
 
-    /// `build.rs` embeds whole only the Japanese CJK faces, so a checkout with a large Chinese or
-    /// Korean face (craft-fonts has the 16.4 MB Noto Sans CJK SC) leaves the binary as it was: the
-    /// four Japanese faces of the pinned craft-fonts are 24.1 MB.
+    /// `build.rs` embeds the Japanese CJK faces whole and any other CJK face only up to
+    /// `MAX_OTHER_CJK_BYTES`, so a checkout with a large Chinese or Korean face (craft-fonts has the
+    /// 16.4 MB Noto Sans CJK SC) leaves it out. The four Japanese faces of the pinned craft-fonts
+    /// are 24.1 MB.
     #[test]
-    fn only_the_japanese_cjk_faces_are_embedded_whole() {
-        use crate::cjk_scripts::is_cjk_script;
+    fn cjk_faces_follow_the_size_rule() {
+        use crate::cjk_scripts::{MAX_OTHER_CJK_BYTES, WHOLE_CJK_FAMILIES, is_cjk_script};
         // A tag can carry a region after the code: craft-fonts tags Noto Sans HK UI `Hant-HK`.
         assert!(["Hant-HK", "Hans", "Jpan", "Hang"].iter().all(|s| is_cjk_script(s)));
         assert!(!["Latn", "Arab", "Hebr"].iter().any(|s| is_cjk_script(s)));
-        let whole: Vec<_> = CRAFT_FONTS.iter().filter(|f| f.scripts.iter().any(|s| is_cjk_script(s))).collect();
-        for face in &whole {
-            assert!(["Shippori Mincho", "BIZ UDPGothic", "BIZ UDMincho"].contains(&face.family), "{} is embedded", face.name());
+        let cjk = CRAFT_FONTS.iter().filter(|f| f.scripts.iter().any(|s| is_cjk_script(s)));
+        let (whole, other): (Vec<_>, Vec<_>) = cjk.partition(|f| WHOLE_CJK_FAMILIES.contains(&f.family));
+        for face in &other {
+            let len = face.bytes.len();
+            assert!(u64::try_from(len).is_ok_and(|n| n <= MAX_OTHER_CJK_BYTES), "{} is embedded at {len} bytes", face.name());
         }
         let bytes: usize = whole.iter().map(|f| f.bytes.len()).sum();
-        assert!(bytes < 25_000_000, "{bytes} bytes of CJK faces");
+        assert!(bytes < 25_000_000, "{bytes} bytes of Japanese faces");
     }
 
     /// The bundled Inter faces carry the Latin, Greek and Cyrillic letters the craft-fonts faces
