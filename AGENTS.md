@@ -63,7 +63,7 @@ Anything else is forbidden, including assets whose licence you cannot prove from
   - an entry's hash does not match;
   - a licence is not on the allowlist;
   - a licence file is missing;
-  - an image, icon or font names Adobe as author or source.
+  - an image, icon or font names Adobe as author or source, except a font licensed under OFL-1.1 alone.
 - **`cargo xtask demo-pdf`** downloads its fonts only from `ATTRIBUTION.toml` entries, pinned by SHA-256. Afterwards it **fails if the PDF embeds any font not in its allowlist**, which catches the browser silently falling back to a system font.
 
 ### 1.4 Fonts live in craft-fonts
