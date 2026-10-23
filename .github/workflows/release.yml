@@ -25,11 +25,26 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Check Cargo.lock
+      - name: Git dependencies come from storytold
         run: |
-          if grep -E '^source = "git\+' Cargo.lock | grep -v '"git+https://github.com/storytold/'; then
-            echo "Cargo.lock has a git dependency outside github.com/storytold"; exit 1
+          set -euo pipefail
+          test -f Cargo.lock || { echo "Cargo.lock is missing"; exit 1; }
+          # Source replacement and patches in cargo config never show up in Cargo.lock.
+          if grep -qE '^[[:space:]]*(replace-with|\[patch)' .cargo/config.toml 2>/dev/null; then
+            echo ".cargo/config.toml replaces or patches a source"; exit 1
           fi
+          # Fails when Cargo.lock is out of date with the manifests.
+          cargo metadata --locked --format-version 1 > /dev/null
+          python3 - <<'PY'
+          import sys, tomllib
+          lock = tomllib.load(open("Cargo.lock", "rb"))
+          bad = sorted({p["source"] for p in lock.get("package", [])
+                        if p.get("source", "").startswith("git+")
+                        and not p["source"].startswith("git+https://github.com/storytold/")})
+          if bad:
+              print("Git dependencies outside github.com/storytold:", *bad, sep="\n")
+              sys.exit(1)
+          PY
 
   release:
     needs: git-sources
