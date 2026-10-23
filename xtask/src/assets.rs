@@ -230,6 +230,9 @@ pub fn check(root: &Path, m: &Manifest, repo_files: &[String], lock: &BTreeSet<(
     // Kinds that may never come from Adobe (AGENTS.md §1.1): visual design, and UI translations
     // (which must be clean-room, never taken from a product's string tables).
     let visual = |kind: &str| matches!(kind, "icon" | "image" | "font" | "logo" | "cursor" | "video" | "translation");
+    // Typefaces under the SIL Open Font License are allowed whoever designed them (AGENTS.md §1.1).
+    let ofl_font =
+        |kind: &str, licence: &str| kind == "font" && licence_ids(licence).next().is_some() && licence_ids(licence).all(|id| id == "OFL-1.1");
     let licence_ok = |what: &str, licence: &str, problems: &mut Vec<String>| {
         for id in licence_ids(licence) {
             if !ALLOWED_LICENCES.contains(&id) {
@@ -248,7 +251,7 @@ pub fn check(root: &Path, m: &Manifest, repo_files: &[String], lock: &BTreeSet<(
         if !root.join(&a.licence_file).is_file() {
             problems.push(format!("{}: licence file {} is missing", a.path, a.licence_file));
         }
-        if visual(&a.kind) && (mentions_adobe(&a.author) || mentions_adobe(&a.source) || mentions_adobe(&a.title)) {
+        if visual(&a.kind) && !ofl_font(&a.kind, &a.licence) && (mentions_adobe(&a.author) || mentions_adobe(&a.source) || mentions_adobe(&a.title)) {
             problems.push(format!("{}: {} from Adobe is forbidden (AGENTS.md §1.1)", a.path, a.kind));
         }
         if a.adobe_data && !(ADOBE_DATA_FILES.contains(&a.path.as_str()) && a.kind == "data") {
@@ -271,10 +274,10 @@ pub fn check(root: &Path, m: &Manifest, repo_files: &[String], lock: &BTreeSet<(
         if !lock.contains(&(b.krate.clone(), b.version.clone())) {
             problems.push(format!("{what}: crate version not in Cargo.lock (dependency changed: re-audit its bundled assets)"));
         }
-        if visual(&b.kind) && (mentions_adobe(&b.author) || mentions_adobe(&b.source)) {
+        if visual(&b.kind) && !ofl_font(&b.kind, &b.licence) && (mentions_adobe(&b.author) || mentions_adobe(&b.source)) {
             problems.push(format!("{what}: {} from Adobe is forbidden (AGENTS.md §1.1)", b.kind));
         }
-        let adobe = mentions_adobe(&b.author);
+        let adobe = mentions_adobe(&b.author) && !ofl_font(&b.kind, &b.licence);
         let approved = ADOBE_DATA_ALLOWED.contains(&(b.krate.as_str(), b.path.as_str())) && b.kind == "data";
         if (adobe || b.adobe_data) && !(approved && b.adobe_data) {
             problems.push(format!("{what}: Adobe-authored material outside the closed list in AGENTS.md §1.1"));
@@ -285,7 +288,7 @@ pub fn check(root: &Path, m: &Manifest, repo_files: &[String], lock: &BTreeSet<(
     }
     for f in &m.fetched {
         licence_ok(&f.file, &f.licence, &mut problems);
-        if visual(&f.kind) && (mentions_adobe(&f.author) || mentions_adobe(&f.source) || mentions_adobe(&f.title)) {
+        if visual(&f.kind) && !ofl_font(&f.kind, &f.licence) && (mentions_adobe(&f.author) || mentions_adobe(&f.source) || mentions_adobe(&f.title)) {
             problems.push(format!("{}: {} from Adobe is forbidden (AGENTS.md §1.1)", f.file, f.kind));
         }
         if f.sha256.len() != 64 || f.licence_sha256.len() != 64 {
@@ -297,7 +300,7 @@ pub fn check(root: &Path, m: &Manifest, repo_files: &[String], lock: &BTreeSet<(
     }
     for b in &m.build_input {
         licence_ok(&b.name, &b.licence, &mut problems);
-        if visual(&b.kind) && (mentions_adobe(&b.author) || mentions_adobe(&b.source) || mentions_adobe(&b.title)) {
+        if visual(&b.kind) && !ofl_font(&b.kind, &b.licence) && (mentions_adobe(&b.author) || mentions_adobe(&b.source) || mentions_adobe(&b.title)) {
             problems.push(format!("{}: {} from Adobe is forbidden (AGENTS.md §1.1)", b.name, b.kind));
         }
         if !b.source.starts_with("https://") || !b.attribution.starts_with("https://") {
@@ -525,6 +528,21 @@ mod tests {
         assert!(p.iter().any(|p| p.contains("no ATTRIBUTION.toml entry")), "{p:?}");
         let m = Manifest { asset: vec![asset("crates/ui-egui/src/i18n/ja.tsv", "Adobe", "translation", "MIT")], ..Default::default() };
         assert!(check(&root(), &m, &[], &lock(&[])).iter().any(|p| p.contains("from Adobe is forbidden")));
+    }
+
+    #[test]
+    fn adobe_ofl_fonts_are_allowed_and_other_adobe_fonts_rejected() {
+        let l = lock(&[("noto", "1.0.0")]);
+        let noto = |licence: &str| {
+            let mut b = bundled("noto", "fonts/NotoSansCJKsc-Regular.otf", "Adobe", "font", false);
+            b.licence = licence.into();
+            Manifest { bundled: vec![b], ..Default::default() }
+        };
+        assert!(check(&root(), &noto("OFL-1.1"), &[], &l).is_empty());
+        assert!(check(&root(), &noto("MIT"), &[], &l).iter().any(|p| p.contains("forbidden")));
+        assert!(check(&root(), &noto(""), &[], &l).iter().any(|p| p.contains("forbidden")), "an empty licence is not OFL");
+        let icon = Manifest { asset: vec![asset("assets/icons/x.svg", "Adobe Inc.", "icon", "OFL-1.1")], ..Default::default() };
+        assert!(check(&root(), &icon, &[], &l).iter().any(|p| p.contains("from Adobe is forbidden")));
     }
 
     #[test]

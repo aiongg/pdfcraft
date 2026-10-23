@@ -217,12 +217,13 @@ pub(crate) fn attachment_file_name(name: &str) -> String {
     if reserved { format!("_{name}") } else { name.to_string() }
 }
 
-/// Whether `name` names a file directly inside a folder: not empty, `.` or `..`, with no `/` or
-/// `\\`, and no drive (`C:`). On Windows any `:` is refused, which also rules out alternate data
-/// streams.
+/// Whether `name` names a file directly inside a folder: not empty, with no `/` or `\\`, no drive
+/// (`C:`), and not ending in `.` or a space (which also rules out `.` and `..`): Windows drops a
+/// trailing dot or space, so `report.` would write `report`. On Windows any `:` is refused, which
+/// also rules out alternate data streams.
 pub(crate) fn is_plain_file_name(name: &str) -> bool {
     let drive = matches!(name.as_bytes(), [letter, b':', ..] if letter.is_ascii_alphabetic());
-    !(name.is_empty() || name == "." || name == ".." || name.contains(['/', '\\']) || drive || (cfg!(windows) && name.contains(':')))
+    !(name.is_empty() || name.ends_with(['.', ' ']) || name.contains(['/', '\\']) || drive || (cfg!(windows) && name.contains(':')))
 }
 
 /// Pages ▸ Rotate Pages.
@@ -1085,6 +1086,16 @@ mod stem_tests {
     }
 
     #[test]
+    fn plain_file_names_do_not_end_in_a_dot_or_a_space() {
+        for good in ["report.pdf", "report", ".hidden", "a b.pdf", "資料.pdf"] {
+            assert!(is_plain_file_name(good), "{good}");
+        }
+        for bad in ["report.", "report.pdf.", "report.pdf ", "report. . ", " ", "...", ". "] {
+            assert!(!is_plain_file_name(bad), "{bad:?}");
+        }
+    }
+
+    #[test]
     fn write_files_refuses_names_that_leave_the_folder() {
         let dir = std::env::temp_dir().join(format!("pdfcraft-write-files-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -1094,7 +1105,7 @@ mod stem_tests {
         let mut app = crate::PdfCraftApp::new();
         app.set_option("language", "en").unwrap();
         app.export_dir_override = Some(out.to_string_lossy().into_owned());
-        for bad in ["../x.pdf", "..", ".", "", "sub/x.pdf", "sub\\x.pdf", "C:x.pdf", absolute.as_str()] {
+        for bad in ["../x.pdf", "..", ".", "", "sub/x.pdf", "sub\\x.pdf", "C:x.pdf", "x.pdf.", absolute.as_str()] {
             assert!(!is_plain_file_name(bad), "{bad}");
             // A plain name first: nothing is written when any name in the batch is refused.
             app.write_files(&[("ok.pdf".into(), std::sync::Arc::new(b"%PDF".to_vec())), (bad.into(), std::sync::Arc::new(b"%PDF".to_vec()))], "t");
