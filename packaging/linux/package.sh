@@ -132,6 +132,7 @@ if has appimage; then
   case "$ARCH" in
     x86_64) APPIMAGETOOL_SHA256=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0 ;;
     aarch64) APPIMAGETOOL_SHA256=f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158 ;;
+    *) APPIMAGETOOL_SHA256= ;;
   esac
   APPDIR="$WORK/PdfCraft.AppDir"
   cp -R "$STAGE" "$APPDIR"
@@ -143,6 +144,10 @@ if has appimage; then
 
   TOOL="${APPIMAGETOOL:-$(command -v appimagetool || true)}"
   if [[ -z "$TOOL" ]]; then
+    if [[ -z "$APPIMAGETOOL_SHA256" ]]; then
+      echo "error: no pinned appimagetool for $ARCH; set APPIMAGETOOL or leave appimage out of --formats" >&2
+      exit 2
+    fi
     TOOL="$CARGO_TARGET_DIR/appimagetool-$APPIMAGETOOL_VERSION-$ARCH.AppImage"
     if [[ ! -x "$TOOL" ]]; then
       download="$TOOL.download"
