@@ -2,8 +2,8 @@
 //! build script includes this file with `#[path]` and the crate's tests use it as a module, so
 //! the two can't drift.
 
-/// ISO 15924 codes of the Han, Japanese and Korean scripts.
-const CJK_SCRIPTS: [&str; 5] = ["Hani", "Hans", "Hant", "Jpan", "Kore"];
+/// ISO 15924 codes of the Han, Japanese and Korean scripts, Hangul on its own included.
+const CJK_SCRIPTS: [&str; 6] = ["Hani", "Hans", "Hant", "Jpan", "Kore", "Hang"];
 
 /// Whether a craft-fonts manifest script tag is CJK. A tag can carry a region after the code
 /// (craft-fonts tags Noto Sans HK UI `Hant-HK`), so only the part before `-` is compared.
