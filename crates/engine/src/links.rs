@@ -198,8 +198,11 @@ pub fn resolve_remote_document_path(source: Option<&Path>, raw: &str) -> Result<
         }
     }
     craft_docpath::resolve_absolute(raw, source).map_err(|r| match r {
-        // A path that resolves but not to an absolute one is relative to a source without a usable path.
-        craft_docpath::Refused::Invalid if craft_docpath::resolve(raw, source).is_ok() => RemoteDocumentPathError::MissingSourcePath,
+        // A path that resolves but not to an absolute one needed a source with an absolute path. With
+        // such a source, it is a path this platform cannot open (`C:\x.pdf` on Unix).
+        craft_docpath::Refused::Invalid if !source.is_some_and(Path::is_absolute) && craft_docpath::resolve(raw, source).is_ok() => {
+            RemoteDocumentPathError::MissingSourcePath
+        }
         r => RemoteDocumentPathError::NotLocal(r),
     })
 }
@@ -511,6 +514,8 @@ mod tests {
         assert_eq!(resolve(Some(source), "/manual/target.pdf").as_deref(), Ok(Path::new("/manual/target.pdf")));
         assert_eq!(resolve(None, "target.pdf"), Err(E::MissingSourcePath));
         assert_eq!(resolve(Some(Path::new("source.pdf")), "target.pdf"), Err(E::MissingSourcePath), "a relative source is not used");
+        #[cfg(unix)]
+        assert_eq!(resolve(Some(source), "C:\\x.pdf"), Err(E::NotLocal(craft_docpath::Refused::Invalid)), "a Windows path on Unix needs no source");
         assert_eq!(resolve(Some(source), ""), Err(E::Empty));
         assert_eq!(resolve(Some(source), "   "), Err(E::Empty));
         for url in
