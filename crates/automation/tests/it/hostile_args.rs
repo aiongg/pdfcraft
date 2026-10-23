@@ -205,10 +205,18 @@ fn blank_doc(a: &mut Automation) -> u64 {
 /// Delete everything inside `dir`, so one tool never sees files an earlier tool wrote: a digital ID
 /// that `sign_id_create` wrote to the `in.pdf` placeholder would stop every later `sign_document`
 /// call at its decrypt, before the argument under test.
+///
+/// The entries are reached through the canonical path, as the tools reach them: on Windows that
+/// is a `\\?\` path, whose names are taken literally. Through the plain path a file the tools
+/// named `" "` would lose its trailing space and name `dir` itself, which would then be deleted.
 fn empty_dir(dir: &Path) {
-    for entry in std::fs::read_dir(dir).expect("read the root").flatten() {
+    let dir = dir.canonicalize().expect("the root exists");
+    for entry in std::fs::read_dir(&dir).expect("read the root").flatten() {
         let path = entry.path();
-        let _ = if path.is_dir() { std::fs::remove_dir_all(&path) } else { std::fs::remove_file(&path) };
+        let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
+        if let Err(e) = if is_dir { std::fs::remove_dir_all(&path) } else { std::fs::remove_file(&path) } {
+            eprintln!("could not remove {} before the next tool: {e}", path.display());
+        }
     }
 }
 
