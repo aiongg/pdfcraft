@@ -113,6 +113,7 @@ pub fn ci(_: &[String]) -> anyhow::Result<()> {
         ("clippy", Box::new(|| run_args(&["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]))),
         ("cli-no-default-features", Box::new(|| run_args(&["check", "-p", "pdfcraft-cli", "--no-default-features"]))),
         ("test", Box::new(|| test(&[]))),
+        ("i18n-report", Box::new(|| i18n_report(&["--workspace".to_string()]))),
         ("layers", Box::new(|| layers(&[]))),
         ("wasm", Box::new(|| wasm(&[]))),
         ("assets", Box::new(|| crate::assets::run(&[]))),
@@ -127,6 +128,36 @@ pub fn ci(_: &[String]) -> anyhow::Result<()> {
         }
     }
     println!("\nCI: all {} steps passed", steps.len());
+    Ok(())
+}
+
+/// `cargo xtask i18n-report`: the strings each interface language has no translation for, as
+/// counts and the first few keys, from the UI crate's `translation_gaps_report` test. It always
+/// passes: a missing string shows in English. `--workspace` runs the test from the workspace
+/// test build, which `xtask ci` has just made; without it only the UI crate is built.
+pub fn i18n_report(args: &[String]) -> anyhow::Result<()> {
+    const TEST: &str = "i18n::tests::translation_gaps_report";
+    const START: &str = "=== translation gaps ===";
+    const END: &str = "=== end of translation gaps ===";
+    let scope: &[&str] = if args.iter().any(|a| a == "--workspace") { &["--workspace"] } else { &["-p", "pdfcraft-ui-egui"] };
+    let mut c = cargo();
+    c.arg("test").args(scope).args(["--lib", "--quiet", "--", TEST, "--exact", "--nocapture"]).stderr(std::process::Stdio::inherit());
+    eprintln!("$ cargo test {} --lib --quiet -- {TEST} --exact --nocapture", scope.join(" "));
+    let out = match c.output() {
+        Ok(out) => out,
+        Err(e) => {
+            println!("i18n-report: no report, cargo test did not start: {e}");
+            return Ok(());
+        }
+    };
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let report: Vec<&str> = stdout.lines().skip_while(|l| *l != START).skip(1).take_while(|l| *l != END).collect();
+    if report.is_empty() {
+        println!("i18n-report: no report (cargo test exited with {})", out.status);
+    }
+    for line in report {
+        println!("{line}");
+    }
     Ok(())
 }
 
