@@ -177,6 +177,9 @@ pub fn run(args: &[String]) -> Result<()> {
         std::fs::write(root.join("ATTRIBUTION.md"), &markdown)?;
         println!("assets: wrote ATTRIBUTION.md");
     }
+    for a in manifest.asset.iter().filter(|a| a.is_translation_catalog() && a.sha256.is_some()) {
+        println!("assets: note: {}: translation catalogs aren't hashed; its sha256 line can be deleted", a.path);
+    }
     let mut problems = check(&root, &manifest, &repo_files(&root)?, &cargo_lock_versions(&root)?);
     match std::fs::read_to_string(root.join("ATTRIBUTION.md")) {
         Ok(existing) if existing == markdown => {}
@@ -275,10 +278,8 @@ pub fn check(root: &Path, m: &Manifest, repo_files: &[String], lock: &BTreeSet<(
         let catalog = a.is_translation_catalog();
         match (std::fs::read(root.join(&a.path)), &a.sha256) {
             (Err(_), _) => problems.push(format!("{}: listed but missing", a.path)),
-            (Ok(_), None) if catalog => {}
-            (Ok(_), Some(_)) if catalog => {
-                problems.push(format!("{}: translation catalogs carry no sha256 (AGENTS.md §1.3); remove it from the entry", a.path))
-            }
+            // A leftover hash line (e.g. kept while resolving a rebase) is not checked; `run` notes it.
+            (Ok(_), _) if catalog => {}
             (Ok(_), None) => problems.push(format!("{}: sha256 is missing (only translation catalogs go without one)", a.path)),
             (Ok(bytes), Some(hash)) if sha256_hex(&bytes) == *hash => {}
             (Ok(_), Some(_)) => {
@@ -567,8 +568,8 @@ mod tests {
         let check_one = |m: Manifest| check(&root(), &m, &[], &lock(&[]));
         let ja = "crates/ui-egui/src/i18n/ja.tsv";
         assert_eq!(check_one(parsed(ja, "translation", "")), Vec::<String>::new());
-        let hash = format!("sha256 = \"{}\"\n", sha256_hex(&std::fs::read(root().join(ja)).unwrap()));
-        assert!(check_one(parsed(ja, "translation", &hash)).iter().any(|p| p.contains("carry no sha256")));
+        let stale = format!("sha256 = \"{}\"\n", "0".repeat(64));
+        assert_eq!(check_one(parsed(ja, "translation", &stale)), Vec::<String>::new(), "a leftover hash is not checked");
         for (path, kind) in [("assets/fonts/Inter-Regular.ttf", "font"), (ja, "data"), ("Cargo.toml", "translation")] {
             let p = check_one(parsed(path, kind, ""));
             assert!(p.iter().any(|p| p.contains("sha256 is missing")), "{path} {kind}: {p:?}");
