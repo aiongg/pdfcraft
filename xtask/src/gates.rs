@@ -78,20 +78,32 @@ pub fn wasm(_: &[String]) -> anyhow::Result<()> {
         .filter(|c| matches!(layers::classify(&c.name), Some(layers::Class::Layer(_) | layers::Class::Standalone(_))))
         .map(|c| c.name)
         .collect();
-    let mut failed = Vec::new();
+    // One call over every crate: they share one dependency build, and `--keep-going` reports
+    // each failing crate instead of stopping at the first.
+    let mut c = cargo();
+    c.args(["check", "--target", "wasm32-unknown-unknown", "--keep-going"]);
     for pkg in &set {
-        let mut c = cargo();
-        c.args(["check", "--target", "wasm32-unknown-unknown", "-p", pkg]);
-        if run(c, &format!("cargo check --target wasm32-unknown-unknown -p {pkg}")).is_err() {
-            failed.push(pkg.clone());
-        }
+        c.args(["-p", pkg]);
     }
-    if failed.is_empty() {
-        println!("wasm32: {} crates ok", set.len());
-        Ok(())
+    run(c, &format!("cargo check --target wasm32-unknown-unknown --keep-going ({} crates)", set.len()))?;
+    println!("wasm32: {} crates ok", set.len());
+    Ok(())
+}
+
+/// The workspace tests. Unit and integration tests run under cargo-nextest when it is installed
+/// (one process per test, so the run is not held up by its slowest binary), else under
+/// `cargo test`; doctests run separately because nextest does not run them. Examples are left
+/// out of the test build: clippy `--all-targets` already checks that they compile.
+pub fn test(_: &[String]) -> anyhow::Result<()> {
+    let targets = ["--workspace", "--lib", "--bins", "--tests"];
+    let nextest = cargo().args(["nextest", "--version"]).output().is_ok_and(|o| o.status.success());
+    if nextest {
+        run_args(&[&["nextest", "run", "--no-fail-fast"][..], &targets].concat())?;
     } else {
-        bail!("wasm32 check failed for: {}", failed.join(", "))
+        eprintln!("test: cargo-nextest is not installed, using cargo test (cargo install cargo-nextest --locked)");
+        run_args(&[&["test", "--no-fail-fast"][..], &targets].concat())?;
     }
+    run_args(&["test", "--workspace", "--doc"])
 }
 
 pub fn ci(_: &[String]) -> anyhow::Result<()> {
@@ -99,7 +111,8 @@ pub fn ci(_: &[String]) -> anyhow::Result<()> {
     let steps: Vec<Step> = vec![
         ("fmt", Box::new(|| run_args(&["fmt", "--all", "--", "--check"]))),
         ("clippy", Box::new(|| run_args(&["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"]))),
-        ("test", Box::new(|| run_args(&["test", "--workspace"]))),
+        ("cli-no-default-features", Box::new(|| run_args(&["check", "-p", "pdfcraft-cli", "--no-default-features"]))),
+        ("test", Box::new(|| test(&[]))),
         ("layers", Box::new(|| layers(&[]))),
         ("wasm", Box::new(|| wasm(&[]))),
         ("assets", Box::new(|| crate::assets::run(&[]))),
