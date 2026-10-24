@@ -133,8 +133,11 @@ impl TextBox {
             // As the appearance draws it: the first baseline is 0.85 em below the padded top and
             // a line is drawn while its descent (0.207 em) stays inside the border, so the
             // padding below the last line is not needed: `inner_h` plus 2 pt.
-            let above = wrap_with(&shown, size, self.inner_w, width_of).len().saturating_sub(1) as f64;
-            above * size * 1.15 + 1.057 * size <= self.inner_h + 2.0 + 0.01
+            // Long words break by character, so a line is wider than the box only when it is a
+            // single character wider than the box, which the appearance still cuts at the sides.
+            let lines = wrap_with(&shown, size, self.inner_w, width_of);
+            let above = lines.len().saturating_sub(1) as f64;
+            above * size * 1.15 + 1.057 * size <= self.inner_h + 2.0 + 0.01 && lines.iter().all(|l| width_of(l, size) <= self.inner_w + 0.01)
         } else {
             // A line break in a single-line value is drawn as a space.
             let line: String = shown.chars().map(|c| if matches!(c, '\n' | '\r') { ' ' } else { c }).collect();

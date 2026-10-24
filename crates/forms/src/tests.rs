@@ -471,6 +471,32 @@ fn a_short_multiline_field_takes_the_one_line_it_draws() {
     assert!(!tb("boxed").fits("one line"));
 }
 
+/// A multi-line field narrower than one glyph: wrapping can't break inside a character, so the
+/// appearance cuts that character at the sides (`Overflow::Wide`), and `fits` must say so too.
+#[test]
+fn a_multiline_field_rejects_a_glyph_wider_than_the_field() {
+    // 12 x 40 pt with no border: 8 pt inside the 2 pt padding. At 12 pt Helvetica a W is 11.3 pt
+    // wide and an i 2.7 pt.
+    let objs: Vec<String> = vec![
+        "<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R >>".into(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 600 800] >>".into(),
+        "<< /Type /Page /Parent 2 0 R /Annots [6 0 R] >>".into(),
+        "<< /Fields [6 0 R] /DA (/Helv 12 Tf 0 g) /DR << /Font << /Helv 5 0 R >> >> >>".into(),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>".into(),
+        format!(
+            "<< /Type /Annot /Subtype /Widget /FT /Tx /T (thin) /V (W) /DA (/Helv 12 Tf 0 g) /Ff {} /Rect [50 660 62 700] /P 3 0 R >>",
+            flags::MULTILINE
+        ),
+    ];
+    let doc = document(&objs);
+    let all = fields(&doc);
+    let f = field(&all, "thin");
+    let tb = appearance::text_box(&doc, f, &f.widgets[0]);
+    assert!(tb.fits("i") && tb.fits("i\ni"));
+    assert!(matches!(appearance::value_overflow(&doc, f, &f.widgets[0]), Some(appearance::Overflow::Wide { .. })));
+    assert!(!tb.fits("W") && !tb.fits("iW"));
+}
+
 /// An edit to a field that doesn't scroll keeps as much of what it inserted as fits, wherever the
 /// caret was, and always keeps a deletion.
 #[test]
