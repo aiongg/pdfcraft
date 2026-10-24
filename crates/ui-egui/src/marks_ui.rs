@@ -7,7 +7,7 @@ use egui::{Align, Color32, CornerRadius, Layout, Rect, Stroke, pos2, vec2};
 use pdfcraft_engine::{Background, Edit, FontFamily, HeaderFooter, MarkKind, Watermark};
 
 use crate::theme::{self, Tokens};
-use crate::{PdfCraftApp, widgets};
+use crate::{PdfCraftApp, icons, widgets};
 
 /// How far a watermark may be moved from the page centre, in points.
 const MAX_OFFSET: f64 = 20_000.0;
@@ -90,6 +90,9 @@ pub struct MarksDraft {
     pub use_file: bool,
     pub file: Option<(String, std::sync::Arc<Vec<u8>>)>,
     pub file_page: usize,
+    /// The page (0-based) the preview was stepped to; `None` previews the current page. Reset
+    /// each time the dialog opens.
+    pub preview: Option<usize>,
 }
 
 impl Default for MarksDraft {
@@ -107,6 +110,7 @@ impl Default for MarksDraft {
             use_file: false,
             file: None,
             file_page: 1,
+            preview: None,
         }
     }
 }
@@ -170,6 +174,13 @@ fn behind(color: [f64; 3], opacity: f64) -> Color32 {
 fn preview_page(range: &PageRange, current: usize, count: usize) -> usize {
     let pages = range.pages(count);
     if pages.contains(&current) { current } else { pages.first().copied().unwrap_or(current) }
+}
+
+/// The page the preview steps to from `shown`: the range's next page after it (`forward`) or the
+/// last one before it, or `None` at either end.
+fn step_preview(range: &PageRange, shown: usize, count: usize, forward: bool) -> Option<usize> {
+    let pages = range.pages(count);
+    if forward { pages.into_iter().find(|&p| p > shown) } else { pages.into_iter().rev().find(|&p| p < shown) }
 }
 
 /// The dialog for `kind`; returns (apply, cancel).
@@ -343,10 +354,10 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
     ui.label(egui::RichText::new(tl!("Page Range Options")).font(theme::semibold(12.5)));
     d.range.ui(ui, count);
     ui.add_space(8.0);
-    // The preview: the current page, or the first one the range selects if it leaves that out,
-    // drawn from its thumbnail at its displayed size (after /Rotate), the frame the engine lays
-    // the marks out in.
-    let target = preview_page(&d.range, current, count);
+    // The preview: the current page (or the page stepped to), or the first one the range selects
+    // if it leaves that out, drawn from its thumbnail at its displayed size (after /Rotate), the
+    // frame the engine lays the marks out in.
+    let target = preview_page(&d.range, d.preview.unwrap_or(current), count);
     let page = doc.info.pages.get(target).map(|p| (p.width as f64, p.height as f64)).unwrap_or((612.0, 792.0));
     let picture = app.views.get_mut(i).and_then(|view| {
         view.need_thumbnail(target, true);
@@ -425,14 +436,24 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
             MarkKind::Background => {}
         });
         ui.vertical(|ui| {
-            ui.label(
-                egui::RichText::new(crate::i18n::fmt(
-                    tl!("Preview: page {p} of {n}"),
-                    &[("p", &(target + 1).to_string()), ("n", &count.to_string())],
-                ))
-                .small()
-                .color(t.text_faint),
-            );
+            ui.horizontal(|ui| {
+                // Steps through the pages the range selects.
+                let (back, next) = (step_preview(&d.range, target, count, false), step_preview(&d.range, target, count, true));
+                if ui.add_enabled_ui(back.is_some(), |ui| icons::button(ui, "chevron-left", 22.0, false, tl!("Previous page"))).inner.clicked() {
+                    d.preview = back.or(d.preview);
+                }
+                ui.label(
+                    egui::RichText::new(crate::i18n::fmt(
+                        tl!("Preview: page {p} of {n}"),
+                        &[("p", &(target + 1).to_string()), ("n", &count.to_string())],
+                    ))
+                    .small()
+                    .color(t.text_faint),
+                );
+                if ui.add_enabled_ui(next.is_some(), |ui| icons::button(ui, "chevron-right", 22.0, false, tl!("Next page"))).inner.clicked() {
+                    d.preview = next.or(d.preview);
+                }
+            });
             let n = d.range.pages(count).len();
             let applies =
                 if n == 1 { tl!("Applies to 1 page").to_string() } else { crate::i18n::fmt(tl!("Applies to {n} pages"), &[("n", &n.to_string())]) };
@@ -595,6 +616,26 @@ mod tests {
         let none = PageRange { all: false, from: 4, to: 2, subset: Subset::All };
         assert_eq!(preview_page(&none, 1, 5), 1, "the current page when the range selects none");
         assert_eq!(preview_page(&all, 0, 0), 0, "no pages at all");
+    }
+
+    #[test]
+    fn the_preview_steps_through_the_pages_the_range_selects() {
+        let odd = PageRange { all: true, subset: Subset::Odd, ..PageRange::default() };
+        // Pages 1, 3 and 5 (0-based 0, 2, 4) of 5.
+        assert_eq!(step_preview(&odd, 0, 5, true), Some(2));
+        assert_eq!(step_preview(&odd, 2, 5, true), Some(4));
+        assert_eq!(step_preview(&odd, 4, 5, true), None, "the last page has no next");
+        assert_eq!(step_preview(&odd, 4, 5, false), Some(2));
+        assert_eq!(step_preview(&odd, 0, 5, false), None, "the first page has no previous");
+        // From a page the range leaves out, to the nearest one it selects on that side.
+        assert_eq!(step_preview(&odd, 1, 5, true), Some(2));
+        assert_eq!(step_preview(&odd, 1, 5, false), Some(0));
+        assert_eq!(step_preview(&odd, 0, 0, true), None, "no pages at all");
+        // A page stepped to is previewed while the range selects it, and the range's first page
+        // once a new range leaves it out.
+        assert_eq!(preview_page(&odd, 2, 5), 2);
+        let later = PageRange { all: false, from: 4, to: 5, subset: Subset::All };
+        assert_eq!(preview_page(&later, 2, 5), 3);
     }
 
     #[test]
