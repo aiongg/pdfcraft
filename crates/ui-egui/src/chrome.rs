@@ -785,7 +785,8 @@ pub fn right_rail(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             egui::ScrollArea::vertical().id_salt("rail-panels").show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 4.0;
                 let mut rail_button = |ui: &mut egui::Ui, panel: RightPanel, icon: &str, tip: &str, has: bool| {
-                    let selected = app.right == Some(panel) && (app.mode == Mode::Read || app.docking.exposed(crate::docking::Panel::Inspector));
+                    let selected = app.right == Some(panel)
+                        && (app.mode == Mode::Read || crate::docking::exposed(&app.docking, crate::docking::Panel::Inspector));
                     let r = icons::button(ui, icon, 34.0, selected, tl!(tip));
                     if has && !selected {
                         let c = r.rect.right_top() + vec2(-8.0, 8.0);

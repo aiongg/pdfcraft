@@ -1090,7 +1090,7 @@ impl PdfCraftApp {
             date_format_draft: None,
             mode_override: None,
             left: LeftPanel::AllTools,
-            docking: docking::Workspace::default(),
+            docking: docking::default_workspace(),
             pending_panel_reveals: Vec::new(),
             left_open: true,
             right: None,
@@ -2650,7 +2650,7 @@ impl PdfCraftApp {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return };
         if let Some(saved) = v.get("docking")
             && let Ok(workspace) = serde_json::from_value::<docking::Workspace>(saved.clone())
-            && workspace.validate().is_ok()
+            && docking::validate(&workspace).is_ok()
         {
             self.docking = workspace;
             self.left_open =
@@ -3005,11 +3005,14 @@ impl PdfCraftApp {
                     _ => return Err("always-default-view must be on or off".into()),
                 };
             }
-            ("tools-side", _) => self.docking.set_tools_on_right(match value {
-                "left" => false,
-                "right" => true,
-                _ => return Err("tools-side must be left or right".into()),
-            })?,
+            ("tools-side", _) => docking::set_tools_on_right(
+                &mut self.docking,
+                match value {
+                    "left" => false,
+                    "right" => true,
+                    _ => return Err("tools-side must be left or right".into()),
+                },
+            )?,
             ("organize", Some(v)) => {
                 if value == "off" {
                     v.organize = false;

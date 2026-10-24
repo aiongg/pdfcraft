@@ -735,7 +735,7 @@ impl Host for crate::PdfCraftApp {
             "default_mode": self.default_mode,
             "comment_tool_pinned": self.comment_prefs.pinned,
             "left_panel": if self.left_open { json!(format!("{:?}", self.left)) } else { Value::Null },
-            "tools_side": if self.docking.tools_on_right() { "right" } else { "left" },
+            "tools_side": if crate::docking::tools_on_right(&self.docking) { "right" } else { "left" },
             "right_panel": self.right.map(|r| format!("{r:?}")),
             "dialog": self.dialog.map(|d| format!("{d:?}")),
             "palette_open": self.palette_open,

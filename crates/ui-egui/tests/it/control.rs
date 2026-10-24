@@ -1513,7 +1513,7 @@ fn docking_pointer_group_float_close_restore_and_document_commands() {
     h.run_steps(3);
     h.get_by_label("Float panel").click();
     h.run_steps(5);
-    let rect = h.state().docking.layout.floating.iter().find(|g| g.panels.contains(&Panel::Inspector)).unwrap().rect;
+    let rect = h.state().docking.layout.floating.iter().find(|g| g.contains(&Panel::Inspector)).unwrap().rect;
     h.get_by_role_and_label(egui::accesskit::Role::Tab, "Inspector").click_button(egui::PointerButton::Secondary);
     h.run_steps(3);
     // Scope to the open context menu; the Tools body also has a close icon.
@@ -1522,7 +1522,7 @@ fn docking_pointer_group_float_close_restore_and_document_commands() {
     assert!(!h.state().docking.layout.contains(&Panel::Inspector));
     ok(&mut h, &c, "ui.set", json!({"key":"panel", "value":"bookmarks"}));
     h.run_steps(4);
-    assert_eq!(h.state().docking.layout.floating.iter().find(|g| g.panels.contains(&Panel::Inspector)).unwrap().rect, rect);
+    assert_eq!(h.state().docking.layout.floating.iter().find(|g| g.contains(&Panel::Inspector)).unwrap().rect, rect);
     let saved = h.state().persist();
     let expected = serde_json::to_value(&h.state().docking).unwrap();
     let (mut reloaded, client) = harness();
@@ -1585,7 +1585,7 @@ fn docking_renders_real_pdf_default_floating_and_redocked() {
                     ok(&mut h, &c, "ui.dock", json!({"operation":"move", "panel":"inspector", "target":"tools", "zone":"center"}));
                 }
                 h.run_steps(5);
-                h.state().docking.validate().unwrap();
+                pdfcraft_ui_egui::docking::validate(&h.state().docking).unwrap();
                 if let Ok(directory) = std::env::var("CRAFT_UI_DOCKING_DIR") {
                     let _gpu = crate::gpu();
                     std::fs::create_dir_all(&directory).unwrap();
@@ -1675,10 +1675,90 @@ fn malformed_docking_settings_preserve_other_preferences() {
     let mut app = PdfCraftApp::new();
     app.restore(r#"{"docking":{"layout":{"root":null,"floating":[]},"hidden":[]},"default_mode":"edit","flatten_fill_sign":true}"#);
     assert_eq!(app.default_mode, pdfcraft_ui_egui::Mode::Edit);
-    app.docking.validate().unwrap();
+    pdfcraft_ui_egui::docking::validate(&app.docking).unwrap();
     let saved: Value = serde_json::from_str(&app.persist()).unwrap();
     assert_eq!(saved["default_mode"], "edit");
     assert_eq!(saved["flatten_fill_sign"], true);
+}
+
+/// Settings written before docking workspaces had a version: `{layout, hidden}`, a floating
+/// window as one group `{panels, active, rect}`, and a hidden location without dock state.
+#[test]
+fn version_one_docking_settings_restore_their_layout_and_hidden_panel() {
+    use pdfcraft_ui_egui::docking::{self, Panel};
+    let v1 = json!({
+        "docking": {
+            "layout": {
+                "root": {"Tabs": {"panels": ["canvas"], "active": 0}},
+                "floating": [{"panels": ["inspector"], "active": 0, "rect": [600.0, 120.0, 330.0, 480.0]}]
+            },
+            "hidden": [["tools", {
+                "floating": null,
+                "anchor": "canvas",
+                "placement": {"Split": "Right"},
+                "size": {"FixedSecond": 260.0},
+                "stack": null,
+                "sibling": ["canvas"]
+            }]]
+        },
+        "docking_left_open": false,
+        "docking_right": "Bookmarks"
+    });
+    let mut app = PdfCraftApp::new();
+    app.restore(&v1.to_string());
+    assert_eq!(app.docking.version, 1);
+    docking::validate(&app.docking).unwrap();
+    assert_eq!(app.docking.layout.root, Some(craft_ui::docking::Node::Tabs { panels: vec![Panel::Canvas], active: 0 }));
+    let window = app.docking.layout.floating.first().unwrap();
+    assert!(window.contains(&Panel::Inspector));
+    assert_eq!(window.rect, [600.0, 120.0, 330.0, 480.0]);
+    assert_eq!(app.docking.hidden.iter().map(|(panel, _)| *panel).collect::<Vec<_>>(), [Panel::Tools]);
+    assert!(docking::tools_on_right(&app.docking), "a closed panel keeps its saved side");
+    assert!(!app.left_open);
+    assert_eq!(app.right, Some(pdfcraft_ui_egui::RightPanel::Bookmarks));
+
+    docking::command(&mut app, false, &json!({"operation": "open", "panel": "tools"})).unwrap();
+    let location = app.docking.layout.location(&Panel::Tools).unwrap();
+    assert_eq!((location.anchor, location.size), (Some(Panel::Canvas), Some(craft_ui::layout::SplitSize::FixedSecond(260.0))));
+    assert!(app.left_open);
+    let saved: Value = serde_json::from_str(&app.persist()).unwrap();
+    assert_eq!(saved["docking"]["version"], 2);
+    assert_eq!(saved["docking"]["layout"]["floating"][0]["panels"], json!(["inspector"]), "a one-group window keeps the v1 shape");
+}
+
+/// A group's drag bar moves the whole group: Tools and Inspector, grouped on the left, dropped on
+/// the document's right edge become one group to the right of it.
+#[test]
+fn dragging_a_group_bar_moves_the_whole_group() {
+    use craft_ui::docking::{DockArea, Hit, Node};
+    use pdfcraft_ui_egui::docking::Panel;
+    let (mut h, c) = harness();
+    ok(&mut h, &c, "ui.set", json!({"key":"panel", "value":"bookmarks"}));
+    ok(&mut h, &c, "ui.dock", json!({"operation":"move", "panel":"inspector", "target":"tools", "zone":"center"}));
+    h.run_steps(4);
+    let id = egui::Id::new("pdfcraft-docking");
+    let bar = DockArea::<Panel>::hit_rects(&h.ctx, id)
+        .into_iter()
+        .find_map(|(hit, rect)| matches!(hit, Hit::DragBar(Panel::Tools | Panel::Inspector)).then_some(rect))
+        .expect("the Tools group has a drag bar");
+    let area = craft_ui::docking::float_space::<Panel>(&h.ctx, id).unwrap().area;
+    assert!(bar.center().x < area.center().x, "the group starts on the left");
+    let (from, to) = (bar.center(), egui::pos2(area.right() - 12.0, area.center().y));
+    h.hover_at(from);
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton { pos: from, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
+    h.run_steps(1);
+    for step in 1..=8 {
+        h.hover_at(from + (to - from) * (step as f32 / 8.0));
+        h.run_steps(1);
+    }
+    h.event(egui::Event::PointerButton { pos: to, button: egui::PointerButton::Primary, pressed: false, modifiers: egui::Modifiers::NONE });
+    h.run_steps(4);
+    let Some(Node::Split { first, second, .. }) = &h.state().docking.layout.root else { panic!("a split of document and group") };
+    assert_eq!(**first, Node::Tabs { panels: vec![Panel::Canvas], active: 0 });
+    let Node::Tabs { panels, .. } = &**second else { panic!("the group docks right of the document") };
+    assert_eq!(panels, &[Panel::Tools, Panel::Inspector]);
+    pdfcraft_ui_egui::docking::validate(&h.state().docking).unwrap();
 }
 
 #[test]

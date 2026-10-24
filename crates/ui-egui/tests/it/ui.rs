@@ -42,6 +42,7 @@ fn home_shows_welcome_and_tools() {
 #[test]
 fn tools_panel_side_preference_moves_and_persists() {
     use pdfcraft_ui_egui::Dialog;
+    use pdfcraft_ui_egui::docking::tools_on_right;
 
     let mut h = harness(|_| {});
     h.state_mut().dialog = Some(Dialog::Preferences);
@@ -49,14 +50,14 @@ fn tools_panel_side_preference_moves_and_persists() {
     h.get_by_label("Tools panel side");
     h.get_by_label("Right").click();
     h.run_steps(3);
-    assert!(h.state().docking.tools_on_right());
+    assert!(tools_on_right(&h.state().docking));
     let saved = h.state().persist();
     let mut restored = PdfCraftApp::new();
     restored.restore(&saved);
-    assert!(restored.docking.tools_on_right());
+    assert!(tools_on_right(&restored.docking));
     h.get_by_label("Left").click();
     h.run_steps(3);
-    assert!(!h.state().docking.tools_on_right());
+    assert!(!tools_on_right(&h.state().docking));
 }
 
 /// Every piece of text painted on the last frame: its whole text, whether it was cut with "…",
