@@ -176,6 +176,17 @@ fn preview_page(range: &PageRange, current: usize, count: usize) -> usize {
     if pages.contains(&current) { current } else { pages.first().copied().unwrap_or(current) }
 }
 
+/// [`preview_page`] for the page stepped to (`stepped`), or the current page if none. A page
+/// stepped to that the range leaves out is replaced by the page shown, so widening the range again
+/// keeps that page rather than jumping back.
+fn shown_preview(range: &PageRange, stepped: &mut Option<usize>, current: usize, count: usize) -> usize {
+    let shown = preview_page(range, stepped.unwrap_or(current), count);
+    if stepped.is_some() {
+        *stepped = Some(shown);
+    }
+    shown
+}
+
 /// The page the preview steps to from `shown`: the range's next page after it (`forward`) or the
 /// last one before it, or `None` at either end.
 fn step_preview(range: &PageRange, shown: usize, count: usize, forward: bool) -> Option<usize> {
@@ -357,7 +368,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
     // The preview: the current page (or the page stepped to), or the first one the range selects
     // if it leaves that out, drawn from its thumbnail at its displayed size (after /Rotate), the
     // frame the engine lays the marks out in.
-    let target = preview_page(&d.range, d.preview.unwrap_or(current), count);
+    let target = shown_preview(&d.range, &mut d.preview, current, count);
     let page = doc.info.pages.get(target).map(|p| (p.width as f64, p.height as f64)).unwrap_or((612.0, 792.0));
     let picture = app.views.get_mut(i).and_then(|view| {
         view.need_thumbnail(target, true);
@@ -636,6 +647,20 @@ mod tests {
         assert_eq!(preview_page(&odd, 2, 5), 2);
         let later = PageRange { all: false, from: 4, to: 5, subset: Subset::All };
         assert_eq!(preview_page(&later, 2, 5), 3);
+        // Narrowing the range past the page stepped to keeps the page shown instead, also once
+        // the range is widened again.
+        let mut stepped = Some(4);
+        let first_two = PageRange { all: false, from: 1, to: 2, subset: Subset::All };
+        assert_eq!(shown_preview(&first_two, &mut stepped, 1, 5), 0);
+        assert_eq!(stepped, Some(0));
+        assert_eq!(shown_preview(&PageRange::default(), &mut stepped, 1, 5), 0);
+        // A page stepped to inside the range stays; with none stepped to, the current page shows.
+        let mut stepped = Some(2);
+        assert_eq!(shown_preview(&odd, &mut stepped, 0, 5), 2);
+        assert_eq!(stepped, Some(2));
+        let mut stepped = None;
+        assert_eq!(shown_preview(&odd, &mut stepped, 4, 5), 4);
+        assert_eq!(stepped, None);
     }
 
     #[test]
