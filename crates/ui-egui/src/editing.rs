@@ -605,6 +605,7 @@ impl PdfCraftApp {
             || v.content.blocked().is_some()
             || v.forms.focus.as_ref().is_some_and(|f| crate::forms_ui::draft_edit(f, &doc.form).is_some())
             || v.fill_text.as_ref().is_some_and(|t| !t.text.trim().is_empty())
+            || v.content.draft.as_ref().is_some_and(|d| d.index.is_none() && !d.text.trim().is_empty())
             || v.line_editor.as_ref().map_or_else(|| false, |ed| ed.has_unsaved_text())
     }
 
@@ -1604,6 +1605,21 @@ mod revert_draft_tests {
         assert!(app.apply_edit(Edit::SetFieldValue { name: "name".into(), value: FieldValue::Text("Changed".into()) }));
         app.guard_quit(&ctx);
         assert!(app.unsaved_flag.load(Ordering::Relaxed));
+    }
+
+    /// Text typed into a new text box is lost on close unless the save prompt appears; an empty
+    /// box has nothing to lose.
+    #[test]
+    fn text_typed_into_a_new_text_box_counts_as_unsaved_work() {
+        use crate::content_ui::{TextDraft, default_style};
+        let mut app = app();
+        let draft = |text: &str| TextDraft { page: 0, index: None, rect: [0.0; 4], text: text.into(), style: default_style(), focus: true };
+        assert!(!app.has_unsaved_work(0));
+        app.views[0].content.draft = Some(draft("  \n"));
+        assert!(!app.has_unsaved_work(0));
+        app.views[0].content.draft = Some(draft("Typed"));
+        assert!(!app.session.get(app.views[0].id).unwrap().dirty);
+        assert!(app.has_unsaved_work(0));
     }
 
     #[test]
