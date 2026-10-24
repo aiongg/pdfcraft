@@ -1067,8 +1067,9 @@ fn xref_stream_subsection<'a>(
             bytes.iter().fold(0u64, |acc, b| (acc << 8) | u64::from(*b))
         };
 
-        // PdfCraft patch: object numbers stop at u32::MAX; a subsection running past it is refused.
-        let obj_number = start.checked_add(i)?;
+        // PdfCraft patch: object numbers are stored as `i32`; a subsection running past
+        // `i32::MAX` is refused instead of overflowing or turning negative.
+        let obj_number = i32::try_from(start.checked_add(i)?).ok()?;
 
         match f_type {
             // We don't care about free objects.
@@ -1091,7 +1092,7 @@ fn xref_stream_subsection<'a>(
                 };
 
                 insert_map.insert(
-                    ObjectIdentifier::new(obj_number as i32, gen_number as i32),
+                    ObjectIdentifier::new(obj_number, gen_number as i32),
                     EntryType::Normal(offset as usize),
                 );
             }
@@ -1109,7 +1110,7 @@ fn xref_stream_subsection<'a>(
                 };
 
                 insert_map.insert(
-                    ObjectIdentifier::new(obj_number as i32, gen_number),
+                    ObjectIdentifier::new(obj_number, gen_number),
                     EntryType::ObjStream(obj_stream_number, index),
                 );
             }
@@ -1283,10 +1284,13 @@ mod tests {
         let mut whole = Reader::new(&data[..6]);
         assert!(xref_stream_subsection(&mut whole, 0, 2, 1, 1, 1, &mut map).is_some());
         assert_eq!(map.len(), 2);
-        // A subsection running past object number u32::MAX is refused.
-        let mut past_end = XrefMap::default();
-        let mut wrap = Reader::new(&data[..6]);
-        assert!(xref_stream_subsection(&mut wrap, u32::MAX, 2, 1, 1, 1, &mut past_end).is_none());
+        // A subsection running past object number i32::MAX is refused.
+        for start in [i32::MAX as u32, u32::MAX] {
+            let mut past_end = XrefMap::default();
+            let mut wrap = Reader::new(&data[..6]);
+            assert!(xref_stream_subsection(&mut wrap, start, 2, 1, 1, 1, &mut past_end).is_none());
+            assert!(past_end.keys().all(|id| id.obj_number >= 0));
+        }
     }
 
     #[test]
