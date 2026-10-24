@@ -1681,6 +1681,21 @@ fn malformed_docking_settings_preserve_other_preferences() {
     assert_eq!(saved["flatten_fill_sign"], true);
 }
 
+/// pdfcraft has no Lock Workspace or saved-arrangement UI, so a settings file carrying them loads
+/// without them: panels still close and move.
+#[test]
+fn locked_or_saved_docking_settings_load_unlocked() {
+    let mut app = PdfCraftApp::new();
+    let mut saved: Value = serde_json::from_str(&app.persist()).unwrap();
+    saved["docking"]["locked"] = json!(true);
+    saved["docking"]["saved"] = saved["docking"]["layout"].clone();
+    app.restore(&saved.to_string());
+    assert!(!app.docking.locked);
+    assert_eq!(app.docking.saved, None);
+    pdfcraft_ui_egui::docking::command(&mut app, false, &json!({"operation": "close", "panel": "tools"})).unwrap();
+    assert!(!app.left_open);
+}
+
 /// Settings written before docking workspaces had a version: `{layout, hidden}`, a floating
 /// window as one group `{panels, active, rect}`, and a hidden location without dock state.
 #[test]

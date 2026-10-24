@@ -2649,8 +2649,13 @@ impl PdfCraftApp {
     pub fn restore(&mut self, json: &str) {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return };
         if let Some(saved) = v.get("docking")
-            && let Ok(workspace) = serde_json::from_value::<docking::Workspace>(saved.clone())
-            && docking::validate(&workspace).is_ok()
+            && let Ok(mut workspace) = serde_json::from_value::<docking::Workspace>(saved.clone())
+            && {
+                // No UI locks the workspace or keeps a saved arrangement; a file with either loads without it.
+                workspace.locked = false;
+                workspace.saved = None;
+                docking::validate(&workspace).is_ok()
+            }
         {
             self.docking = workspace;
             self.left_open =

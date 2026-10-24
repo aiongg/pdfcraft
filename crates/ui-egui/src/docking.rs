@@ -122,9 +122,8 @@ pub fn validate(workspace: &Workspace) -> Result<(), String> {
             Node::Stack { entries } if entries.iter().any(|entry| entry.panel == Panel::Canvas) => {
                 return Err("The document view cannot be collapsed".into());
             }
-            Node::Dock { columns, .. } if columns.iter().flat_map(|column| &column.groups).any(|group| group.panels.contains(&Panel::Canvas)) => {
-                return Err("The document view cannot be in a dock".into());
-            }
+            // Tools' side and the Home split paths read a split tree; nothing offers docks.
+            Node::Dock { .. } => return Err("Panels cannot form a side dock".into()),
             _ => {}
         }
     }
@@ -156,7 +155,12 @@ pub fn set_visible(workspace: &mut Workspace, panel: Panel, visible: bool) -> Re
     }
     validate(workspace)?;
     let mut next = workspace.clone();
-    if workspace.hidden.iter().any(|(id, _)| *id == panel) && next.set_visible(panel, true, None, permissions).is_ok() && validate(&next).is_ok() {
+    // The document takes no tabs, so craft-ui refuses to open the panel beside it when the
+    // recorded place is gone, and the panel's usual side below applies instead.
+    if workspace.hidden.iter().any(|(id, _)| *id == panel)
+        && next.set_visible(panel, true, Some(Panel::Canvas), permissions).is_ok()
+        && validate(&next).is_ok()
+    {
         *workspace = next;
         return Ok(());
     }
@@ -288,6 +292,14 @@ pub fn show(app: &mut crate::PdfCraftApp, ui: &mut egui::Ui) {
     style.panels_label = crate::i18n::t("Panels").into();
     style.resize_label = crate::i18n::t("Resize panels").into();
     style.resize_window_label = crate::i18n::t("Resize panel window").into();
+    style.move_group_label = crate::i18n::t("Move tab group").into();
+    style.close_group_label = crate::i18n::t("Close tab group").into();
+    style.minimize_label = crate::i18n::t("Minimize").into();
+    style.expand_label = crate::i18n::t("Expand").into();
+    style.float_group_label = crate::i18n::t("Float tab group").into();
+    style.move_group_to_label = crate::i18n::t("Move group to").into();
+    style.move_window_label = crate::i18n::t("Move panel window").into();
+    style.close_window_label = crate::i18n::t("Close panel window").into();
     style.background = t.panel;
     style.tab_background = t.chrome;
     style.active_background = t.selected;
@@ -443,5 +455,32 @@ mod tests {
         let mut resized = workspace.layout.clone();
         resized.apply(Action::Close { panel: Panel::Inspector }).unwrap();
         assert!(matches!(resized.root, Some(Node::Split { size: SplitSize::FixedFirst(290.0), .. })));
+    }
+
+    #[test]
+    fn hidden_panel_whose_place_is_gone_reopens_beside_the_document_on_its_side() {
+        let mut workspace: Workspace = serde_json::from_value(json!({
+            "layout": {"root": {"Tabs": {"panels": ["canvas"], "active": 0}}, "floating": []},
+            "hidden": [["tools", {
+                "floating": null,
+                "anchor": "canvas",
+                "placement": {"Group": {"below": false, "height": null}},
+                "size": null,
+                "stack": null
+            }]]
+        }))
+        .unwrap();
+        validate(&workspace).unwrap();
+        set_visible(&mut workspace, Panel::Tools, true).unwrap();
+        let Some(Node::Split { first, second, .. }) = &workspace.layout.root else { panic!("Tools splits beside the document") };
+        assert_eq!((&**first, &**second), (&tabs(Panel::Tools), &tabs(Panel::Canvas)));
+    }
+
+    #[test]
+    fn docks_are_refused() {
+        let mut workspace = default_workspace();
+        let to_dock = json!({"action": {"MovePanel": {"panel": "inspector", "to": {"NewDock": {"side": "End"}}}}});
+        assert!(run(&mut workspace, &to_dock).is_err());
+        assert_eq!(workspace, default_workspace());
     }
 }
