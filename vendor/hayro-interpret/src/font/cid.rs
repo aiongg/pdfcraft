@@ -618,13 +618,14 @@ fn read_widths2(arr: &Array<'_>) -> Option<HashMap<u32, [f32; 3]>> {
             let mut iter = range.iter::<f32>();
 
             while let Some(w) = iter.next() {
-                let v1 = iter.next()?;
-                let v2 = iter.next()?;
-                // PdfCraft patch: as in `read_widths`. Without it, a run starting at
-                // 4294967295 overflowed `first` and discarded the whole /W2 table.
+                // PdfCraft patch: as in `read_widths`, checked before the run's metrics are
+                // read. Without it, a run starting at 4294967295 overflowed `first` and
+                // discarded the whole /W2 table.
                 if first > MAX_CID {
                     break;
                 }
+                let v1 = iter.next()?;
+                let v2 = iter.next()?;
                 map.insert(first, [w, v1, v2]);
                 first = first.checked_add(1)?;
             }
@@ -685,7 +686,7 @@ mod tests {
     #[test]
     fn w2_run_past_the_largest_cid_keeps_the_rest_of_the_table() {
         let arr =
-            Array::from_bytes(b"[4294967295 [1000 500 880] 10 [900 450 860] 20 30 800 400 870]")
+            Array::from_bytes(b"[4294967295 [1000 500] 10 [900 450 860] 20 30 800 400 870]")
                 .unwrap();
         let map = read_widths2(&arr).unwrap();
 
