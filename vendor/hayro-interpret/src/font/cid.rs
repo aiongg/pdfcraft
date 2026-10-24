@@ -620,6 +620,11 @@ fn read_widths2(arr: &Array<'_>) -> Option<HashMap<u32, [f32; 3]>> {
             while let Some(w) = iter.next() {
                 let v1 = iter.next()?;
                 let v2 = iter.next()?;
+                // PdfCraft patch: as in `read_widths`. Without it, a run starting at
+                // 4294967295 overflowed `first` and discarded the whole /W2 table.
+                if first > MAX_CID {
+                    break;
+                }
                 map.insert(first, [w, v1, v2]);
                 first = first.checked_add(1)?;
             }
@@ -667,5 +672,26 @@ fn read_encoding(object: &Object<'_>, cmap_resolver: &CMapResolverFn) -> Option<
             CMap::parse(&decoded, move |n| (resolver)(n))
         }
         _ => None,
+    }
+}
+
+/// PdfCraft patch test (ported from craft-libs): a /W2 run whose first CID is past `MAX_CID`
+/// is skipped and the rest of the table kept.
+#[cfg(test)]
+mod tests {
+    use super::read_widths2;
+    use hayro_syntax::object::{Array, FromBytes};
+
+    #[test]
+    fn w2_run_past_the_largest_cid_keeps_the_rest_of_the_table() {
+        let arr =
+            Array::from_bytes(b"[4294967295 [1000 500 880] 10 [900 450 860] 20 30 800 400 870]")
+                .unwrap();
+        let map = read_widths2(&arr).unwrap();
+
+        assert_eq!(map.get(&4_294_967_295), None);
+        assert_eq!(map.get(&10), Some(&[900.0, 450.0, 860.0]));
+        assert_eq!(map.get(&25), Some(&[800.0, 400.0, 870.0]));
+        assert_eq!(map.len(), 12);
     }
 }
