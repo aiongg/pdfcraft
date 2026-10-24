@@ -73,13 +73,15 @@ fn harness_pages_at(pages: usize, width: f32, scale: f32) -> (Harness<'static, P
 /// Send a request and run frames until it is answered.
 fn call(h: &mut Harness<'static, PdfCraftApp>, c: &ControlClient, method: &str, params: Value) -> Reply {
     let rx = c.send(method, params);
-    for _ in 0..30 {
-        h.step();
-        if let Ok(r) = rx.try_recv() {
-            return r;
-        }
+    let mut reply = None;
+    let answered = crate::support::step_until(h, |_| {
+        reply = rx.try_recv().ok();
+        reply.is_some()
+    });
+    match reply {
+        Some(r) if answered => r,
+        _ => panic!("{method}: no reply in 30 s"),
     }
-    panic!("{method}: no reply after 30 frames");
 }
 
 fn ok(h: &mut Harness<'static, PdfCraftApp>, c: &ControlClient, method: &str, params: Value) -> Value {
@@ -1674,15 +1676,12 @@ fn control_open_replies_pending_while_the_worker_opens_and_focuses_once_it_has()
     // The worker completes the open on later frames; the tab shows, and only then does a
     // repeated open focus it instead of reporting another pending open.
     let mut documents = 0;
-    for _ in 0..30 {
-        h.run_steps(1);
-        let state = ok(&mut h, &c, "ui.state", json!({}));
+    let opened = crate::support::step_until(&mut h, |h| {
+        let state = ok(h, &c, "ui.state", json!({}));
         documents = state["documents"].as_array().map(|d| d.len()).unwrap_or_default();
-        if documents == 1 {
-            break;
-        }
-    }
-    assert_eq!(documents, 1, "the pending open completed into a tab");
+        documents == 1
+    });
+    assert!(opened, "the pending open completed into a tab: {documents} tabs");
 
     let again = ok(&mut h, &c, "ui.open", json!({ "path": a }));
     assert_eq!(again["focused"], true, "{again}");
