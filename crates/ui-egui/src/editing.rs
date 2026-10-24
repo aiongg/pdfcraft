@@ -38,6 +38,11 @@ pub enum SaveTarget {
     As,
 }
 
+/// Text typed into a new text box that isn't added to the page yet.
+fn new_text_typed(v: &crate::DocView) -> bool {
+    v.content.draft.as_ref().is_some_and(|d| d.index.is_none() && !d.text.trim().is_empty())
+}
+
 impl PdfCraftApp {
     /// Apply an edit to the active document. Returns `true` on success; failures are shown.
     pub fn apply_edit(&mut self, edit: Edit) -> bool {
@@ -537,17 +542,38 @@ impl PdfCraftApp {
             self.notify(crate::content_ui::undrawable_message(c));
             return false;
         }
-        let typing = self
-            .views
-            .get(i)
-            .is_some_and(|v| v.pending_edit.is_some() || v.forms.focus.is_some() || v.fill_text.as_ref().is_some_and(|t| !t.text.trim().is_empty()));
+        let typing = self.views.get(i).is_some_and(|v| {
+            v.pending_edit.is_some()
+                || v.forms.focus.is_some()
+                || v.fill_text.as_ref().is_some_and(|t| !t.text.trim().is_empty())
+                || new_text_typed(v)
+        });
         if self.active != Some(i) {
             if !typing {
                 return true;
             }
             self.active = Some(i);
         }
-        self.commit_form_typing() && self.commit_open_fill_text(id)
+        self.commit_form_typing() && self.commit_open_fill_text(id) && self.commit_new_text(id)
+    }
+
+    /// Text typed into a new text box is kept when the user clicks away. Save does that first,
+    /// so the text is in the file rather than lost when its tab closes after the save.
+    fn commit_new_text(&mut self, id: pdfcraft_engine::DocId) -> bool {
+        let Some(i) = self.views.iter().position(|v| v.id == id) else { return true };
+        if !new_text_typed(&self.views[i]) {
+            return true;
+        }
+        let added = self.session.get(id).map(|d| d.added().to_vec()).unwrap_or_default();
+        let draft = self.views[i].content.draft.clone();
+        let Some(edit) = self.views[i].content.finish_draft(&added) else { return true };
+        if self.apply_edit(edit) {
+            return true;
+        }
+        if let Some(view) = self.views.get_mut(i) {
+            view.content.draft = draft;
+        }
+        false
     }
 
     /// The Fill & Sign type box commits on click-away. Save does that first, so the text is in
@@ -605,7 +631,7 @@ impl PdfCraftApp {
             || v.content.blocked().is_some()
             || v.forms.focus.as_ref().is_some_and(|f| crate::forms_ui::draft_edit(f, &doc.form).is_some())
             || v.fill_text.as_ref().is_some_and(|t| !t.text.trim().is_empty())
-            || v.content.draft.as_ref().is_some_and(|d| d.index.is_none() && !d.text.trim().is_empty())
+            || new_text_typed(v)
             || v.line_editor.as_ref().map_or_else(|| false, |ed| ed.has_unsaved_text())
     }
 
@@ -1620,6 +1646,41 @@ mod revert_draft_tests {
         app.views[0].content.draft = Some(draft("Typed"));
         assert!(!app.session.get(app.views[0].id).unwrap().dirty);
         assert!(app.has_unsaved_work(0));
+    }
+
+    /// Close ▸ Save, and Quit ▸ Save, write the text typed into a new text box before the tab
+    /// closes.
+    #[test]
+    fn saving_on_close_keeps_text_typed_into_a_new_text_box() {
+        use crate::content_ui::{TextDraft, default_style};
+        use pdfcraft_engine::AddedContent;
+        for quit in [false, true] {
+            let dir = std::env::temp_dir().join(format!("pdfcraft-ui-new-text-{}-{quit}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("source.pdf").to_string_lossy().into_owned();
+            let bytes = include_bytes!("../tests/data/form.pdf").to_vec();
+            std::fs::write(&path, &bytes).unwrap();
+            let mut app = PdfCraftApp::new();
+            app.open_bytes("source.pdf", Some(path.clone()), bytes).unwrap();
+            let rect = [72.0, 72.0, 272.0, 92.0];
+            app.views[0].content.draft = Some(TextDraft { page: 0, index: None, rect, text: "Typed".into(), style: default_style(), focus: true });
+            let ctx = egui::Context::default();
+            if quit {
+                assert!(!app.request_quit(&ctx));
+            } else {
+                app.request_close_tab(0);
+            }
+            assert!(app.close_request.is_some());
+            app.resolve_close(&ctx, Some(true));
+            assert!(app.views.is_empty(), "the tab closes once saved");
+
+            let mut reopened = PdfCraftApp::new();
+            reopened.open_bytes("source.pdf", Some(path.clone()), std::fs::read(&path).unwrap()).unwrap();
+            let doc = reopened.session.get(reopened.views[0].id).unwrap();
+            assert!(doc.added().iter().any(|a| matches!(&a.content, AddedContent::Text(t) if t.text == "Typed")), "quit: {quit}");
+            let _ = std::fs::remove_dir_all(&dir);
+        }
     }
 
     #[test]
