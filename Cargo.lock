@@ -1145,12 +1145,12 @@ dependencies = [
 [[package]]
 name = "craft-docpath"
 version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=6fdd2efbba5090c26c31eb30990eb262ea1c2afb#6fdd2efbba5090c26c31eb30990eb262ea1c2afb"
+source = "git+https://github.com/storytold/craft-libs?rev=6e7f28518dd1cb57e1624bdc269c3c14316b13ae#6e7f28518dd1cb57e1624bdc269c3c14316b13ae"
 
 [[package]]
 name = "craft-print"
 version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=6fdd2efbba5090c26c31eb30990eb262ea1c2afb#6fdd2efbba5090c26c31eb30990eb262ea1c2afb"
+source = "git+https://github.com/storytold/craft-libs?rev=6e7f28518dd1cb57e1624bdc269c3c14316b13ae#6e7f28518dd1cb57e1624bdc269c3c14316b13ae"
 dependencies = [
  "craft-winprint-gdi",
  "miniz_oxide 0.8.9",
@@ -1163,7 +1163,7 @@ dependencies = [
 [[package]]
 name = "craft-quit"
 version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=6fdd2efbba5090c26c31eb30990eb262ea1c2afb#6fdd2efbba5090c26c31eb30990eb262ea1c2afb"
+source = "git+https://github.com/storytold/craft-libs?rev=6e7f28518dd1cb57e1624bdc269c3c14316b13ae#6e7f28518dd1cb57e1624bdc269c3c14316b13ae"
 dependencies = [
  "dispatch2",
  "egui",
@@ -1175,7 +1175,7 @@ dependencies = [
 [[package]]
 name = "craft-ui"
 version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=6fdd2efbba5090c26c31eb30990eb262ea1c2afb#6fdd2efbba5090c26c31eb30990eb262ea1c2afb"
+source = "git+https://github.com/storytold/craft-libs?rev=6e7f28518dd1cb57e1624bdc269c3c14316b13ae#6e7f28518dd1cb57e1624bdc269c3c14316b13ae"
 dependencies = [
  "egui",
  "log",
@@ -1900,7 +1900,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3317,7 +3317,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "png 0.18.1",
  "thiserror 2.0.21",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4982,7 +4982,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5532,7 +5532,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5602,7 +5602,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6257,7 +6257,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6476,10 +6476,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6848,7 +6848,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7562,7 +7562,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -13,13 +13,13 @@ repository = "https://github.com/storytold/pdfcraft"
 
 [workspace.dependencies]
 # Shared frontend components; engines remain independent of egui.
-craft-ui = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "6fdd2efbba5090c26c31eb30990eb262ea1c2afb", features = ["serde"] }
+craft-ui = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae", features = ["serde"] }
 # Quit the macOS way (#1136): ⌘Q asks about unsaved changes, and closing quits through `terminate:`.
-craft-quit = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "6fdd2efbba5090c26c31eb30990eb262ea1c2afb" }
+craft-quit = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae" }
 # Shared system spooler; document composition remains in pdfcraft-print.
-craft-print = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "6fdd2efbba5090c26c31eb30990eb262ea1c2afb" }
+craft-print = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae" }
 # Whether a path stored in a document may be opened (GoToR link targets).
-craft-docpath = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "6fdd2efbba5090c26c31eb30990eb262ea1c2afb" }
+craft-docpath = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "6e7f28518dd1cb57e1624bdc269c3c14316b13ae" }
 # internal
 pdfcraft-geom = { path = "crates/geom", version = "0.13.0" }
 pdfcraft-filters = { path = "crates/filters", version = "0.13.0" }
