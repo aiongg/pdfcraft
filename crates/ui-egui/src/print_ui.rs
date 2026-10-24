@@ -300,7 +300,7 @@ pub(crate) struct PrintTasks {
 fn listed_printers() -> Vec<spool::Printer> {
     #[cfg(target_arch = "wasm32")]
     {
-        vec![spool::Printer { name: crate::web_print::BROWSER_PRINTER.to_string(), default: true, two_sided: None }]
+        vec![spool::Printer { name: crate::web_print::BROWSER_PRINTER.to_string(), description: String::new(), default: true, two_sided: None }]
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
