@@ -181,7 +181,7 @@ fn fixed_size(size: Option<&Value>, second: bool) -> Option<f64> {
     size?.get(key)?.as_f64()
 }
 
-fn group_ids<'a>(node: &'a Value) -> Option<Vec<&'a str>> {
+fn group_ids(node: &Value) -> Option<Vec<&str>> {
     if let Some(tabs) = node.get("Tabs") {
         return Some(tabs.get("panels")?.as_array()?.iter().filter_map(Value::as_str).collect());
     }

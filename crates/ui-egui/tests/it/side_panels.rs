@@ -100,7 +100,8 @@ fn a_dragged_width_is_remembered_across_restarts() {
     h.drop_at(edge - egui::vec2(40.0, 0.0));
     h.run_steps(3);
     let after = h.state().side_panels.side_width;
-    assert!((after - before - 40.0).abs() <= 1.0, "{before} -> {after}");
+    // The pointer was pressed 2 pt inside the panel, and the edge follows the pointer.
+    assert!((after - (before + 40.0 - 2.0)).abs() <= 1.0, "{before} -> {after}");
     let saved = h.state().persist();
     let mut restored = PdfCraftApp::new();
     restored.restore(&saved);
