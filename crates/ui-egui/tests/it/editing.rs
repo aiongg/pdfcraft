@@ -1087,6 +1087,9 @@ fn save_prompt_fits_the_smallest_window_whatever_the_name() {
     let size = egui::vec2(820.0, 520.0);
     for name in names {
         let start: String = name.chars().take(10).collect();
+        if support::skip_without_glyphs(&format!("save_prompt_fits_the_smallest_window_whatever_the_name ({start}…)"), "en", &name) {
+            continue;
+        }
         let mut h = Harness::builder().with_size(size).build_eframe(move |_cc| {
             let mut app = PdfCraftApp::new();
             app.set_option("language", "en").unwrap();
@@ -3575,6 +3578,9 @@ fn an_applied_paragraph_keeps_its_edited_look_until_the_page_is_redrawn() {
 /// as a form field does; the editor used to close with the error and the typing was lost.
 #[test]
 fn a_paragraph_whose_edit_fails_stays_open_with_its_typing() {
+    if crate::support::skip_without_glyphs("a_paragraph_whose_edit_fails_stays_open_with_its_typing", "en", "Top ก") {
+        return;
+    }
     let bytes = source_font_fixture_with_text("BT /F1 24 Tf 20 220 Td (Top) Tj ET BT /F2 24 Tf 20 120 Td (Bottom) Tj ET");
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
         let mut app = PdfCraftApp::new();

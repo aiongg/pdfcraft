@@ -623,6 +623,9 @@ fn palette_ime_idle_frames_and_reopen_do_not_interrupt_composition() {
 
 #[test]
 fn palette_ime_chinese_preedit_commit_and_cancel_remain_uninterrupted() {
+    if crate::support::skip_without_glyphs("palette_ime_chinese_preedit_commit_and_cancel_remain_uninterrupted", "en", "你") {
+        return;
+    }
     let mut h = harness();
     let mut interruptions = Vec::new();
     h.state_mut().run_command("view.palette");
