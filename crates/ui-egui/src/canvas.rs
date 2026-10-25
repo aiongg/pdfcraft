@@ -2701,8 +2701,7 @@ const SUPPRESS_SECS: f64 = 0.25;
 /// Short rolling extension while egui still has an unprocessed wheel tail.
 const SUPPRESS_TAIL_SECS: f64 = 0.05;
 
-// The viewer moves between docking and the central panel as modes change; keep its scroll
-// identity tied to the document instead of either parent UI.
+// Keep the viewer's scroll identity tied to the document instead of its parent UI.
 fn page_scroll<R>(
     ui: &mut egui::Ui,
     scroll: egui::ScrollArea,

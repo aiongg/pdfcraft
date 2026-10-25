@@ -42,7 +42,6 @@ mod image_pick;
 mod tags_ui;
 pub use combine_grid::ThumbState as CombineThumb;
 mod combine_ui;
-pub mod docking;
 pub use combine_ui::{Columns as CombineColumns, CombineView, Lock as CombineLock, SortKey};
 mod camera_ui;
 mod commands;
@@ -65,6 +64,7 @@ mod measure_ui;
 mod ocr_ui;
 mod optimize_ui;
 mod search_ui;
+pub mod side_panels;
 mod sign_ui;
 mod stamps_ui;
 mod standards_ui;
@@ -202,7 +202,7 @@ pub enum LeftPanel {
 }
 
 /// Right-hand panels, opened from the rail.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum RightPanel {
     Comments,
     Bookmarks,
@@ -623,8 +623,8 @@ pub struct RecentFile {
 }
 
 pub struct PdfCraftApp {
-    pub docking: docking::Workspace,
-    pub(crate) pending_panel_reveals: Vec<docking::Panel>,
+    /// Tools side and pane widths; which panes are open is `left_open` and `right`.
+    pub side_panels: side_panels::SidePanels,
     pub session: Session,
     pub views: Vec<DocView>,
     pub(crate) closed_tabs: Vec<String>,
@@ -647,6 +647,8 @@ pub struct PdfCraftApp {
     pub left: LeftPanel,
     pub left_open: bool,
     pub right: Option<RightPanel>,
+    /// The side panel F4 reopens: the one open last.
+    pub(crate) last_right: RightPanel,
     /// The right panel that was open when the user switched to Read mode, which starts with the
     /// panes closed; leaving Read mode brings it back unless the user opened or closed a pane in
     /// Read mode meanwhile.
@@ -1103,10 +1105,10 @@ impl PdfCraftApp {
             date_format_draft: None,
             mode_override: None,
             left: LeftPanel::AllTools,
-            docking: docking::Workspace::default(),
-            pending_panel_reveals: Vec::new(),
+            side_panels: Default::default(),
             left_open: true,
             right: None,
+            last_right: RightPanel::Comments,
             right_before_read: None,
             comments_panel_closed: false,
             right_panel_closed: false,
@@ -2471,7 +2473,6 @@ impl PdfCraftApp {
 
     pub(crate) fn reveal_tools(&mut self) {
         self.left_open = true;
-        self.pending_panel_reveals.push(docking::Panel::Tools);
     }
 
     /// Enter a tool from the catalogue, Home, palette or control channel. Organize is a
@@ -2580,9 +2581,6 @@ impl PdfCraftApp {
             if self.right.is_none() {
                 self.right = before;
             }
-            if self.right.is_some() {
-                self.pending_panel_reveals.push(docking::Panel::Inspector);
-            }
         }
     }
 
@@ -2604,17 +2602,21 @@ impl PdfCraftApp {
             self.right_panel_closed = true;
         }
         self.right = panel;
-        if panel.is_some() {
-            self.pending_panel_reveals.push(docking::Panel::Inspector);
+        if let Some(panel) = panel {
+            self.last_right = panel;
         }
+    }
+
+    /// F4: closes the side panel, or reopens the one open last.
+    pub(crate) fn toggle_side_panel(&mut self) {
+        self.choose_right_panel(if self.right.is_some() { None } else { Some(self.last_right) });
     }
 
     /// Serialize the user's persistent state (recent files, theme). Local only.
     pub fn persist(&self) -> String {
         let trusted: Vec<String> = self.session.trusted_certificates().iter().map(pdfcraft_engine::sign::x509::to_pem).collect();
         let mut v = serde_json::json!({
-            "docking": self.docking,
-            "docking_left_open": self.left_open,
+            "side_panels": self.side_panels.to_json(self.left_open),
             "docking_right": self.right,
             "recent": self.recent,
             "reopen_last_session": self.reopen_last_session,
@@ -2691,14 +2693,13 @@ impl PdfCraftApp {
     /// Restore state written by `persist`. Unknown or malformed data is ignored.
     pub fn restore(&mut self, json: &str) {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return };
-        if let Some(saved) = v.get("docking")
-            && let Ok(workspace) = serde_json::from_value::<docking::Workspace>(saved.clone())
-            && workspace.validate().is_ok()
-        {
-            self.docking = workspace;
-            self.left_open =
-                v.get("docking_left_open").and_then(serde_json::Value::as_bool).unwrap_or(self.docking.layout.contains(&docking::Panel::Tools));
-            self.right = v.get("docking_right").and_then(|value| serde_json::from_value(value.clone()).ok()).flatten();
+        let panels = side_panels::restore(&v);
+        self.side_panels = panels.panels;
+        if let Some(open) = panels.tools_open {
+            self.left_open = open;
+        }
+        if let Some(right) = v.get("docking_right") {
+            self.right = serde_json::from_value(right.clone()).ok().flatten().filter(|_| !panels.side_closed);
         }
         self.combine_columns = combine_ui::Columns::from_json(&v["combine_columns"]);
         if let Some(view) = v["combine_view"].as_str().and_then(combine_ui::CombineView::parse) {
@@ -3062,11 +3063,13 @@ impl PdfCraftApp {
                     _ => return Err("always-default-view must be on or off".into()),
                 };
             }
-            ("tools-side", _) => self.docking.set_tools_on_right(match value {
-                "left" => false,
-                "right" => true,
-                _ => return Err("tools-side must be left or right".into()),
-            })?,
+            ("tools-side", _) => {
+                self.side_panels.tools_side = match value {
+                    "left" => side_panels::ToolsSide::Left,
+                    "right" => side_panels::ToolsSide::Right,
+                    _ => return Err("tools-side must be left or right".into()),
+                }
+            }
             ("organize", Some(v)) => {
                 if value == "off" {
                     v.organize = false;
@@ -3253,12 +3256,6 @@ impl PdfCraftApp {
                 return Err(format!("`{k}` needs an open document"));
             }
             (other, _) => return Err(format!("unknown option {other}")),
-        }
-        if key == "panel" && self.right.is_some() {
-            self.pending_panel_reveals.push(docking::Panel::Inspector);
-        }
-        if key == "left" && self.left_open {
-            self.pending_panel_reveals.push(docking::Panel::Tools);
         }
         Ok(())
     }
@@ -3696,27 +3693,16 @@ impl eframe::App for PdfCraftApp {
         }
         chrome::tab_strip(self, ui);
         chrome::mode_bar(self, ui);
-        if self.active.is_some() {
-            chrome::right_rail(self, ui);
-            // Read mode hides the tools, not the navigation panes: the rail stays visible
-            // there, so its buttons (Bookmarks, Page thumbnails, ...) must open their panels.
-            // Outside Read mode the docking workspace draws the inspector.
-            if self.mode == Mode::Read && self.right.is_some() {
-                egui::Panel::right("read_right_panel")
-                    .resizable(true)
-                    .default_size(330.0)
-                    .size_range(260.0..=520.0)
-                    .frame(egui::Frame::NONE)
-                    .show(ui, |ui| panels::right_panel(self, ui));
-            }
-        }
         // Whichever way another tab came to the front, it shows instead of the expanded view.
         if self.all_tools_full && self.all_tools_tab != self.shown_tab() {
             self.all_tools_full = false;
         }
+        side_panels::show(self, ui);
         let t = theme::Tokens::get(&ctx);
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.pasteboard)).show(ui, |ui| {
-            if self.mode == Mode::Read {
+            if self.mode == Mode::AllTools && self.all_tools_full {
+                all_tools_ui::show(self, ui);
+            } else {
                 match self.active {
                     None if self.combine_showing() => combine_ui::page(self, ui),
                     None => home::show(self, ui),
@@ -3725,10 +3711,6 @@ impl eframe::App for PdfCraftApp {
                         None => canvas::document_area(self, index, ui),
                     },
                 }
-            } else if self.mode == Mode::AllTools && self.all_tools_full {
-                all_tools_ui::show(self, ui);
-            } else {
-                docking::show(self, ui);
             }
         });
         self.process_pending_edits();

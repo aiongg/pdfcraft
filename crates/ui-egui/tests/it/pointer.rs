@@ -339,10 +339,10 @@ fn link_tip_stays_off_while_the_palette_is_open() {
     h.get_by_label("https://example.org/");
 }
 
-/// A panel's tab carried over a link shows neither its tip nor its cursor, and the link answers
-/// again once the tab is let go.
+/// A panel's resize edge dragged over a link shows neither the link's tip nor its cursor, and the
+/// link answers again once the edge is let go.
 #[test]
-fn a_dragged_panel_tab_passes_over_a_link_without_its_tip() {
+fn a_dragged_panel_edge_passes_over_a_link_without_its_tip() {
     use egui::accesskit::Role;
     use egui_kittest::kittest::Queryable;
     let mut h = open(link_pdf(), "150", false);
@@ -354,10 +354,17 @@ fn a_dragged_panel_tab_passes_over_a_link_without_its_tip() {
     assert_eq!(cursor_at(&mut h, on_link), egui::CursorIcon::PointingHand);
     h.run_steps(2);
     assert!(tip_shown(&h), "the link's tip shows over an uncovered page");
-    // Away from the link, then the Inspector's tab is picked up and carried over it.
+    // Away from the link, then the side panel's resize edge (the rightmost one) is picked up and
+    // carried over it.
     h.hover_at(at(&h, 150.0, 100.0));
     h.run_steps(4);
-    let tab = h.get_by(|n| n.role() == Role::Tab && n.label().as_deref() == Some("Inspector")).rect().center();
+    let tab = h
+        .get_all_by(|n| n.role() == Role::Splitter && n.label().as_deref() == Some("Resize panels"))
+        .map(|n| n.rect().center())
+        .max_by(|a, b| a.x.total_cmp(&b.x))
+        .expect("the side panel has a resize edge")
+        // The pane's half of the edge: the page, drawn after the panes, takes the other half.
+        + egui::vec2(2.0, 0.0);
     h.hover_at(tab);
     h.run_steps(1);
     h.drag_at(tab);
@@ -368,11 +375,11 @@ fn a_dragged_panel_tab_passes_over_a_link_without_its_tip() {
     }
     for _ in 0..4 {
         h.run_steps(2);
-        assert!(h.ctx.dragged_id().is_some(), "the tab is still being dragged");
-        assert!(!tip_shown(&h), "no link tip under a dragged panel tab");
+        assert!(h.ctx.dragged_id().is_some(), "the edge is still being dragged");
+        assert!(!tip_shown(&h), "no link tip under a dragged panel edge");
         assert_ne!(h.output().platform_output.cursor_icon, egui::CursorIcon::PointingHand);
     }
-    // Back to the tab and let go there, which leaves the layout as it was.
+    // Back to the start and let go there, which leaves the width as it was.
     for i in 1..=8 {
         h.hover_at(on_link + (tab - on_link) * (i as f32 / 8.0));
         h.run_steps(1);
