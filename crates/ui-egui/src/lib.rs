@@ -931,7 +931,7 @@ pub struct PdfCraftApp {
     deferred_commands: Vec<(&'static str, Option<DocId>)>,
     /// The native menu bar (macOS), while it is installed; the in-window bar shows otherwise.
     pub(crate) native_menu: Option<craft_menu::NativeMenu>,
-    /// Input a menu click stands for (⌘C, Delete…), fed to egui at the start of the next frame.
+    /// Input a menu click stands for (⌘C, Delete…), added to the next frame's input in `logic`.
     pub(crate) menu_input: Vec<egui::Event>,
     /// The dialog seen at the last check, and a counter bumped whenever it changes (see
     /// [`Self::dialog_epoch`]).
@@ -3513,11 +3513,10 @@ impl PdfCraftApp {
         }
         // Before egui reads this frame's wheel input.
         self.scroll_speed.apply(ctx, raw);
-        // The native menu's key equivalents, and the keys an earlier menu click stands for.
+        // The native menu's key equivalents.
         if let Some(native) = self.native_menu.as_mut() {
             native.raw_input(raw);
         }
-        raw.events.append(&mut self.menu_input);
     }
 }
 
@@ -3690,6 +3689,11 @@ impl eframe::App for PdfCraftApp {
         // Shortcuts deferred last frame: the text field has taken that frame's typing since.
         let deferred = std::mem::take(&mut self.deferred_commands);
         self.native_menu_clicks(ctx);
+        // The keys a menu click stands for (⌘C, Delete…), before anything reads this frame's keys.
+        if !self.menu_input.is_empty() {
+            let events = std::mem::take(&mut self.menu_input);
+            ctx.input_mut(|i| i.events.extend(events));
+        }
         self.shortcuts(ctx);
         // Scrolling and group-drag previews are transient: never resume after changing tabs,
         // opening a modal/palette, or returning to a window that lost focus.

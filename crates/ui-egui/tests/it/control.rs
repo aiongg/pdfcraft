@@ -512,12 +512,11 @@ fn language_switch_preserves_document_and_command_ids() {
         assert_eq!(ok(&mut h, &c, "ui.commands", json!({})), commands);
 
         let lang = i18n::Lang::from_code(code).unwrap();
-        h.get_by_label(i18n::tr(lang, "Menu")).click();
+        // A title without an ASCII letter shows its mnemonic after it: "ファイル(F)".
+        let file = i18n::tr(lang, "File");
+        h.get_by(|n| n.role() == egui::accesskit::Role::MenuItem && n.label().is_some_and(|l| l.starts_with(file))).click();
         h.run_steps(2);
-        h.get_by_label(i18n::tr(lang, "File")).hover();
-        h.run_steps(3);
         h.get_by_label_contains(i18n::tr(lang, "Open…"));
-        ok(&mut h, &c, "ui.key", json!({ "key": "Escape" }));
         ok(&mut h, &c, "ui.key", json!({ "key": "Escape" }));
         h.run_steps(2);
     }

@@ -21,6 +21,11 @@ use crate::{PdfCraftApp, RightPanel};
 /// The app's name in the menus the layouts write (About, Hide, Quit).
 pub(crate) const APP_NAME: &str = "PdfCraft";
 
+/// The top bar's width after the menus: the mode tabs, the search box and the buttons.
+const ROW_AFTER_MENUS: f32 = 720.0;
+/// The narrowest the menu bar gets: one "Menu" title.
+const MIN_MENUS_WIDTH: f32 = 80.0;
+
 /// Menu-only commands. The registry's commands keep their own ids.
 pub(crate) const CUT: &str = "edit.cut";
 pub(crate) const PASTE: &str = "edit.paste";
@@ -573,8 +578,23 @@ impl PdfCraftApp {
         let ctx = ui.ctx().clone();
         let bar = craft_menu::layout(&self.menu_bar(&ctx), Target::current(), &layout_options()).bar;
         let gate = self.menu_gate(&ctx);
-        let chosen =
-            craft_menu::MenuBarUi::new(&bar).gate(gate).label(&translate).english(&english).id(egui::Id::unique("pdfcraft-menu-bar")).show(ui);
+        // The bar fills the width it is given, and the mode tabs, search and buttons follow it in
+        // the same row: give it the titles' width (with room for a "(F)" mnemonic), less when
+        // the row is short, where the menus that don't fit move into its "⋯" menu.
+        let font = egui::TextStyle::Button.resolve(ui.style());
+        let pad = 2.0 * ui.spacing().button_padding.x;
+        let title = |t: &str| {
+            let mnemonic = if t.chars().any(|c| c.is_ascii_alphanumeric()) { 0.0 } else { 24.0 };
+            ui.painter().layout_no_wrap(t.to_owned(), font.clone(), egui::Color32::PLACEHOLDER).size().x + pad + mnemonic
+        };
+        let natural: f32 = bar.menus.iter().map(|m| title(&m.title)).sum::<f32>() + 4.0;
+        let width = natural.min((ui.available_width() - ROW_AFTER_MENUS).max(MIN_MENUS_WIDTH));
+        let chosen = ui
+            .allocate_ui_with_layout(egui::vec2(width, ui.available_height()), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                ui.set_max_width(width);
+                craft_menu::MenuBarUi::new(&bar).gate(gate).label(&translate).english(&english).id(egui::Id::unique("pdfcraft-menu-bar")).show(ui)
+            })
+            .inner;
         for command in chosen {
             self.run_menu_command(&ctx, &command);
         }
@@ -625,4 +645,168 @@ fn param_index(command: &CommandRef) -> Option<usize> {
 fn panel(command: &CommandRef) -> Option<RightPanel> {
     let name = command.params.get("panel").and_then(serde_json::Value::as_str)?;
     PANELS.iter().find(|(_, n, _)| *n == name).map(|(p, ..)| *p)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use craft_menu::{Backend, Dispatch, Event, ItemKind, NativeMenu};
+
+    use super::*;
+
+    const PDF: &[u8] = include_bytes!("../tests/data/form.pdf");
+
+    fn app(docs: &[&str]) -> (PdfCraftApp, egui::Context) {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        for name in docs {
+            app.open_bytes(name, None, PDF.to_vec()).unwrap();
+        }
+        (app, egui::Context::default())
+    }
+
+    fn linux(app: &PdfCraftApp, ctx: &egui::Context) -> MenuBar {
+        craft_menu::layout(&app.menu_bar(ctx), Target::Linux, &layout_options()).bar
+    }
+
+    fn item<'b>(bar: &'b MenuBar, command: &CommandRef) -> &'b Item {
+        bar.find(command).unwrap_or_else(|| panic!("{} is in the menus", command.key()))
+    }
+
+    #[test]
+    fn every_menu_command_is_listed_once_with_its_shortcut() {
+        let (app, ctx) = app(&["a.pdf"]);
+        let bar = linux(&app, &ctx);
+        let items = bar.items();
+        let mut keys: Vec<String> = items.iter().map(|it| it.command.key()).collect();
+        keys.sort();
+        let count = keys.len();
+        keys.dedup();
+        assert_eq!(keys.len(), count, "no command is listed twice");
+        for spec in commands::COMMANDS.iter().filter(|s| s.menu.is_some()) {
+            if spec.id == "file.open_recent" {
+                continue; // A submenu of the recent files.
+            }
+            let it = item(&bar, &CommandRef::new(spec.id));
+            let shortcut = spec.shortcut.or((spec.id == "edit.copy").then_some(crate::commands::COPY));
+            assert_eq!(it.shortcut, shortcut.and_then(chord), "{} has its registry shortcut", spec.id);
+        }
+        // Every item runs a registry command or one of the menu's own.
+        for it in items {
+            let id = it.command.id.as_str();
+            assert!(
+                commands::command(id).is_some() || extra(id).is_some() || [PANEL, DOCUMENT].contains(&id) || Builtin::of(&it.command).is_some(),
+                "{id} runs something"
+            );
+        }
+    }
+
+    #[test]
+    fn check_and_radio_items_follow_the_app() {
+        let (mut app, ctx) = app(&["a.pdf"]);
+        let kind = |app: &PdfCraftApp, id: &str| item(&linux(app, &ctx), &CommandRef::new(id)).kind;
+        assert_eq!(kind(&app, "view.layout.single"), ItemKind::Radio(true));
+        assert_eq!(kind(&app, "view.layout.two_up"), ItemKind::Radio(false));
+        let continuous = app.views[0].continuous();
+        assert_eq!(kind(&app, "view.continuous"), ItemKind::Check(continuous));
+        app.run_menu_command(&ctx, &CommandRef::new("view.layout.two_up"));
+        app.run_menu_command(&ctx, &CommandRef::new("view.continuous"));
+        assert_eq!(kind(&app, "view.layout.single"), ItemKind::Radio(false));
+        assert_eq!(kind(&app, "view.layout.two_up"), ItemKind::Radio(true));
+        assert_eq!(kind(&app, "view.continuous"), ItemKind::Check(!continuous));
+        let left = app.left_open;
+        assert_eq!(kind(&app, "view.tools_pane"), ItemKind::Check(left));
+        app.run_menu_command(&ctx, &CommandRef::new("view.tools_pane"));
+        assert_eq!(kind(&app, "view.tools_pane"), ItemKind::Check(!left));
+        let bookmarks = CommandRef::with_params(PANEL, serde_json::json!({ "panel": "bookmarks" }));
+        app.run_menu_command(&ctx, &bookmarks);
+        assert_eq!(app.right, Some(RightPanel::Bookmarks));
+        assert_eq!(item(&linux(&app, &ctx), &bookmarks).kind, ItemKind::Radio(true));
+        assert_eq!(kind(&app, "view.side_panel"), ItemKind::Check(true));
+    }
+
+    #[test]
+    fn a_dialog_greys_document_commands_and_drops_their_clicks() {
+        let (mut app, ctx) = app(&["a.pdf"]);
+        let rotate = CommandRef::new("page.rotate");
+        assert!(app.menu_gate(&ctx).allows_command(&rotate));
+        app.dialog = Some(crate::Dialog::About);
+        assert!(!app.menu_gate(&ctx).allows_command(&rotate), "the gate greys the menus under a dialog");
+        let doc = app.views[0].id;
+        let before = app.session.get(doc).unwrap().info.pages[0].rotation;
+        app.run_menu_command(&ctx, &rotate);
+        assert_eq!(app.session.get(doc).unwrap().info.pages[0].rotation, before, "a click that arrives anyway does nothing");
+        // Quit still asks the window to close, which asks about unsaved changes.
+        assert!(app.menu_gate(&ctx).allows_command(&Builtin::Quit.command()));
+    }
+
+    #[test]
+    fn recent_files_and_open_documents_are_listed_once_each() {
+        let (mut app, ctx) = app(&["a.pdf", "b.pdf"]);
+        app.recent = ["one.pdf", "two.pdf"].map(|n| crate::RecentFile { name: n.into(), path: format!("/nowhere/{n}"), pages: 1, size: 0 }).into();
+        let bar = linux(&app, &ctx);
+        for (i, name) in ["one.pdf", "two.pdf"].into_iter().enumerate() {
+            assert_eq!(item(&bar, &CommandRef::with_params("file.open_recent", serde_json::json!({ "index": i }))).label, name);
+        }
+        let window = bar.menu(MenuRole::Window).unwrap();
+        let documents: Vec<&str> = window
+            .children
+            .iter()
+            .filter_map(|n| match n {
+                Node::Item(it) if it.command.id == DOCUMENT => Some(it.label.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(documents, ["a.pdf", "b.pdf"], "each open document once, in tab order");
+        app.run_menu_command(&ctx, &CommandRef::with_params(DOCUMENT, serde_json::json!({ "index": 0 })));
+        assert_eq!(app.active, Some(0));
+        // The macOS layout lists them once too.
+        let mac = craft_menu::mac_layout(&app.menu_bar(&ctx), &layout_options()).bar;
+        let listed = mac.items().iter().filter(|it| it.command.id == DOCUMENT).count();
+        assert_eq!(listed, 2);
+        app.recent.clear();
+        let bar = linux(&app, &ctx);
+        assert!(!item(&bar, &CommandRef::new(NO_RECENT)).enabled, "an empty list shows a greyed placeholder");
+        assert!(bar.find(&CommandRef::new("file.clear_recent")).is_none());
+    }
+
+    /// A native backend that reports what the test queues, through the driver's dispatch as the
+    /// macOS backend does.
+    #[derive(Clone, Default)]
+    struct FakeMenu(Rc<RefCell<(Option<Dispatch>, Vec<Event>)>>);
+
+    impl FakeMenu {
+        fn click(&self, command: &CommandRef) {
+            let mut state = self.0.borrow_mut();
+            let event = state.0.as_ref().map(|d| d.chosen(command, None, false, None));
+            state.1.extend(event);
+        }
+    }
+
+    impl Backend for FakeMenu {
+        fn sync(&mut self, _bar: &MenuBar) {}
+        fn drain(&mut self) -> Vec<Event> {
+            std::mem::take(&mut self.0.borrow_mut().1)
+        }
+        fn attach(&mut self, dispatch: Dispatch) {
+            self.0.borrow_mut().0 = Some(dispatch);
+        }
+    }
+
+    #[test]
+    fn a_native_menu_click_runs_its_command_once() {
+        let (mut app, ctx) = app(&["a.pdf"]);
+        let fake = FakeMenu::default();
+        app.native_menu = Some(NativeMenu::new(Box::new(fake.clone())));
+        let doc = app.views[0].id;
+        let before = app.session.get(doc).unwrap().info.pages[0].rotation;
+        fake.click(&CommandRef::new("page.rotate"));
+        let mut raw = egui::RawInput::default();
+        app.prepare_raw_input(&ctx, &mut raw);
+        app.native_menu_clicks(&ctx);
+        app.native_menu_clicks(&ctx);
+        assert_eq!(app.session.get(doc).unwrap().info.pages[0].rotation, (before + 90) % 360, "rotated once");
+    }
 }
