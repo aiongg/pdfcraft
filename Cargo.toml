@@ -13,9 +13,12 @@ repository = "https://github.com/storytold/pdfcraft"
 
 [workspace.dependencies]
 # Shared frontend components; engines remain independent of egui.
-craft-ui = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "42e30cd5b3f4b114270dd053fccbc33bedc47f68", features = ["serde"] }
+craft-ui = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "70ade1fb221d8a91f73b1ba7a2c4b65f54833110", features = ["serde"] }
 # Quit the macOS way (#1136): ⌘Q asks about unsaved changes, and closing quits through `terminate:`.
-craft-quit = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "42e30cd5b3f4b114270dd053fccbc33bedc47f68" }
+craft-quit = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "70ade1fb221d8a91f73b1ba7a2c4b65f54833110" }
+# One menu definition for the native macOS menu bar and the in-window bar elsewhere.
+craft-menu = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "70ade1fb221d8a91f73b1ba7a2c4b65f54833110" }
+craft-keymap = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "70ade1fb221d8a91f73b1ba7a2c4b65f54833110", default-features = false }
 # Shared system spooler; document composition remains in pdfcraft-print.
 craft-print = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "42e30cd5b3f4b114270dd053fccbc33bedc47f68" }
 # Whether a path stored in a document may be opened (GoToR link targets).
