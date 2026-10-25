@@ -59,7 +59,13 @@ pub fn wait_until(h: &mut Harness<'static, PdfCraftApp>, what: &str, ready: impl
 /// The fonts are those the app installs for `language` and for the default CJK preference: a
 /// switch to Chinese installs its fonts for the next frame, so the first frame in Chinese draws
 /// with the fonts of the language before it.
+///
+/// A build that requires craft-fonts (`CRAFT_FONTS_REQUIRED=1`, as the CI gate sets) never skips:
+/// a missing glyph there is a failure.
 pub fn skip_without_glyphs(name: &str, language: &str, text: &str) -> bool {
+    if std::env::var("CRAFT_FONTS_REQUIRED").as_deref() == Ok("1") {
+        return false;
+    }
     let catalog = i18n::LANGUAGES.iter().find(|l| l.code == language).map_or("", |l| l.source);
     let translations = catalog.lines().filter(|l| !l.starts_with('#')).filter_map(|l| l.split('\t').nth(2));
     let chars: BTreeSet<char> = std::iter::once(text).chain(translations).flat_map(str::chars).filter(|c| !c.is_control()).collect();
