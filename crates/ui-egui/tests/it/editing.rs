@@ -3701,7 +3701,7 @@ fn editing_existing_text_in_place() {
 /// paragraph editor and retypes it as "Chapter One", leaving the editor open.
 fn edit_tab_with_an_open_paragraph(h: &mut Harness<'static, PdfCraftApp>) {
     use pdfcraft_ui_egui::{Mode, QuickTool};
-    support::outside_menus(&h, "Edit").click();
+    support::outside_menus(h, "Edit").click();
     h.run_steps(3);
     assert_eq!((h.state().mode, h.state().quick_tool), (Mode::Edit, QuickTool::EditText));
     open_the_first_line(h);
