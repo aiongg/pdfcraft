@@ -504,6 +504,9 @@ fn language_switch_preserves_document_and_command_ids() {
     assert_eq!(documents[0]["dirty"], true);
     let commands = ok(&mut h, &c, "ui.commands", json!({}));
     for code in ["ja", "zh-hans", "fr", "de", "uk", "lt", "en"] {
+        if crate::support::skip_without_glyphs(&format!("language_switch_preserves_document_and_command_ids ({code})"), code, "") {
+            continue;
+        }
         ok(&mut h, &c, "ui.set", json!({ "key": "language", "value": code }));
         h.run_steps(2);
         let state = ok(&mut h, &c, "ui.state", json!({}));
@@ -912,6 +915,9 @@ fn state_and_view_options() {
 
 #[test]
 fn japanese_controls_and_search_keep_command_ids() {
+    if crate::support::skip_without_glyphs("japanese_controls_and_search_keep_command_ids", "ja", "") {
+        return;
+    }
     let (mut h, c) = harness();
     ok(&mut h, &c, "ui.set", json!({ "key": "language", "value": "ja" }));
     assert_eq!(ok(&mut h, &c, "ui.state", json!({}))["language"], "ja");
@@ -1006,6 +1012,9 @@ fn ukrainian_preferences_and_search_keep_command_ids() {
 
 #[test]
 fn preferences_menu_and_shortcut_allow_switching_interface_languages() {
+    if crate::support::skip_without_glyphs("preferences_menu_and_shortcut_allow_switching_interface_languages", "ja", "") {
+        return;
+    }
     let (mut h, c) = harness();
     ok(&mut h, &c, "ui.set", json!({ "key": "language", "value": "ja" }));
     ok(&mut h, &c, "ui.click", json!({ "label": "メニュー" }));
@@ -1048,6 +1057,9 @@ fn preferences_menu_and_shortcut_allow_switching_interface_languages() {
 
 #[test]
 fn japanese_dialogs_errors_and_custom_action_names() {
+    if crate::support::skip_without_glyphs("japanese_dialogs_errors_and_custom_action_names", "ja", "") {
+        return;
+    }
     let (mut h, c) = harness();
     ok(&mut h, &c, "ui.set", json!({"key": "language", "value": "ja"}));
     for (dialog, label) in [
@@ -1088,6 +1100,9 @@ fn japanese_dialogs_errors_and_custom_action_names() {
 
 #[test]
 fn simplified_chinese_about_tabs_and_credit_controls() {
+    if crate::support::skip_without_glyphs("simplified_chinese_about_tabs_and_credit_controls", "zh-hans", "") {
+        return;
+    }
     let (mut h, c) = harness();
     let documents = ok(&mut h, &c, "ui.state", json!({}))["documents"].clone();
     ok(&mut h, &c, "ui.set", json!({"key": "language", "value": "zh-hans"}));
@@ -1117,6 +1132,9 @@ fn simplified_chinese_about_tabs_and_credit_controls() {
 
 #[test]
 fn simplified_chinese_signature_prompts_and_errors_keep_document_state() {
+    if crate::support::skip_without_glyphs("simplified_chinese_signature_prompts_and_errors_keep_document_state", "zh-hans", "") {
+        return;
+    }
     let (mut h, c) = harness();
     let documents = ok(&mut h, &c, "ui.state", json!({}))["documents"].clone();
     ok(&mut h, &c, "ui.set", json!({"key": "language", "value": "zh-hans"}));
@@ -1725,6 +1743,9 @@ fn control_quit_retains_inactive_fill_sign_typing_after_cancel() {
 
 #[test]
 fn control_quit_retains_blocked_content_typing_after_cancel() {
+    if crate::support::skip_without_glyphs("control_quit_retains_blocked_content_typing_after_cancel", "en", "Keep 世界") {
+        return;
+    }
     let (mut h, c) = harness();
     ok(&mut h, &c, "ui.command", json!({"id":"edit.text"}));
     h.run_steps(3);
