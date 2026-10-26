@@ -225,13 +225,7 @@ const HELP: &[&str] =
 /// A registry shortcut as a craft-keymap chord: `command` is ⌘ (Ctrl elsewhere) and `mac_ctrl`
 /// the Control key on macOS. `None` for a key craft-keymap doesn't name.
 pub(crate) fn chord(s: Shortcut) -> Option<Chord> {
-    let key = match s.key {
-        "+" => Key::parse("Plus"),
-        "−" | "-" => Key::parse("Minus"),
-        "←" => Key::parse("ArrowLeft"),
-        "→" => Key::parse("ArrowRight"),
-        other => Key::parse(other),
-    }?;
+    let key = Key::parse(s.key)?;
     Some(Chord::new(Mods { cmd: s.command, ctrl: s.mac_ctrl, alt: false, shift: s.shift }, key))
 }
 
@@ -511,15 +505,7 @@ impl PdfCraftApp {
     /// drawn) does nothing.
     pub fn run_menu_command(&mut self, ctx: &egui::Context, command: &CommandRef) {
         match Builtin::of(command) {
-            Some(Builtin::Quit) => {
-                craft_quit::on_menu_event(ctx, &command.id);
-                return;
-            }
-            Some(Builtin::Minimize) => {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true));
-                return;
-            }
-            // Hide and Hide Others are AppKit's, handled by the native menu.
+            // Both menu bars run Quit and Minimize themselves; Hide and Hide Others are AppKit's.
             Some(_) => return,
             None => {}
         }
@@ -578,23 +564,16 @@ impl PdfCraftApp {
         let ctx = ui.ctx().clone();
         let bar = craft_menu::layout(&self.menu_bar(&ctx), Target::current(), &layout_options()).bar;
         let gate = self.menu_gate(&ctx);
-        // The bar fills the width it is given, and the mode tabs, search and buttons follow it in
-        // the same row: give it the titles' width (with room for a "(F)" mnemonic), less when
-        // the row is short, where the menus that don't fit move into its "⋯" menu.
-        let font = egui::TextStyle::Button.resolve(ui.style());
-        let pad = 2.0 * ui.spacing().button_padding.x;
-        let title = |t: &str| {
-            let mnemonic = if t.chars().any(|c| c.is_ascii_alphanumeric()) { 0.0 } else { 24.0 };
-            ui.painter().layout_no_wrap(t.to_owned(), font.clone(), egui::Color32::PLACEHOLDER).size().x + pad + mnemonic
-        };
-        let natural: f32 = bar.menus.iter().map(|m| title(&m.title)).sum::<f32>() + 4.0;
-        let width = natural.min((ui.available_width() - ROW_AFTER_MENUS).max(MIN_MENUS_WIDTH));
-        let chosen = ui
-            .allocate_ui_with_layout(egui::vec2(width, ui.available_height()), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                ui.set_max_width(width);
-                craft_menu::MenuBarUi::new(&bar).gate(gate).label(&translate).english(&english).id(egui::Id::unique("pdfcraft-menu-bar")).show(ui)
-            })
-            .inner;
+        // The mode tabs, search and buttons follow the bar in the same row: it takes its titles'
+        // width, less when the row is short, where the menus that don't fit move into its "⋯".
+        let fit = (ui.available_width() - ROW_AFTER_MENUS).max(MIN_MENUS_WIDTH);
+        let chosen = craft_menu::MenuBarUi::new(&bar)
+            .gate(gate)
+            .label(&translate)
+            .english(&english)
+            .id(egui::Id::unique("pdfcraft-menu-bar"))
+            .shrink_to_fit(fit)
+            .show(ui);
         for command in chosen {
             self.run_menu_command(&ctx, &command);
         }
@@ -606,7 +585,8 @@ impl PdfCraftApp {
     pub fn install_native_menu(&mut self, ctx: &egui::Context) -> bool {
         crate::i18n::set_current(crate::i18n::Lang::from_pref(&self.language));
         let bar = craft_menu::mac_layout(&self.menu_bar(ctx), &layout_options()).bar;
-        self.native_menu = craft_menu::mac::install(ctx, &bar);
+        // The Window menu lists the open documents itself, so AppKit's window list stays off.
+        self.native_menu = craft_menu::mac::install_with(ctx, &bar, craft_menu::mac::MacOptions::default().window_list(false));
         self.native_menu.is_some()
     }
 
