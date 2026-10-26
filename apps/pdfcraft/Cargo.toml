@@ -11,8 +11,6 @@ workspace = true
 [dependencies]
 # Help ▸ Check for updates (issue #28): one HTTPS request to GitHub, over rustls with the OS's
 # trusted roots. No bundled root list (webpki-roots and webpki-root-certs are CDLA-licensed).
-ureq = { version = "3.4", default-features = false, features = ["rustls-no-provider", "_ring"] }
-rustls-native-certs = "0.8"
 pdfcraft-ui-egui = { workspace = true }
 # `build_info`: the version and compile-time build label for `--version` and the log.
 pdfcraft-engine = { workspace = true }
@@ -68,3 +66,6 @@ uds_windows = "=1.2.1"
 [build-dependencies]
 # Icon + VERSIONINFO for pdfcraft.exe; build.rs only uses it when targeting Windows.
 winresource = "0.1"
+
+[target.'cfg(windows)'.dependencies]
+craft-update = { workspace = true }
