@@ -504,10 +504,9 @@ impl PdfCraftApp {
     /// key handles the click. A command that can't run now (a dialog opened since the menu was
     /// drawn) does nothing.
     pub fn run_menu_command(&mut self, ctx: &egui::Context, command: &CommandRef) {
-        match Builtin::of(command) {
-            // Both menu bars run Quit and Minimize themselves; Hide and Hide Others are AppKit's.
-            Some(_) => return,
-            None => {}
+        // Both menu bars run Quit and Minimize themselves; Hide and Hide Others are AppKit's.
+        if Builtin::of(command).is_some() {
+            return;
         }
         if !self.menu_gate(ctx).allows_command(command) || !self.menu_state(ctx, command).enabled {
             return;
