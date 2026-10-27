@@ -283,7 +283,7 @@ pub struct PdfCraftApp {
     #[cfg(target_os = "linux")]
     appearance: Option<craft_platform::appearance::Watcher>,
     #[cfg(target_os = "linux")]
-    appearance_enabled: bool,
+    desktop_theme_enabled: bool,
     /// How far a mouse-wheel notch scrolls.
     pub scroll_speed: scroll_speed::ScrollSpeed,
     /// Preferences ▸ Animation effects: on, off, or as the system's animation setting says.

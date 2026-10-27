@@ -14,7 +14,7 @@ impl PdfCraftApp {
         #[cfg(target_os = "linux")]
         {
             let active = self.theme_preference == ThemePreference::System;
-            if self.appearance_enabled && active && self.appearance.is_none() {
+            if self.desktop_theme_enabled && active && self.appearance.is_none() {
                 let ctx = ctx.clone();
                 self.appearance = craft_platform::appearance::Watcher::start_active(true, move || ctx.request_repaint());
             }

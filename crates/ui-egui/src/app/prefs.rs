@@ -62,8 +62,8 @@ impl PdfCraftApp {
     /// Enable the Linux desktop portal in a native window. Headless contexts keep
     /// their supplied input and never connect to the user's session bus.
     #[cfg(target_os = "linux")]
-    pub fn enable_desktop_appearance(&mut self) {
-        self.appearance_enabled = true;
+    pub fn enable_desktop_theme(&mut self) {
+        self.desktop_theme_enabled = true;
     }
 
     /// Today in `fmt` (or Preferences ▸ Date format), with month and weekday names in the date

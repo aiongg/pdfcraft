@@ -63,7 +63,7 @@ impl PdfCraftApp {
             #[cfg(target_os = "linux")]
             appearance: None,
             #[cfg(target_os = "linux")]
-            appearance_enabled: false,
+            desktop_theme_enabled: false,
             scroll_speed: scroll_speed::ScrollSpeed::default(),
             animation_effects: motion::AnimationEffects::default(),
             motion: motion::Motion::default(),
