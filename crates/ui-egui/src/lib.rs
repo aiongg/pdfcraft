@@ -288,6 +288,9 @@ pub struct PdfCraftApp {
     /// The suite state saved with the preferences, which the shell shows until the shared folder
     /// has been read (and while it is damaged or from a newer build).
     suite_last: Option<Accepted>,
+    /// The restored preferences said "follow the suite". While the suite is in memory the app
+    /// shows its own look, and this keeps the saved preference for the next start with a folder.
+    suite_follow_saved: bool,
     /// What the installed styles were built from: the suite generation and the selection.
     theme_key: Option<(u64, Selection)>,
     /// Why the theme shown differs from the selection (an unknown theme, a single variant).

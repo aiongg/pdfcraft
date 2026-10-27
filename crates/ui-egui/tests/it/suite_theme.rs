@@ -214,6 +214,22 @@ fn an_own_theme_ignores_suite_changes_until_follow_suite_is_back_on() {
     portable.restore(&b.persist());
     portable.open_suite(&SuiteDir::memory(), || {});
     assert_eq!(portable.appearance(), &AppChoice::Own(Selection { theme: ThemeId::suite_default(), mode: Mode::Dark }));
+    // The in-memory start saves the preference it restored, so the next start with a folder follows.
+    let saved: serde_json::Value = serde_json::from_str(&portable.persist()).unwrap();
+    assert_eq!(saved["appearance"]["follow_suite"], true);
+    // An explicit choice in the app replaces it.
+    portable.set_follow_suite(false);
+    let saved: serde_json::Value = serde_json::from_str(&portable.persist()).unwrap();
+    assert_eq!(saved["appearance"]["follow_suite"], false);
+    // With a folder the saved value is the live choice.
+    let disk = tempfile::tempdir().unwrap();
+    let mut on_disk = PdfCraftApp::new();
+    on_disk.restore(&b.persist());
+    on_disk.open_suite(&SuiteDir::at(disk.path()), || {});
+    assert!(on_disk.follows_suite());
+    on_disk.set_follow_suite(false);
+    let saved: serde_json::Value = serde_json::from_str(&on_disk.persist()).unwrap();
+    assert_eq!(saved["appearance"]["follow_suite"], false);
 }
 
 #[test]

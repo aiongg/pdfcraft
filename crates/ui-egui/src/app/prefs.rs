@@ -145,6 +145,7 @@ impl PdfCraftApp {
         if follow && !self.suite_available() {
             return false;
         }
+        self.suite_follow_saved = false;
         self.app_choice = match (follow, &self.app_choice) {
             (true, _) => AppChoice::FollowSuite,
             (false, AppChoice::FollowSuite) => AppChoice::Own(self.effective_selection()),
@@ -546,7 +547,7 @@ impl PdfCraftApp {
         // In memory the suite isn't the shared one: keep the shared state last read.
         let last_suite = if self.suite.shared() { Some(self.suite.accepted().clone()) } else { self.suite_last.clone() };
         serde_json::json!({
-            "follow_suite": self.follows_suite(),
+            "follow_suite": self.follows_suite() || (!self.suite_available() && self.suite_follow_saved),
             "theme_id": shown.theme.as_str(),
             "mode": shown.mode,
             "last_suite": last_suite,
@@ -567,7 +568,8 @@ impl PdfCraftApp {
                 if let Ok(last) = serde_json::from_value::<Accepted>(a["last_suite"].clone()) {
                     self.suite_last = Some(last);
                 }
-                if a["follow_suite"].as_bool() == Some(true) {
+                self.suite_follow_saved = a["follow_suite"].as_bool() == Some(true);
+                if self.suite_follow_saved {
                     Some(AppChoice::FollowSuite)
                 } else {
                     let theme = a["theme_id"].as_str().and_then(|id| ThemeId::parse(id).ok()).unwrap_or_else(ThemeId::app_default);

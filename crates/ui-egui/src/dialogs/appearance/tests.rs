@@ -128,6 +128,15 @@ fn a_card_writes_the_suite_when_following_and_the_apps_own_choice_otherwise() {
     h.run_steps(2);
     wait(&mut h, "the suite write", |_| disk_theme(dir.path()).as_deref() == Some("craft.graphite"));
     assert_eq!(h.state().appearance(), &AppChoice::FollowSuite);
+    // The card of the theme the suite already has writes nothing.
+    wait(&mut h, "the accepted revision", |h| h.state().suite().accepted().revision == 1);
+    h.get_by_label("Graphite").click();
+    for _ in 0..5 {
+        h.state_mut().suite_mut().sync();
+        h.run_steps(1);
+        std::thread::sleep(Duration::from_millis(40));
+    }
+    assert_eq!(h.state().suite().accepted().revision, 1, "the same theme again is no write");
 
     h.get_by_label("Use a different theme in this app").click();
     h.run_steps(2);
@@ -235,6 +244,8 @@ fn a_low_contrast_import_shows_warnings_and_keeps_its_colours() {
     };
     import(&mut h);
     let id = ThemeId::parse("test.low-contrast").unwrap();
+    wait(&mut h, "the imported theme in the index", |h| h.state().suite().snapshot().index.iter().any(|e| e.id == id));
+    wait(&mut h, "the import notice", |h| h.query_by_label("Imported Low contrast").is_some());
     let entry = h.state().suite().snapshot().index.iter().find(|e| e.id == id).cloned().expect("imported");
     assert!(entry.diagnostics > 0);
     assert!(h.query_by_label("Imported Low contrast").is_some());
@@ -258,7 +269,7 @@ fn a_low_contrast_import_shows_warnings_and_keeps_its_colours() {
     import(&mut h);
     assert!(h.query_by_label("Theme already installed").is_some());
     h.get_by_label("Import as copy").click();
+    wait(&mut h, "the copy in the index", |h| h.state().suite().snapshot().index.len() == 2);
     h.run_steps(4);
-    assert_eq!(h.state().suite().snapshot().index.len(), 2);
     assert!(h.query_by_label("Theme already installed").is_none());
 }

@@ -13,7 +13,11 @@ use pdfcraft_engine::{
     word_count::{self, Options, Report},
 };
 
-use crate::{PdfCraftApp, widgets};
+use crate::{
+    PdfCraftApp,
+    theme::{self, Tokens},
+    widgets,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct Key {
@@ -145,7 +149,8 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp) -> bool {
             }
         }
         Some(Err(error)) => {
-            ui.colored_label(ui.visuals().error_fg_color, error);
+            let t = Tokens::get(ui.ctx());
+            theme::status_label(ui, t.bad, t.text, egui::RichText::new(error));
         }
         None => {
             ui.spinner();

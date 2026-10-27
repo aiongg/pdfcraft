@@ -767,7 +767,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
                         ui.label(crate::i18n::fmt(tl!("{n} pages selected."), &[("n", &pages.len().to_string())]));
                     }
                     Err(e) => {
-                        ui.colored_label(ui.visuals().error_fg_color, e);
+                        theme::status_label(ui, t.bad, t.text, egui::RichText::new(e));
                     }
                 }
                 ui.add_space(4.0);

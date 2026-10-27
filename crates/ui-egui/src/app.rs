@@ -64,6 +64,7 @@ impl PdfCraftApp {
             app_choice: AppChoice::Own(Selection { theme: craft_theme::ThemeId::app_default(), mode: craft_theme::Mode::System }),
             suite: suite_theme::Suite::memory(),
             suite_last: None,
+            suite_follow_saved: false,
             theme_key: None,
             theme_note: None,
             theme_library: Default::default(),

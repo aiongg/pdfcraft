@@ -626,8 +626,12 @@ pub fn preferences_section(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
         ui.add_space(6.0);
     }
     if let Some(id) = picked {
-        // The suite while following it, otherwise the app's own choice.
-        app.set_appearance(SelectionChange::theme(id));
+        // The suite while following it, otherwise the app's own choice. The theme the suite
+        // already has is not written again (it would bump the revision and clear notices).
+        let already = app.follows_suite() && id == shown && app.suite().accepted().suite.theme.as_ref() == Some(&id);
+        if !already {
+            app.set_appearance(SelectionChange::theme(id));
+        }
     }
     library_row(ui, app, t);
     ui.add_space(4.0);

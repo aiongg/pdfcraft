@@ -1,5 +1,10 @@
 //! Measure objects: page-space clicks, live readings and persistent drawing scales.
-use crate::{LeftPanel, PdfCraftApp, QuickTool, canvas::DocView, theme::Tokens, widgets};
+use crate::{
+    LeftPanel, PdfCraftApp, QuickTool,
+    canvas::DocView,
+    theme::{self, Tokens},
+    widgets,
+};
 use egui::{Color32, Pos2, Stroke};
 use pdfcraft_engine::{
     Document, Edit, Style,
@@ -354,7 +359,7 @@ pub(crate) fn panel(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     egui::ScrollArea::vertical().id_salt("measure-panel").show(ui, |ui| panel_body(app, ui, t));
 }
 /// Draw the measurement panel: tool selection, scale calibration, snapping and the current reading.
-fn panel_body(app: &mut PdfCraftApp, ui: &mut egui::Ui, _t: &Tokens) {
+fn panel_body(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     crate::widgets::begin_dialog(ui);
     let Some((index, id)) = app.active_ids() else {
         ui.label(tl!("Open a PDF to measure it."));
@@ -486,7 +491,7 @@ fn panel_body(app: &mut PdfCraftApp, ui: &mut egui::Ui, _t: &Tokens) {
     });
     let apply = ui.add_enabled(doc.allows_annotation(), egui::Button::new(tl!("Apply scale"))).clicked();
     if let Some(error) = &state.error {
-        ui.colored_label(Color32::from_rgb(190, 50, 50), error);
+        theme::status_label(ui, t.bad, t.text, egui::RichText::new(error));
     }
     ui.separator();
     let mut select = None;
@@ -497,8 +502,13 @@ fn panel_body(app: &mut PdfCraftApp, ui: &mut egui::Ui, _t: &Tokens) {
             if !listing.unsupported.is_empty() {
                 let reasons: Vec<String> =
                     listing.unsupported.iter().map(|u| format!("{} {}: {}", tl!("Page"), u.page.saturating_add(1), u.reason)).collect();
-                ui.colored_label(Color32::from_rgb(190, 120, 30), format!("{}: {}", tl!("Unsupported measurements"), listing.unsupported.len()))
-                    .on_hover_text(reasons.join("\n"));
+                theme::status_label(
+                    ui,
+                    t.warn,
+                    t.text,
+                    egui::RichText::new(format!("{}: {}", tl!("Unsupported measurements"), listing.unsupported.len())),
+                )
+                .on_hover_text(reasons.join("\n"));
             }
             egui::ScrollArea::vertical().id_salt("measurement-list").max_height(140.0).show(ui, |ui| {
                 for m in &listing.measurements {
@@ -509,7 +519,7 @@ fn panel_body(app: &mut PdfCraftApp, ui: &mut egui::Ui, _t: &Tokens) {
             });
         }
         Some(Err(e)) => {
-            ui.colored_label(Color32::from_rgb(190, 50, 50), e);
+            theme::status_label(ui, t.bad, t.text, egui::RichText::new(e));
         }
     }
     let export = ui.button(tl!("Export measurements as CSV")).clicked();
