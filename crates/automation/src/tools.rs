@@ -545,6 +545,17 @@ pub fn tools() -> Vec<ToolDef> {
         )
         .ro()
         .with(schema(json!({ "doc": doc() }), &["doc"])),
+        t("suite_get", "Get the suite theme", "The theme and mode every Craft app that follows the suite shows (null: not chosen yet, so each app shows its own default; effective is what PdfCraft shows), the revisions, whether the suite is the shared folder (shared: false keeps it in memory for this session) and any problem reading it.")
+            .ro()
+            .with(schema(json!({}), &[])),
+        t("suite_set", "Set the suite theme", "Change the suite theme, mode or both; every Craft app that follows the suite changes with it. theme: a built-in (craft.artcraft, craft.graphite, craft.high-contrast) or a library theme id from theme_list. Fails without writing when another Craft app changed the same field first.")
+            .with(schema(json!({ "theme": { "type": "string", "maxLength": 64 }, "mode": { "type": "string", "enum": ["system", "light", "dark"] } }), &[])),
+        t("theme_list", "List themes", "App default, the built-in themes and the theme library, each with its variants and warning count (roles filled in plus low-contrast pairs); suite marks the suite's theme.").ro().with(schema(json!({}), &[])),
+        t("theme_import", "Import a theme", "Add a theme file (JSON, schema craft-theme) to the theme library, kept byte for byte. An id the library has already fails unless as_copy, which stores it as <id>-2 (or the next free number). Low contrast is reported as warnings and never blocks the import.")
+            .with(schema(json!({ "path": path_arg(), "as_copy": { "type": "boolean" } }), &["path"])),
+        t("theme_export", "Export a theme", "Write a library or built-in theme to path as a theme file others can import.")
+            .destructive()
+            .with(schema(json!({ "id": { "type": "string", "maxLength": 64 }, "path": path_arg() }), &["id", "path"])),
         t("printers", "List printers", "The printers the system's print spooler knows (CUPS on macOS and Linux), with the default marked.").ro().with(schema(json!({}), &[])),
         t("printer_options", "List printer options", "A printer driver's own job options (CUPS: from its PPD), such as the paper tray, paper type or finishing: key, label, group, default and choices. Pass chosen values to doc_print as options. Empty on Windows, where the driver's preferences window holds them.")
             .ro()

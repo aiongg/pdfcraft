@@ -30,6 +30,7 @@ mod printing;
 mod reading;
 mod redact;
 mod signing;
+mod suite;
 mod text_cache;
 mod tools;
 
@@ -42,6 +43,7 @@ use pdfcraft_platform::staging::{StagingName, staging_suffixes};
 use pdfcraft_render::{PageRenderer, PageText, RenderConfig, RenderRequest, RequestKind};
 use serde_json::{Value, json};
 
+pub use craft_theme_store::SuiteDir;
 pub use pdfcraft_render::Pixels;
 pub use tools::{ToolDef, tools};
 
@@ -88,6 +90,10 @@ pub struct Automation {
     /// Documents that lost a listing to the cap. A page of one with no listing is refused rather
     /// than read as "a number is a position", which the page may no longer match.
     evicted: HashSet<DocId>,
+    /// Where the suite theme tools read and write: in memory unless the caller names a folder.
+    suite_dir: craft_theme_store::SuiteDir,
+    /// The suite store, opened on the first suite tool call.
+    suite: Option<craft_theme_store::Store>,
 }
 
 impl Default for Automation {
@@ -106,6 +112,8 @@ impl Automation {
             texts: TextCache::default(),
             listed: HashMap::new(),
             evicted: HashSet::new(),
+            suite_dir: craft_theme_store::SuiteDir::memory(),
+            suite: None,
         }
     }
 

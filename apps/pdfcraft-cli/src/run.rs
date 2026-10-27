@@ -6,7 +6,9 @@ use super::*;
 // ---- automation --------------------------------------------------------------------------------
 
 pub(crate) fn automation(args: &[String]) -> Result<pdfcraft_automation::Automation, String> {
-    let a = pdfcraft_automation::Automation::new();
+    // The suite theme tools use the folder every Craft app shares (`CRAFT_SUITE_DIR`, empty for
+    // none, overrides it).
+    let a = pdfcraft_automation::Automation::new().with_suite_dir(pdfcraft_automation::SuiteDir::resolve(false));
     match flag(args, "--root") {
         Some(root) => a.with_root(root).map_err(|e| format!("--root {root}: {e}")),
         None => Ok(a),
