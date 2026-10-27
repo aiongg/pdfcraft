@@ -154,7 +154,7 @@ fn tile(ui: &mut egui::Ui, t: &Tokens, g: &ToolGroup, items: &[&'static str]) ->
         let w = widgets::text_width(ui, tl!(b), &font);
         let r = Rect::from_min_size(body.right_top() + vec2(-w - 18.0, 8.0), vec2(w + 10.0, 16.0));
         ui.painter().rect_filled(r, CornerRadius::same(4), t.badge_new);
-        ui.painter().text(r.center(), Align2::CENTER_CENTER, tl!(b), font, Color32::WHITE);
+        ui.painter().text(r.center(), Align2::CENTER_CENTER, tl!(b), font, t.on_accent);
     }
     let resp = if elided { resp.on_hover_text(format!("{}\n{note}", tl!(g.label))) } else { resp };
     theme::hand(resp)

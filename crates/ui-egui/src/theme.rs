@@ -100,7 +100,11 @@ pub struct Tokens {
     pub hover: Color32,
     pub pressed: Color32,
     pub selected: Color32,
+    /// Fill of a selected item (a selected row, a selection highlight).
+    pub selection: Color32,
     pub accent: Color32,
+    /// Text and icons painted on an `accent` or `badge_new` fill.
+    pub on_accent: Color32,
     pub accent_text: Color32,
     pub accent_soft: Color32,
     pub field: Color32,
@@ -128,7 +132,9 @@ impl Tokens {
                 hover: Color32::from_rgb(0xF0, 0xF0, 0xF3),
                 pressed: Color32::from_rgb(0xE4, 0xE4, 0xE9),
                 selected: Color32::from_rgb(0xE6, 0xEE, 0xFD),
+                selection: Color32::from_rgb(0xE6, 0xEE, 0xFD),
                 accent: Color32::from_rgb(0x1B, 0x63, 0xE0),
+                on_accent: Color32::WHITE,
                 accent_text: Color32::from_rgb(0x17, 0x55, 0xC4),
                 accent_soft: Color32::from_rgb(0xE3, 0xEC, 0xFD),
                 field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
@@ -152,7 +158,9 @@ impl Tokens {
                 hover: Color32::from_rgb(0x34, 0x34, 0x3A),
                 pressed: Color32::from_rgb(0x3E, 0x3E, 0x45),
                 selected: Color32::from_rgb(0x23, 0x3A, 0x63),
+                selection: Color32::from_rgb(0x23, 0x3A, 0x63),
                 accent: Color32::from_rgb(0x4B, 0x8B, 0xF5),
+                on_accent: Color32::WHITE,
                 accent_text: Color32::from_rgb(0x8C, 0xB6, 0xFA),
                 accent_soft: Color32::from_rgb(0x24, 0x36, 0x57),
                 field: Color32::from_rgb(0x1E, 0x1E, 0x22),
@@ -189,7 +197,9 @@ impl Tokens {
             hover: color32(d.hover),
             pressed: color32(d.pressed),
             selected: color32(c.selection),
+            selection: color32(c.selection),
             accent: color32(c.accent),
+            on_accent: color32(c.on_accent),
             accent_text: color32(d.accent_text),
             accent_soft: color32(d.accent_soft),
             field: color32(c.raised),
@@ -255,7 +265,7 @@ impl Press {
     /// The colour [`Self::wash`] paints.
     pub fn wash_color(self, t: &Tokens, selected: bool) -> Color32 {
         if selected {
-            self.fill(t.accent_soft, t.accent_soft.lerp_to_gamma(t.accent, 0.16), t.selected)
+            self.fill(t.accent_soft, t.accent_soft.lerp_to_gamma(t.accent, 0.16), t.selection)
         } else {
             self.fill(Color32::TRANSPARENT, t.hover, t.pressed)
         }

@@ -86,7 +86,7 @@ pub(crate) fn composer(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, 
                     if ui
                         .add_enabled(
                             can_post,
-                            egui::Button::new(egui::RichText::new(tl!("Post")).color(Color32::WHITE)).fill(t.accent).corner_radius(14),
+                            egui::Button::new(egui::RichText::new(tl!("Post")).color(t.on_accent)).fill(t.accent).corner_radius(14),
                         )
                         .clicked()
                         || (enter && can_post)

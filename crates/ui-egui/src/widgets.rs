@@ -143,7 +143,7 @@ pub fn pill_button(ui: &mut egui::Ui, label: &str, primary: bool) -> Response {
 pub fn pill_button_marked(ui: &mut egui::Ui, label: &str, primary: bool, marked: bool) -> Response {
     let t = Tokens::get(ui.ctx());
     let font = theme::medium(12.5);
-    let text_color = if primary { Color32::WHITE } else { t.text };
+    let text_color = if primary { t.on_accent } else { t.text };
     // Dialog buttons are translated UI text: an explicit RTL base keeps an Arabic label right
     // to left even when its first strong character is Latin or a placeholder.
     let label_galley = crate::bidi::layout_ui(ui, label.to_owned(), font, text_color);
@@ -633,7 +633,7 @@ pub fn icon_pill(ui: &mut egui::Ui, icon: &str, label: &str, primary: bool) -> R
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), label));
     let press = theme::Press::track(ui, &resp);
     let (fill, stroke, text) = if primary {
-        (press.fill(t.accent, t.accent_text, t.accent.lerp_to_gamma(Color32::BLACK, 0.22)), Stroke::NONE, Color32::WHITE)
+        (press.fill(t.accent, t.accent_text, t.accent.lerp_to_gamma(Color32::BLACK, 0.22)), Stroke::NONE, t.on_accent)
     } else {
         (press.fill(t.card, t.hover, t.pressed), Stroke::new(1.0, t.border), t.text)
     };

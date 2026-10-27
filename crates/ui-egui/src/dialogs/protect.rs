@@ -80,7 +80,7 @@ fn radio(ui: &mut egui::Ui, t: &Tokens, on: bool, label: &str) -> egui::Response
     let c = egui::pos2(rect.left() + 9.0, rect.center().y);
     if on {
         ui.painter().circle_filled(c, 8.0, t.accent);
-        ui.painter().circle_filled(c, 3.0, Color32::WHITE);
+        ui.painter().circle_filled(c, 3.0, t.on_accent);
     } else {
         ui.painter().circle_stroke(c, 7.5, egui::Stroke::new(1.5, t.text_muted));
     }

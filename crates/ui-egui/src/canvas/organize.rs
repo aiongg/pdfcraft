@@ -204,7 +204,7 @@ fn gap_button(ui: &mut egui::Ui, gap: usize, at: Pos2, height: f32, label: Strin
         ui.painter().line_segment([pos2(at.x, at.y - height / 2.0), pos2(at.x, at.y + height / 2.0)], Stroke::new(3.0, t.accent));
     }
     ui.painter().circle(at, 9.0, if hot { t.accent } else { t.chrome }, Stroke::new(1.0, if hot { t.accent } else { t.border }));
-    let ink = Stroke::new(1.5, if hot { Color32::WHITE } else { t.text_muted });
+    let ink = Stroke::new(1.5, if hot { t.on_accent } else { t.text_muted });
     ui.painter().line_segment([at - vec2(4.0, 0.0), at + vec2(4.0, 0.0)], ink);
     ui.painter().line_segment([at - vec2(0.0, 4.0), at + vec2(0.0, 4.0)], ink);
     resp.on_hover_text(label).clicked()
