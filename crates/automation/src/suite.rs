@@ -56,7 +56,9 @@ impl Automation {
     /// The store, opened on first use, with `selection.json` re-read (parsed only when it
     /// changed). A damaged or newer file keeps the last state; [`Self::suite_get`] reports it.
     fn suite_store(&mut self) -> (&mut Store, Option<String>) {
-        let store = self.suite.get_or_insert_with(|| Store::open(&self.suite_dir, StoreOptions::new(concat!("pdfcraft-automation ", env!("CARGO_PKG_VERSION")))));
+        let store = self
+            .suite
+            .get_or_insert_with(|| Store::open(&self.suite_dir, StoreOptions::new(concat!("pdfcraft-automation ", env!("CARGO_PKG_VERSION")))));
         let problem = store.load_selection().err().map(|p| p.to_string());
         (store, problem)
     }
@@ -119,10 +121,14 @@ impl Automation {
         let (store, problem) = self.suite_store();
         let active = store.accepted().suite.with_defaults(&app_defaults()).theme;
         let library = store.library();
-        let mut themes = vec![json!({ "id": craft_theme::APP_DEFAULT, "name": "App default", "origin": "built-in", "variants": ["light", "dark"], "warnings": 0, "suite": false })];
+        let mut themes = vec![
+            json!({ "id": craft_theme::APP_DEFAULT, "name": "App default", "origin": "built-in", "variants": ["light", "dark"], "warnings": 0, "suite": false }),
+        ];
         for t in craft_theme::builtins() {
             let variants: Vec<&str> = t.variants().map(|(v, _)| if v == craft_theme::Variant::Light { "light" } else { "dark" }).collect();
-            themes.push(json!({ "id": t.id.as_str(), "name": t.name, "origin": "built-in", "variants": variants, "warnings": 0, "suite": t.id == active }));
+            themes.push(
+                json!({ "id": t.id.as_str(), "name": t.name, "origin": "built-in", "variants": variants, "warnings": 0, "suite": t.id == active }),
+            );
         }
         for e in &library.entries {
             let variants: Vec<&str> = [(e.has_light, "light"), (e.has_dark, "dark")].into_iter().filter(|(has, _)| *has).map(|(_, v)| v).collect();

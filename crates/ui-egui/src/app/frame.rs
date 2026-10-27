@@ -14,14 +14,16 @@ impl PdfCraftApp {
     ///
     /// Each frame costs one atomic load (the suite watcher's generation) and a comparison.
     pub(super) fn sync_theme(&mut self, ctx: &egui::Context) {
-        self.suite.poll();
-        let selection = self.effective_selection();
         let own_theme = match &self.app_choice {
             AppChoice::Own(own) => Some(&own.theme),
             AppChoice::FollowSuite => None,
         };
         self.suite.set_app_theme(own_theme);
-        if self.theme_key.as_ref().is_none_or(|(generation, shown)| *generation != self.suite.generation() || *shown != selection) {
+        self.suite.sync();
+        // A library theme of the app's own choice that hasn't loaded yet keeps the current look.
+        let loading = own_theme.is_some_and(|id| self.suite.is_loading(id));
+        let selection = self.effective_selection();
+        if !loading && self.theme_key.as_ref().is_none_or(|(generation, shown)| *generation != self.suite.generation() || *shown != selection) {
             let suite = &self.suite;
             self.theme_note = theme::apply_selection(ctx, &selection, &|id| suite.lookup(id));
             self.theme_key = Some((self.suite.generation(), selection.clone()));

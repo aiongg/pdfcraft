@@ -56,11 +56,11 @@ mod widgets;
 use pdfcraft_engine::{DocId, Session};
 
 pub use canvas::{DocView, RasterMemory};
+use craft_theme::{AppChoice, Fallback, Selection, ThemeId};
+use craft_theme_store::{Accepted, SelectionChange};
 pub use editing::{CloseRequest, SaveTarget};
 pub use files::{ExtractDraft, FilePurpose, FileRequest, RotateDraft, SplitDraft, SplitMode, SplitPlan};
 pub use recovery::{AUTOSAVE_SECS, RecoveryMeta, RecoveryStore};
-use craft_theme::{AppChoice, Fallback, Selection, ThemeId};
-use craft_theme_store::{Accepted, SelectionChange};
 use theme::{ThemeKind, ThemePreference};
 
 mod app;

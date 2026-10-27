@@ -35,7 +35,13 @@ fn suite_get_and_suite_set_share_the_selection_through_the_folder() {
     let both = ok(&mut a, "suite_get", json!({}));
     assert_eq!((both["theme"].as_str(), both["mode"].as_str(), both["revision"].as_u64()), (Some("craft.graphite"), Some("light"), Some(2)));
 
-    for bad in [json!({}), json!({ "theme": "craft.nope" }), json!({ "theme": "craft.app-default" }), json!({ "mode": "sepia" }), json!({ "theme": "Bad Id" })] {
+    for bad in [
+        json!({}),
+        json!({ "theme": "craft.nope" }),
+        json!({ "theme": "craft.app-default" }),
+        json!({ "mode": "sepia" }),
+        json!({ "theme": "Bad Id" }),
+    ] {
         assert!(call(&mut a, "suite_set", bad.clone()).is_err(), "{bad} is refused");
     }
     assert_eq!(ok(&mut a, "suite_get", json!({}))["revision"], 2, "refused calls write nothing");
@@ -64,7 +70,10 @@ fn a_theme_imports_lists_activates_and_exports_byte_for_byte() {
     let ids: Vec<&str> = list["themes"].as_array().unwrap().iter().filter_map(|t| t["id"].as_str()).collect();
     assert_eq!(&ids[..4], ["craft.app-default", "craft.artcraft", "craft.graphite", "craft.high-contrast"]);
     let sample = list["themes"].as_array().unwrap().iter().find(|t| t["id"] == SAMPLE_THEME_ID).unwrap();
-    assert_eq!((sample["origin"].as_str(), sample["suite"].as_bool(), sample["variants"].clone()), (Some("library"), Some(true), json!(["light", "dark"])));
+    assert_eq!(
+        (sample["origin"].as_str(), sample["suite"].as_bool(), sample["variants"].clone()),
+        (Some("library"), Some(true), json!(["light", "dark"]))
+    );
 
     let out = ok(&mut a, "theme_export", json!({ "id": SAMPLE_THEME_ID, "path": "out.json" }));
     assert_eq!(out["bytes"], SAMPLE_THEME_JSON.len());

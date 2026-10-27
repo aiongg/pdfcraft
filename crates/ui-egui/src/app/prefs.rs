@@ -68,7 +68,7 @@ impl PdfCraftApp {
 
     /// Changes the theme or mode of the active scope: the suite while the app follows it and the
     /// suite is shared, otherwise the app's own choice. Shows at once; a suite write that
-    /// conflicts or fails returns to the accepted state with [`Self::suite_notice`].
+    /// conflicts or fails returns to the accepted state and is kept in [`Self::suite`].
     pub fn set_appearance(&mut self, change: SelectionChange) {
         if self.follows_suite() && self.suite.shared() {
             self.suite.change(change);
@@ -101,11 +101,6 @@ impl PdfCraftApp {
             (false, own) => own.clone(),
         };
         self.refresh_theme();
-    }
-
-    /// Why the last suite change didn't stick, until the next one.
-    pub fn suite_notice(&self) -> Option<&suite_theme::SuiteNotice> {
-        self.suite.notice()
     }
 
     /// Why the theme shown differs from the selection (an unknown theme, a single variant).
@@ -448,7 +443,8 @@ impl PdfCraftApp {
 
 impl PdfCraftApp {
     /// `ui.state.suite`: the suite selection as shown (unchosen fields null), whether it is the
-    /// shared one, a change that didn't stick and the fallback the theme shown took.
+    /// shared one, its notices (a blocked or failed change, unusable files) and the fallback the
+    /// theme shown took.
     pub(crate) fn suite_state(&self) -> serde_json::Value {
         let choice = self.suite.choice();
         serde_json::json!({
@@ -456,7 +452,7 @@ impl PdfCraftApp {
             "mode": choice.mode,
             "revision": self.suite.accepted().revision,
             "shared": self.suite.shared(),
-            "notice": self.suite.notice().map(suite_theme::SuiteNotice::describe),
+            "notices": self.suite.notices(),
             "fallback": self.theme_note.as_ref().map(|f| format!("{f:?}")),
         })
     }
