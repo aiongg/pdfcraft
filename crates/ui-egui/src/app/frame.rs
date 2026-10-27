@@ -15,8 +15,10 @@ impl PdfCraftApp {
         {
             let active = self.theme_preference == ThemePreference::System;
             if self.desktop_theme_enabled && active && self.appearance.is_none() {
-                let ctx = ctx.clone();
-                self.appearance = craft_platform::appearance::Watcher::start_active(true, move || ctx.request_repaint());
+                self.appearance = match &self.appearance_factory {
+                    Some(factory) => factory(ctx),
+                    None => crate::appearance_source::portal_source(ctx),
+                };
             }
             if let Some(watcher) = &self.appearance {
                 watcher.set_active(active);

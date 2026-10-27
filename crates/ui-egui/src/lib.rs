@@ -61,6 +61,8 @@ pub use recovery::{AUTOSAVE_SECS, RecoveryMeta, RecoveryStore};
 use theme::{ThemeKind, ThemePreference};
 
 mod app;
+#[cfg(target_os = "linux")]
+mod appearance_source;
 mod hooks;
 mod persist;
 mod platform;
@@ -281,7 +283,10 @@ pub struct PdfCraftApp {
     pub reading_colors: pdfcraft_render::ReadingColors,
     /// The Linux portal is enabled only by the native host, and starts on the first System choice.
     #[cfg(target_os = "linux")]
-    appearance: Option<craft_platform::appearance::Watcher>,
+    appearance: Option<Box<dyn appearance_source::AppearanceSource>>,
+    /// Replaces the portal watcher in tests.
+    #[cfg(target_os = "linux")]
+    appearance_factory: Option<appearance_source::AppearanceFactory>,
     #[cfg(target_os = "linux")]
     desktop_theme_enabled: bool,
     /// How far a mouse-wheel notch scrolls.

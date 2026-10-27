@@ -66,6 +66,12 @@ impl PdfCraftApp {
         self.desktop_theme_enabled = true;
     }
 
+    /// Replace the portal watcher with a fake source.
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn set_appearance_factory(&mut self, factory: crate::appearance_source::AppearanceFactory) {
+        self.appearance_factory = Some(factory);
+    }
+
     /// Today in `fmt` (or Preferences ▸ Date format), with month and weekday names in the date
     /// language, or the interface language when it follows that.
     pub fn date_text(&self, fmt: Option<&str>) -> Result<String, String> {

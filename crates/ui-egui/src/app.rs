@@ -7,6 +7,8 @@ use super::state::{
 use super::state::{OpenOutcome, OpenRequest, PendingRemoteLink};
 use super::*;
 
+#[cfg(all(test, target_os = "linux"))]
+mod appearance_tests;
 mod clipboard;
 mod commands;
 mod control;
@@ -62,6 +64,8 @@ impl PdfCraftApp {
             reading_colors: Default::default(),
             #[cfg(target_os = "linux")]
             appearance: None,
+            #[cfg(target_os = "linux")]
+            appearance_factory: None,
             #[cfg(target_os = "linux")]
             desktop_theme_enabled: false,
             scroll_speed: scroll_speed::ScrollSpeed::default(),
