@@ -49,6 +49,7 @@ mod panels;
 pub use print_ui::{Handling as PrintHandling, OptionsSource, PrintDraft, PrinterSource, Which as PrintWhich, system_printers};
 pub use redact_ui::{HiddenDraft, PagesDraft as RedactPagesDraft, RedactPrefs, SearchDraft as RedactSearchDraft, SearchMode as RedactSearchMode};
 pub mod i18n;
+pub mod suite_theme;
 pub mod theme;
 mod widgets;
 
@@ -58,6 +59,8 @@ pub use canvas::{DocView, RasterMemory};
 pub use editing::{CloseRequest, SaveTarget};
 pub use files::{ExtractDraft, FilePurpose, FileRequest, RotateDraft, SplitDraft, SplitMode, SplitPlan};
 pub use recovery::{AUTOSAVE_SECS, RecoveryMeta, RecoveryStore};
+use craft_theme::{AppChoice, Fallback, Selection, ThemeId};
+use craft_theme_store::{Accepted, SelectionChange};
 use theme::{ThemeKind, ThemePreference};
 
 mod app;
@@ -277,7 +280,18 @@ pub struct PdfCraftApp {
     pub comment_prefs: comments::CommentPrefs,
     /// Resolved colours, including the current OS theme when following the system.
     pub theme: ThemeKind,
-    pub theme_preference: ThemePreference,
+    /// "Follow suite" or "Use a different theme in this app"; see [`Self::effective_selection`].
+    app_choice: AppChoice,
+    /// The suite theme shared with the other Craft apps: in memory unless the desktop shell opened
+    /// the shared folder.
+    suite: suite_theme::Suite,
+    /// The suite state saved with the preferences, which the shell shows until the shared folder
+    /// has been read (and while it is damaged or from a newer build).
+    suite_last: Option<Accepted>,
+    /// What the installed styles were built from: the suite generation and the selection.
+    theme_key: Option<(u64, Selection)>,
+    /// Why the theme shown differs from the selection (an unknown theme, a single variant).
+    theme_note: Option<Fallback>,
     /// The reading-colours preference (Preferences ▸ Reading colours): applied to every open
     /// document, and documents open with it (Acrobat's Replace Document Colors).
     pub reading_colors: pdfcraft_render::ReadingColors,

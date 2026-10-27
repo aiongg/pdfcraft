@@ -59,8 +59,13 @@ impl PdfCraftApp {
             full_screen_tool: None,
             comment_prefs: Default::default(),
             theme: ThemeKind::Light,
-            // A fresh install follows the desktop's appearance (#1248); saved settings override.
-            theme_preference: ThemePreference::System,
+            // PdfCraft's own palette following the desktop's appearance (#1248). Saved settings
+            // override; the desktop shell makes a fresh install follow the suite.
+            app_choice: AppChoice::Own(Selection { theme: craft_theme::ThemeId::app_default(), mode: craft_theme::Mode::System }),
+            suite: suite_theme::Suite::memory(),
+            suite_last: None,
+            theme_key: None,
+            theme_note: None,
             reading_colors: Default::default(),
             #[cfg(target_os = "linux")]
             appearance: None,
@@ -366,7 +371,8 @@ impl eframe::App for PdfCraftApp {
             egui_extras::install_image_loaders(ctx);
             theme::install_fonts_for(ctx, cjk);
             self.fonts_cjk = cjk;
-            theme::apply_preference(ctx, self.theme_preference);
+            // `sync_theme` below installs the palette.
+            self.theme_key = None;
             self.styled = true;
         } else {
             self.fonts_ready = true;

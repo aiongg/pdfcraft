@@ -8,12 +8,27 @@ impl PdfCraftApp {
         }
     }
 
-    /// Start the Linux appearance watcher when the app follows the system, and mirror the
-    /// palette egui's current theme slot holds into [`PdfCraftApp::theme`].
+    /// Install the styles for the effective theme selection when it or the suite snapshot
+    /// changed, start the Linux appearance watcher when the mode follows the system, and mirror
+    /// the palette egui's current theme slot holds into [`PdfCraftApp::theme`].
+    ///
+    /// Each frame costs one atomic load (the suite watcher's generation) and a comparison.
     pub(super) fn sync_theme(&mut self, ctx: &egui::Context) {
+        self.suite.poll();
+        let selection = self.effective_selection();
+        let own_theme = match &self.app_choice {
+            AppChoice::Own(own) => Some(&own.theme),
+            AppChoice::FollowSuite => None,
+        };
+        self.suite.set_app_theme(own_theme);
+        if self.theme_key.as_ref().is_none_or(|(generation, shown)| *generation != self.suite.generation() || *shown != selection) {
+            let suite = &self.suite;
+            self.theme_note = theme::apply_selection(ctx, &selection, &|id| suite.lookup(id));
+            self.theme_key = Some((self.suite.generation(), selection.clone()));
+        }
         #[cfg(target_os = "linux")]
         {
-            let active = self.theme_preference == ThemePreference::System;
+            let active = selection.mode == craft_theme::Mode::System;
             if self.desktop_theme_enabled && active && !self.appearance_started {
                 // One attempt: a failed start is not retried every frame.
                 self.appearance_started = true;

@@ -167,7 +167,7 @@ const DISPLAY: &[&str] = &[
     "view.fit_width_scrolling",
     "view.fit_one_page",
 ];
-const THEMES: &[&str] = &["view.theme.system", "view.theme.light", "view.theme.dark"];
+const THEMES: &[&str] = &["view.theme.follow_suite", "view.theme.this_app", SEP, "view.theme.system", "view.theme.light", "view.theme.dark"];
 const PANES: &[&str] = &["view.side_panel", "view.tools_pane"];
 const PANE_COMMANDS: &[&str] = &["comment.list", "form.fields", "ui.dock.reset"];
 const MODES: &[&str] = &["view.full_screen", "view.read_mode"];
@@ -491,9 +491,11 @@ impl PdfCraftApp {
             "view.read_mode" => Some(self.mode == crate::Mode::Read),
             "view.side_panel" => Some(self.right.is_some()),
             "view.tools_pane" => Some(self.left_open),
-            "view.theme.system" => Some(self.theme_preference == ThemePreference::System),
-            "view.theme.light" => Some(self.theme_preference == ThemePreference::Light),
-            "view.theme.dark" => Some(self.theme_preference == ThemePreference::Dark),
+            "view.theme.system" => Some(self.theme_preference() == ThemePreference::System),
+            "view.theme.light" => Some(self.theme_preference() == ThemePreference::Light),
+            "view.theme.dark" => Some(self.theme_preference() == ThemePreference::Dark),
+            "view.theme.follow_suite" => Some(self.follows_suite()),
+            "view.theme.this_app" => Some(!self.follows_suite()),
             PANEL => Some(panel(command).is_some_and(|p| self.right == Some(p))),
             _ => None,
         };

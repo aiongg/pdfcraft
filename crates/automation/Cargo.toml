@@ -14,6 +14,9 @@ pdfcraft-cos = { workspace = true }
 pdfcraft-render = { workspace = true }
 pdfcraft-organize = { workspace = true }
 pdfcraft-platform = { workspace = true }
+# suite_get / suite_set / theme_*: the suite selection and theme library every Craft app shares.
+craft-theme = { workspace = true }
+craft-theme-store = { workspace = true }
 serde_json = { workspace = true }
 sha2 = "0.11"
 tempfile = "3.27"
@@ -26,6 +29,7 @@ default = ["mcp"]
 mcp = ["dep:base64"]
 
 [dev-dependencies]
+craft-theme-store = { workspace = true, features = ["testing"] }
 pdfcraft-fonts = { workspace = true }
 png = "0.18"
 flate2.workspace = true

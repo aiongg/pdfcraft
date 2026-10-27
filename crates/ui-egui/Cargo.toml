@@ -17,6 +17,9 @@ craft-keymap = { workspace = true }
 # Quit from the menus asks the window to close, so the unsaved-changes check runs; on macOS a window
 # close also quits through `terminate:` (the Touch Bar crash, #1136).
 craft-quit = { workspace = true, features = ["egui"] }
+# Suite themes: the shared contract and the theme folder every Craft app follows (in memory on the web).
+craft-theme = { workspace = true }
+craft-theme-store = { workspace = true }
 pdfcraft-fonts = { workspace = true }
 pdfcraft-engine = { workspace = true }
 pdfcraft-cos = { workspace = true }
@@ -92,6 +95,9 @@ web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlE
 
 [dev-dependencies]
 craft-update = { workspace = true }
+# SAMPLE_THEME_JSON and its expected colours, shared by every app's adapter tests.
+craft-theme-store = { workspace = true, features = ["testing"] }
+tempfile = "3"
 pdfcraft-xfa = { workspace = true }
 egui_kittest = { workspace = true, features = ["eframe", "wgpu"] }
 # Tests draw PdfCraft text without a system provider: the bundled and monochrome emoji faces must

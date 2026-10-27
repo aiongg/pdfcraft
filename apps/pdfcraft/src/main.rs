@@ -410,9 +410,17 @@ fn app_creator<'a>(
         app.enable_desktop_theme();
         // The system's reopen-windows choice (macOS) starts the preference; a saved choice replaces it.
         app.reopen_last_session = reopen::system_default();
-        if let Some(json) = cc.storage.and_then(|s| s.get_string("pdfcraft").or_else(|| s.get_string(LEGACY_STORAGE_KEY))) {
-            app.restore(&json);
+        match cc.storage.and_then(|s| s.get_string("pdfcraft").or_else(|| s.get_string(LEGACY_STORAGE_KEY))) {
+            Some(json) => app.restore(&json),
+            // A fresh install follows the suite theme the other Craft apps share.
+            None => app.set_follow_suite(true),
         }
+        // The shared suite theme folder (`CRAFT_SUITE_DIR`, empty for none), after `restore` so the
+        // saved suite state shows until the folder has been read. A portable copy keeps its theme
+        // to itself.
+        let suite_dir = pdfcraft_ui_egui::suite_theme::SuiteDir::resolve(pdfcraft_ui_egui::portable::data_dir().is_some());
+        let wake = cc.egui_ctx.clone();
+        app.open_suite(&suite_dir, move || wake.request_repaint());
         app.window_state = pdfcraft_ui_egui::window_state::WindowState::started_with(cc.storage);
         app.integrated_titlebar = integrated;
         app.window_controls = window_controls;

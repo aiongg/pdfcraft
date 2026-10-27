@@ -3,6 +3,8 @@
 
 use std::sync::Arc;
 
+use craft_theme::{Fallback, Mode, Resolution, Resolved, Selection, SuiteTheme, ThemeId, Variant};
+use craft_ui::theme::color32;
 use egui::epaint::text::{FallbackAlign, FontTweak, HintingTarget, SmoothHinting};
 use egui::{Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Rect, Response, Stroke, Vec2, Visuals};
 
@@ -35,6 +37,45 @@ impl ThemePreference {
                 Some(false) => ThemeKind::Light,
                 None => fallback,
             },
+        }
+    }
+}
+
+impl From<Variant> for ThemeKind {
+    fn from(v: Variant) -> Self {
+        match v {
+            Variant::Light => ThemeKind::Light,
+            Variant::Dark => ThemeKind::Dark,
+        }
+    }
+}
+
+impl From<ThemeKind> for Variant {
+    fn from(k: ThemeKind) -> Self {
+        match k {
+            ThemeKind::Light => Variant::Light,
+            ThemeKind::Dark => Variant::Dark,
+        }
+    }
+}
+
+/// The saved `"theme"` value is the appearance mode in the form older builds read.
+impl From<Mode> for ThemePreference {
+    fn from(m: Mode) -> Self {
+        match m {
+            Mode::System => ThemePreference::System,
+            Mode::Light => ThemePreference::Light,
+            Mode::Dark => ThemePreference::Dark,
+        }
+    }
+}
+
+impl From<ThemePreference> for Mode {
+    fn from(p: ThemePreference) -> Self {
+        match p {
+            ThemePreference::System => Mode::System,
+            ThemePreference::Light => Mode::Light,
+            ThemePreference::Dark => Mode::Dark,
         }
     }
 }
@@ -119,6 +160,50 @@ impl Tokens {
                 page_shadow: Color32::from_black_alpha(120),
                 radius: 6,
             },
+        }
+    }
+
+    /// PdfCraft's own palette ("App default") in a suite-theme variant.
+    pub fn app_default(variant: Variant) -> Self {
+        Self::for_kind(ThemeKind::from(variant))
+    }
+
+    /// The tokens for a resolved suite theme: the core roles and derived states mapped onto
+    /// PdfCraft's surfaces. The page shadow and corner radius stay PdfCraft's own.
+    pub fn from_resolved(r: &Resolved) -> Self {
+        let (c, d) = (&r.roles, &r.derived);
+        let own = Self::app_default(r.variant);
+        Self {
+            kind: ThemeKind::from(r.variant),
+            titlebar: color32(c.background.lerp_gamma(c.text, 0.05)),
+            chrome: color32(c.surface),
+            panel: color32(c.surface),
+            pasteboard: color32(c.background),
+            card: color32(c.raised),
+            border: color32(c.line),
+            divider: color32(c.line.lerp_gamma(c.surface, 0.4)),
+            text: color32(c.text),
+            text_muted: color32(c.text_muted),
+            text_faint: color32(d.text_faint),
+            icon: color32(c.text.lerp_gamma(c.text_muted, 0.25)),
+            hover: color32(d.hover),
+            pressed: color32(d.pressed),
+            selected: color32(c.selection),
+            accent: color32(c.accent),
+            accent_text: color32(d.accent_text),
+            accent_soft: color32(d.accent_soft),
+            field: color32(c.raised),
+            badge_new: color32(c.accent),
+            page_shadow: own.page_shadow,
+            radius: own.radius,
+        }
+    }
+
+    /// The tokens a resolution paints: PdfCraft's own palette, or the resolved theme's.
+    pub fn for_resolution(resolution: &Resolution) -> Self {
+        match resolution {
+            Resolution::AppDefault { variant, .. } => Self::app_default(*variant),
+            Resolution::Theme(r) => Self::from_resolved(r),
         }
     }
 
@@ -439,28 +524,55 @@ pub fn apply(ctx: &egui::Context, kind: ThemeKind) {
 /// its own variant and egui picks between them, so an operating-system change needs no rebuild;
 /// a fixed choice puts that variant in both slots.
 pub fn apply_preference(ctx: &egui::Context, preference: ThemePreference) {
-    let (light, dark) = (Tokens::for_kind(ThemeKind::Light), Tokens::for_kind(ThemeKind::Dark));
-    match preference {
-        ThemePreference::System => install(ctx, light, dark),
-        ThemePreference::Light => install(ctx, light, light),
-        ThemePreference::Dark => install(ctx, dark, dark),
-    }
+    let selection = Selection { theme: ThemeId::app_default(), mode: preference.into() };
+    apply_selection(ctx, &selection, &craft_theme::lookup_builtin);
 }
 
-/// Install `light` as egui's Light slot and `dark` as its Dark slot, and keep both token sets
-/// for [`Tokens::get`].
+/// The token set of each egui slot.
+#[derive(Clone, Copy, Debug)]
+pub struct SlotTokens {
+    pub light: Tokens,
+    pub dark: Tokens,
+}
+
+/// The tokens of each egui slot for `selection`, and the first fallback either slot took (an
+/// unknown theme, a theme with one variant).
+///
+/// Each slot resolves as if the system gave that slot's answer, so under Follow system egui
+/// switches between them without a rebuild; a fixed mode resolves to one variant in both.
+pub fn slot_tokens(selection: &Selection, lookup: &dyn Fn(&ThemeId) -> Option<SuiteTheme>) -> (SlotTokens, Option<Fallback>) {
+    let slot = |v: Variant| craft_theme::resolve(selection, Some(v), Variant::Light, lookup);
+    let (light, dark) = (slot(Variant::Light), slot(Variant::Dark));
+    let note = light.fallback().or(dark.fallback()).cloned();
+    (SlotTokens { light: Tokens::for_resolution(&light), dark: Tokens::for_resolution(&dark) }, note)
+}
+
+/// Install the tokens and styles for a theme selection in both egui slots; see [`slot_tokens`].
+pub fn apply_selection(ctx: &egui::Context, selection: &Selection, lookup: &dyn Fn(&ThemeId) -> Option<SuiteTheme>) -> Option<Fallback> {
+    let (slots, note) = slot_tokens(selection, lookup);
+    install(ctx, slots.light, slots.dark);
+    note
+}
+
+/// Install `light` as egui's Light slot and `dark` as its Dark slot (through
+/// [`craft_ui::theme::install`]), and keep both token sets for [`Tokens::get`].
 pub fn install(ctx: &egui::Context, light: Tokens, dark: Tokens) {
-    // Keep the native window inherited. A concrete egui theme pins macOS's
-    // NSWindow appearance and prevents winit from delivering ThemeChanged.
-    // Our saved choice owns the palettes; each egui slot receives its own below.
-    ctx.set_theme(egui::ThemePreference::System);
+    // `craft_ui::theme::install` keeps egui on `ThemePreference::System`, so the native window
+    // stays inherited: a concrete egui theme pins macOS's NSWindow appearance and prevents winit
+    // from delivering ThemeChanged. Our saved choice owns the palettes; each slot gets its own.
     // Without a system answer egui uses this slot.
     ctx.options_mut(|o| o.fallback_theme = egui::Theme::Light);
     let rtl = crate::i18n::current().rtl();
+    let style = |slot: egui::Theme, t: &Tokens| {
+        let mut s = (*ctx.style_of(slot)).clone();
+        style_for(&mut s, t, rtl);
+        s
+    };
+    let (light_style, dark_style) = (style(egui::Theme::Light, &light), style(egui::Theme::Dark, &dark));
     for (slot, t) in [(egui::Theme::Light, light), (egui::Theme::Dark, dark)] {
         ctx.data_mut(|d| d.insert_temp(tokens_key(slot), t));
-        ctx.style_mut_of(slot, |s| style_for(s, &t, rtl));
     }
+    craft_ui::theme::install(ctx, light_style, dark_style);
     ctx.data_mut(|d| d.insert_temp(direction_key(), rtl));
 }
 

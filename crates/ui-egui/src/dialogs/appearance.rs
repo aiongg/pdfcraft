@@ -119,9 +119,9 @@ pub fn preferences_section(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
     ui.label(RichText::new(tl_ctx!("theme", "Appearance")).font(theme::semibold(13.0)));
     ui.horizontal(|ui| {
         let label = ui.label(tl!("Appearance mode"));
-        let combo = egui::ComboBox::from_id_salt("appearance-mode").selected_text(tl!(mode_label(app.theme_preference))).show_ui(ui, |ui| {
+        let combo = egui::ComboBox::from_id_salt("appearance-mode").selected_text(tl!(mode_label(app.theme_preference()))).show_ui(ui, |ui| {
             for preference in [ThemePreference::System, ThemePreference::Light, ThemePreference::Dark] {
-                if ui.selectable_label(app.theme_preference == preference, tl!(mode_label(preference))).clicked() {
+                if ui.selectable_label(app.theme_preference() == preference, tl!(mode_label(preference))).clicked() {
                     app.execute(mode_command(preference));
                     ui.close();
                 }
@@ -192,12 +192,12 @@ mod tests {
         h.run();
         h.get_by_label("Dark").click();
         h.run();
-        assert_eq!(h.state().theme_preference, ThemePreference::Dark);
+        assert_eq!(h.state().theme_preference(), ThemePreference::Dark);
         h.get_by_role(combo).click();
         h.run();
         h.get_by_label("Use system setting").click();
         h.run();
-        assert_eq!(h.state().theme_preference, ThemePreference::System);
+        assert_eq!(h.state().theme_preference(), ThemePreference::System);
     }
 
     /// Clicking a theme card, or its radio row, picks that theme, not only the mode combo box.
@@ -221,10 +221,10 @@ mod tests {
         h.run();
         h.get_by_label("Dark gray").click();
         h.run();
-        assert_eq!((h.state().theme_preference, h.state().theme), (ThemePreference::Dark, ThemeKind::Dark));
+        assert_eq!((h.state().theme_preference(), h.state().theme), (ThemePreference::Dark, ThemeKind::Dark));
         // The card's title is not a widget of its own: the click lands on the card.
         h.get_by_label("Light theme").click();
         h.run();
-        assert_eq!((h.state().theme_preference, h.state().theme), (ThemePreference::Light, ThemeKind::Light));
+        assert_eq!((h.state().theme_preference(), h.state().theme), (ThemePreference::Light, ThemeKind::Light));
     }
 }

@@ -34,8 +34,14 @@
 //!   input leaves the previous selection unchanged. `ui.state.active.selected_pages` reports it.
 //!   `default-mode=all|read|edit|convert|sign` applies to future PDF opens; `mode` overrides it
 //!   for this session without changing the saved preference. `ui.state.default_mode` reports it.
-//!   `theme=light|dark|system` changes the saved theme preference; `ui.state.theme_preference`
-//!   reports the choice and `ui.state.theme` reports the resolved light/dark colours.
+//!   `theme=light|dark|system` sets the appearance mode and `theme_id=<id>` the theme (a built-in
+//!   such as `craft.graphite`, `craft.app-default` or a library theme) of the active scope: the
+//!   suite while the app follows it, otherwise the app's own choice. `follow_suite=true|false`
+//!   turns "Follow suite" on or off ("Use a different theme in this app" keeps the look).
+//!   `ui.state.theme_preference()` and `ui.state.theme_id` report the mode and theme shown,
+//!   `ui.state.theme` the resolved light/dark colours, `ui.state.follow_suite` the choice and
+//!   `ui.state.suite` the suite selection (`theme`, `mode`, `revision`, `shared`) with any
+//!   `notice` about a change that didn't stick and the `fallback` the theme shown took.
 //!   `comment-tool-pinned=true|false` remembers the annotation quick bar's pin across restarts;
 //!   `ui.state.comment_tool_pinned` reports the same preference.
 //! - `ui.open {path}`: open a file. A file whose tab is already open focuses it

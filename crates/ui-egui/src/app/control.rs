@@ -32,6 +32,12 @@ impl PdfCraftApp {
                 };
                 self.set_theme_preference(preference);
             }
+            ("theme_id", _) => self.set_appearance_theme(value)?,
+            ("follow_suite", _) => match value {
+                "true" => self.set_follow_suite(true),
+                "false" => self.set_follow_suite(false),
+                _ => return Err("follow_suite must be true or false".into()),
+            },
             ("scroll_speed", _) => {
                 self.scroll_speed = scroll_speed::ScrollSpeed::parse(value).ok_or("scroll_speed must be slow, normal, or fast")?;
             }

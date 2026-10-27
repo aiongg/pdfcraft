@@ -16,7 +16,7 @@ fn harness() -> Harness<'static, PdfCraftApp> {
 }
 
 fn preference(h: &Harness<'static, PdfCraftApp>) -> String {
-    format!("{:?}", h.state().theme_preference)
+    format!("{:?}", h.state().theme_preference())
 }
 
 #[test]

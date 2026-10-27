@@ -36,13 +36,117 @@ fn rgb_triple(v: &serde_json::Value) -> Option<[f64; 3]> {
 }
 
 impl PdfCraftApp {
+    /// The appearance mode shown now: the app's own, or the suite's while it follows the suite.
+    pub fn theme_preference(&self) -> ThemePreference {
+        self.effective_selection().mode.into()
+    }
+
+    /// Sets the appearance mode of the active scope (see [`Self::set_appearance`]).
     pub fn set_theme_preference(&mut self, preference: ThemePreference) {
-        self.theme_preference = preference;
+        self.set_appearance(SelectionChange::mode(preference.into()));
+    }
+
+    /// The app's own choice: follow the suite, or its own theme and mode.
+    pub fn appearance(&self) -> &AppChoice {
+        &self.app_choice
+    }
+
+    /// Whether the app follows the suite theme. In memory (tests, the web build, portable copies)
+    /// it shows its fresh-install defaults while it does.
+    pub fn follows_suite(&self) -> bool {
+        self.app_choice == AppChoice::FollowSuite
+    }
+
+    /// The theme and mode to show: the app's own, else the suite's, with PdfCraft's
+    /// fresh-install defaults for the fields no Craft app has chosen yet.
+    pub fn effective_selection(&self) -> Selection {
+        match &self.app_choice {
+            AppChoice::Own(own) => own.clone(),
+            AppChoice::FollowSuite => self.suite.choice().with_defaults(&suite_theme::app_defaults()),
+        }
+    }
+
+    /// Changes the theme or mode of the active scope: the suite while the app follows it and the
+    /// suite is shared, otherwise the app's own choice. Shows at once; a suite write that
+    /// conflicts or fails returns to the accepted state with [`Self::suite_notice`].
+    pub fn set_appearance(&mut self, change: SelectionChange) {
+        if self.follows_suite() && self.suite.shared() {
+            self.suite.change(change);
+        } else {
+            let mut own = self.effective_selection();
+            own.theme = change.theme.unwrap_or(own.theme);
+            own.mode = change.mode.unwrap_or(own.mode);
+            self.app_choice = AppChoice::Own(own);
+        }
+        self.refresh_theme();
+    }
+
+    /// Sets the theme of the active scope by id; refused for an id no built-in or library
+    /// theme has.
+    pub fn set_appearance_theme(&mut self, id: &str) -> Result<(), String> {
+        let id = ThemeId::parse(id).map_err(|e| format!("{id:?} is not a theme id: {e}"))?;
+        if !self.suite.knows(&id) {
+            return Err(format!("no theme has the id {id}"));
+        }
+        self.set_appearance(SelectionChange::theme(id));
+        Ok(())
+    }
+
+    /// "Follow suite" on, or off ("Use a different theme in this app"), which keeps the theme and
+    /// mode shown now as the app's own.
+    pub fn set_follow_suite(&mut self, follow: bool) {
+        self.app_choice = match (follow, &self.app_choice) {
+            (true, _) => AppChoice::FollowSuite,
+            (false, AppChoice::FollowSuite) => AppChoice::Own(self.effective_selection()),
+            (false, own) => own.clone(),
+        };
+        self.refresh_theme();
+    }
+
+    /// Why the last suite change didn't stick, until the next one.
+    pub fn suite_notice(&self) -> Option<&suite_theme::SuiteNotice> {
+        self.suite.notice()
+    }
+
+    /// Why the theme shown differs from the selection (an unknown theme, a single variant).
+    pub fn theme_fallback(&self) -> Option<&craft_theme::Fallback> {
+        self.theme_note.as_ref()
+    }
+
+    /// The suite theme and library this app sees.
+    pub fn suite(&self) -> &suite_theme::Suite {
+        &self.suite
+    }
+
+    #[doc(hidden)]
+    pub fn suite_mut(&mut self) -> &mut suite_theme::Suite {
+        &mut self.suite
+    }
+
+    /// Follows the shared suite folder `dir` (the desktop shell, and tests with a temporary
+    /// folder); `wake` repaints when another app changes it. In memory, nothing changes.
+    pub fn open_suite(&mut self, dir: &craft_theme_store::SuiteDir, wake: impl Fn() + Send + Sync + 'static) {
+        if dir.is_memory() {
+            return;
+        }
+        let mut options = craft_theme_store::StoreOptions::new(concat!("pdfcraft ", env!("CARGO_PKG_VERSION")));
+        if let Some(last) = self.suite_last.clone() {
+            options = options.last_accepted(last);
+        }
+        self.suite = suite_theme::Suite::new(craft_theme_store::SuiteWatch::open(dir, options, wake), true);
+        self.refresh_theme();
+    }
+
+    /// Re-installs the styles when a ctx exists; before the first frame, only the light/dark
+    /// state the styles will have.
+    fn refresh_theme(&mut self) {
+        self.theme_key = None;
         if let Some(ctx) = self.ctx.clone() {
-            theme::apply_preference(&ctx, preference);
             self.sync_theme(&ctx);
         } else {
-            self.theme = preference.resolve(None, ThemeKind::Light);
+            let selection = self.effective_selection();
+            let resolution = craft_theme::resolve(&selection, None, craft_theme::Variant::Light, &|id| self.suite.lookup(id));
+            self.theme = resolution.variant().into();
         }
     }
 
@@ -93,7 +197,8 @@ impl PdfCraftApp {
             "reload_changed_files": self.reload_changed_files,
             "system_title_bar": self.system_title_bar,
             "pinned_folders": self.pinned.folders,
-            "theme": self.theme_preference,
+            // The mode alone, for older builds; "appearance" below holds the whole choice.
+            "theme": self.theme_preference(),
             "scroll_speed": self.scroll_speed,
             "animation_effects": self.animation_effects,
             "default_mode": self.default_mode,
@@ -146,6 +251,7 @@ impl PdfCraftApp {
         // Set apart: one more key inside the macro above passes serde_json's recursion limit.
         v["default_page_gaps"] = serde_json::Value::Bool(self.view_defaults.show_page_gaps);
         v["redact_prefs"] = self.redact_defaults.to_json();
+        v["appearance"] = self.appearance_to_json();
         // Set outside json! above, which is at serde_json's macro recursion limit.
         v["hide_empty_highlight_hover"] = serde_json::Value::Bool(self.comment_prefs.hide_empty_highlight_hover);
         v["comment_tool_pinned"] = serde_json::Value::Bool(self.comment_prefs.pinned);
@@ -202,9 +308,7 @@ impl PdfCraftApp {
             self.show_secured_notice = on;
         }
         self.pinned.restore(&v["pinned_folders"]);
-        if let Ok(preference) = serde_json::from_value::<ThemePreference>(v["theme"].clone()) {
-            self.set_theme_preference(preference);
-        }
+        self.restore_appearance(&v);
         if let Ok(speed) = serde_json::from_value::<scroll_speed::ScrollSpeed>(v["scroll_speed"].clone()) {
             self.scroll_speed = speed;
         }
@@ -338,6 +442,71 @@ impl PdfCraftApp {
         if let Ok(pems) = serde_json::from_value::<Vec<String>>(v["trusted"].clone()) {
             let certs = pems.iter().filter_map(|p| pdfcraft_engine::sign::x509::load_certificates(p.as_bytes()).ok()).flatten().collect();
             self.apply_trusted_certificates(certs);
+        }
+    }
+}
+
+impl PdfCraftApp {
+    /// `ui.state.suite`: the suite selection as shown (unchosen fields null), whether it is the
+    /// shared one, a change that didn't stick and the fallback the theme shown took.
+    pub(crate) fn suite_state(&self) -> serde_json::Value {
+        let choice = self.suite.choice();
+        serde_json::json!({
+            "theme": choice.theme.as_ref().map(ThemeId::as_str),
+            "mode": choice.mode,
+            "revision": self.suite.accepted().revision,
+            "shared": self.suite.shared(),
+            "notice": self.suite.notice().map(suite_theme::SuiteNotice::describe),
+            "fallback": self.theme_note.as_ref().map(|f| format!("{f:?}")),
+        })
+    }
+
+    /// `"appearance"` in the saved preferences: the choice, and the last suite state seen.
+    fn appearance_to_json(&self) -> serde_json::Value {
+        let shown = self.effective_selection();
+        // In memory the suite isn't the shared one: keep the shared state last read.
+        let last_suite = if self.suite.shared() { Some(self.suite.accepted().clone()) } else { self.suite_last.clone() };
+        serde_json::json!({
+            "follow_suite": self.follows_suite(),
+            "theme_id": shown.theme.as_str(),
+            "mode": shown.mode,
+            "last_suite": last_suite,
+        })
+    }
+
+    /// Restores the appearance choice, by the suite themes' migration rule:
+    /// - `"appearance"` saved: that choice;
+    /// - only `"theme"` (an older build): PdfCraft's own palette in that mode, which looks as before;
+    /// - neither: a fresh profile, which follows the suite.
+    ///
+    /// An unreadable value keeps the current choice; settings are untrusted.
+    fn restore_appearance(&mut self, v: &serde_json::Value) {
+        let legacy = serde_json::from_value::<ThemePreference>(v["theme"].clone()).ok();
+        let choice = match v.get("appearance").filter(|a| a.is_object()) {
+            Some(a) => {
+                if let Ok(last) = serde_json::from_value::<Accepted>(a["last_suite"].clone()) {
+                    self.suite_last = Some(last);
+                }
+                if a["follow_suite"].as_bool() == Some(true) {
+                    Some(AppChoice::FollowSuite)
+                } else {
+                    let theme = a["theme_id"].as_str().and_then(|id| ThemeId::parse(id).ok()).unwrap_or_else(ThemeId::app_default);
+                    let mode = serde_json::from_value::<craft_theme::Mode>(a["mode"].clone())
+                        .ok()
+                        .or(legacy.map(Into::into))
+                        .unwrap_or(craft_theme::Mode::System);
+                    Some(AppChoice::Own(Selection { theme, mode }))
+                }
+            }
+            None => match legacy {
+                Some(preference) => Some(AppChoice::Own(Selection { theme: ThemeId::app_default(), mode: preference.into() })),
+                None if v.get("theme").is_none() && v.get("appearance").is_none() => Some(AppChoice::FollowSuite),
+                None => None,
+            },
+        };
+        if let Some(choice) = choice {
+            self.app_choice = choice;
+            self.refresh_theme();
         }
     }
 }

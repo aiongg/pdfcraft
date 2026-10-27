@@ -467,7 +467,7 @@ fn layouts_fit_height_labels_and_system_theme() {
     assert!(!h.state_mut().views[0].go_to_typed("xx", &labels));
     // Follow the system theme.
     h.state_mut().set_option("theme", "system").unwrap();
-    assert_eq!(h.state().theme_preference, pdfcraft_ui_egui::theme::ThemePreference::System);
+    assert_eq!(h.state().theme_preference(), pdfcraft_ui_egui::theme::ThemePreference::System);
 }
 
 fn page_input_focused(h: &Harness<'static, PdfCraftApp>) -> bool {

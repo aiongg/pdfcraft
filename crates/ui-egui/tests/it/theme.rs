@@ -17,7 +17,7 @@ fn harness() -> Harness<'static, PdfCraftApp> {
 }
 
 fn assert_theme(h: &Harness<'static, PdfCraftApp>, preference: ThemePreference, kind: ThemeKind) {
-    assert_eq!(h.state().theme_preference, preference);
+    assert_eq!(h.state().theme_preference(), preference);
     assert_eq!(h.state().theme, kind);
     assert_eq!(Tokens::get(&h.ctx).kind, kind);
     assert_eq!(h.ctx.global_style().visuals.dark_mode, kind == ThemeKind::Dark);
@@ -67,7 +67,7 @@ fn a_fresh_install_follows_the_system_theme() {
     assert_theme(&quiet, ThemePreference::System, ThemeKind::Light);
     let mut app = PdfCraftApp::new();
     app.restore(r#"{"theme":"Light"}"#);
-    assert_eq!(app.theme_preference, ThemePreference::Light, "a saved choice wins over the default");
+    assert_eq!(app.theme_preference(), ThemePreference::Light, "a saved choice wins over the default");
 }
 
 #[test]
@@ -117,19 +117,19 @@ fn saved_preferences_restore_with_legacy_light_dark_settings() {
         let mut restored = PdfCraftApp::new();
         restored.set_option("language", "en").unwrap();
         restored.restore(&saved);
-        assert_eq!(restored.theme_preference, preference);
+        assert_eq!(restored.theme_preference(), preference);
     }
     let mut app = PdfCraftApp::new();
     app.set_option("language", "en").unwrap();
     app.restore(r#"{"theme":"Dark"}"#);
-    assert_eq!(app.theme_preference, ThemePreference::Dark);
+    assert_eq!(app.theme_preference(), ThemePreference::Dark);
     assert_eq!(app.theme, ThemeKind::Dark);
     app.restore(r#"{"theme":"Light"}"#);
-    assert_eq!(app.theme_preference, ThemePreference::Light);
+    assert_eq!(app.theme_preference(), ThemePreference::Light);
     assert_eq!(app.theme, ThemeKind::Light);
     app.restore(r#"{"theme":"System"}"#);
     app.restore(r#"{"theme":"Purple"}"#);
-    assert_eq!(app.theme_preference, ThemePreference::System);
+    assert_eq!(app.theme_preference(), ThemePreference::System);
 }
 
 #[test]
@@ -137,19 +137,19 @@ fn commands_and_options_apply_before_the_first_frame() {
     let mut app = PdfCraftApp::new();
     app.set_option("language", "en").unwrap();
     app.run_command("view.theme.dark");
-    assert_eq!(app.theme_preference, ThemePreference::Dark);
+    assert_eq!(app.theme_preference(), ThemePreference::Dark);
     assert_eq!(app.theme, ThemeKind::Dark);
     app.run_command("view.theme.system");
-    assert_eq!(app.theme_preference, ThemePreference::System);
+    assert_eq!(app.theme_preference(), ThemePreference::System);
     assert_eq!(app.theme, ThemeKind::Light);
     // The existing palette/control toggle also goes through the preference setter.
     app.run_command("view.theme");
-    assert_eq!(app.theme_preference, ThemePreference::Dark);
+    assert_eq!(app.theme_preference(), ThemePreference::Dark);
     assert_eq!(app.theme, ThemeKind::Dark);
     app.run_command("view.theme.light");
     app.set_option("theme", "dark").unwrap();
     assert!(app.set_option("theme", "purple").unwrap_err().contains("light, dark, or system"));
-    assert_eq!(app.theme_preference, ThemePreference::Dark);
+    assert_eq!(app.theme_preference(), ThemePreference::Dark);
     assert_eq!(app.theme, ThemeKind::Dark);
 }
 
