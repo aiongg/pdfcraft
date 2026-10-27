@@ -61,7 +61,7 @@ impl PdfCraftApp {
             theme_preference: ThemePreference::System,
             reading_colors: Default::default(),
             #[cfg(target_os = "linux")]
-            desktop_theme: None,
+            appearance: None,
             #[cfg(target_os = "linux")]
             desktop_theme_enabled: false,
             scroll_speed: scroll_speed::ScrollSpeed::default(),

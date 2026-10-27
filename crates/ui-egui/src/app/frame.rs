@@ -14,15 +14,16 @@ impl PdfCraftApp {
         #[cfg(target_os = "linux")]
         {
             let active = self.theme_preference == ThemePreference::System;
-            if self.desktop_theme_enabled && active && self.desktop_theme.is_none() {
+            if self.desktop_theme_enabled && active && self.appearance.is_none() {
                 let ctx = ctx.clone();
-                self.desktop_theme = Some(pdfcraft_platform::desktop_theme::DesktopTheme::start(move || ctx.request_repaint()));
+                self.appearance = craft_platform::appearance::Watcher::start_active(true, move || ctx.request_repaint());
             }
-            if let Some(desktop) = &self.desktop_theme {
-                desktop.set_active(active);
+            if let Some(watcher) = &self.appearance {
+                watcher.set_active(active);
                 // The standard portal supplies Linux desktop appearance. No preference
                 // must clear an earlier answer rather than retaining stale dark chrome.
-                system = desktop.get().map(|appearance| appearance == pdfcraft_platform::desktop_theme::DesktopAppearance::Dark);
+                system = watcher.current().map(|appearance| appearance == craft_platform::appearance::Theme::Dark);
+                craft_platform::appearance::sync_native_window_theme(ctx, watcher.current());
             }
         }
         let kind = self.theme_preference.resolve(system, ThemeKind::Light);
