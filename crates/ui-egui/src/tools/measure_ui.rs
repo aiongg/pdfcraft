@@ -438,7 +438,7 @@ fn panel_body(app: &mut PdfCraftApp, ui: &mut egui::Ui, _t: &Tokens) {
                 None => state.error = Some(tl!("Enter a scale such as 1:50.").into()),
             }
         }
-        egui::ComboBox::from_id_salt("measure-common-scales").selected_text(tl!("Common scales")).width(20.0).show_ui(ui, |ui| {
+        craft_ui::ComboBox::from_id_salt("measure-common-scales").selected_text(tl!("Common scales")).width(20.0).show_ui(ui, |ui| {
             for n in RATIOS {
                 if ui.selectable_label(state.ratio_text == format_ratio(n), format_ratio(n)).clicked() {
                     chosen = Some(n);
@@ -449,7 +449,7 @@ fn panel_body(app: &mut PdfCraftApp, ui: &mut egui::Ui, _t: &Tokens) {
     ui.horizontal(|ui| {
         ui.add(egui::DragValue::new(&mut state.drawing_points).range(0.000001..=1e9));
         let page_unit = page_unit_of(state.page_unit, &state.unit, units);
-        egui::ComboBox::from_id_salt("measure-page-unit").selected_text(page_unit.label()).width(44.0).show_ui(ui, |ui| {
+        craft_ui::ComboBox::from_id_salt("measure-page-unit").selected_text(page_unit.label()).width(44.0).show_ui(ui, |ui| {
             for u in PageUnit::ALL {
                 if ui.selectable_label(u == page_unit, u.label()).clicked() {
                     state.page_unit = Some(u);

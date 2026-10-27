@@ -412,7 +412,7 @@ pub(crate) fn search_body(ui: &mut egui::Ui, d: &mut SearchDraft, t: &Tokens) ->
     ui.add_space(6.0);
     widgets::radio_value(ui, &mut d.mode, SearchMode::Patterns, tl!("Patterns"));
     ui.add_enabled_ui(d.mode == SearchMode::Patterns, |ui| {
-        egui::ComboBox::from_id_salt("redact-pattern").selected_text(tl!(d.pattern.label())).width(240.0).show_ui(ui, |ui| {
+        craft_ui::ComboBox::from_id_salt("redact-pattern").selected_text(tl!(d.pattern.label())).width(240.0).show_ui(ui, |ui| {
             for p in REDACT_PATTERNS {
                 ui.selectable_value(&mut d.pattern, p, tl!(p.label()));
             }
@@ -475,7 +475,7 @@ pub(crate) fn props_body(ui: &mut egui::Ui, d: &mut RedactPrefs, _t: &Tokens) ->
                 }
                 let codes_on = on && d.use_code;
                 ui.add_enabled_ui(codes_on, |ui| {
-                    egui::ComboBox::from_id_salt("redaction-code-set").selected_text(d.code_set.name).show_ui(ui, |ui| {
+                    craft_ui::ComboBox::from_id_salt("redaction-code-set").selected_text(d.code_set.name).show_ui(ui, |ui| {
                         for set in REDACTION_CODE_SETS {
                             if ui.selectable_label(d.code_set == set, set.name).clicked() && d.code_set != set {
                                 d.code_set = set;
@@ -505,7 +505,7 @@ pub(crate) fn props_body(ui: &mut egui::Ui, d: &mut RedactPrefs, _t: &Tokens) ->
                 let look = &mut d.look;
                 ui.label(tl!("Font:"));
                 ui.add_enabled_ui(on, |ui| {
-                    egui::ComboBox::from_id_salt("overlay-font").selected_text(look.font.name()).show_ui(ui, |ui| {
+                    craft_ui::ComboBox::from_id_salt("overlay-font").selected_text(look.font.name()).show_ui(ui, |ui| {
                         for f in pdfcraft_engine::OverlayFont::ALL {
                             ui.selectable_value(&mut look.font, f, f.name());
                         }
