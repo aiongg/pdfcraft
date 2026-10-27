@@ -156,6 +156,13 @@ impl PdfCraftApp {
         if let Some(last) = self.suite_last.clone() {
             options = options.last_accepted(last);
         }
+        // The app's own library theme is read with the first snapshot, so it shows from the first frame.
+        if let AppChoice::Own(own) = &self.app_choice
+            && !own.theme.is_app_default()
+            && craft_theme::builtin(&own.theme).is_none()
+        {
+            options = options.app_theme(Some(own.theme.clone()));
+        }
         self.suite = suite_theme::Suite::new(craft_theme_store::SuiteWatch::open(dir, options, wake), true);
         // A new watch counts its generations from the start again.
         self.theme_key = None;

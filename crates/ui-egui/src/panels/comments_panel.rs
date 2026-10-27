@@ -367,9 +367,7 @@ fn card(
                     }
                     let submit = crate::comments::submit_key(ui, &r, false);
                     ui.horizontal(|ui| {
-                        if (ui
-                            .add(egui::Button::new(egui::RichText::new(tl!("Save")).color(t.on_accent)).fill(t.accent).corner_radius(12))
-                            .clicked()
+                        if (ui.add(egui::Button::new(egui::RichText::new(tl!("Save")).color(t.on_accent)).fill(t.accent).corner_radius(12)).clicked()
                             || submit)
                             && let Some((page, index, text)) = view.comments.editing.take()
                         {

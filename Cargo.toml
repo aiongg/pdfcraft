@@ -13,17 +13,17 @@ repository = "https://github.com/storytold/pdfcraft"
 
 [workspace.dependencies]
 # Shared frontend components; engines remain independent of egui.
-craft-ui = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "c9fa3bd9d44ac47abfd07cfe1b02338cbe7693c3", features = ["serde"] }
+craft-ui = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "cb4c39cce77443b347f48b83c68906bb2efb770a", features = ["serde"] }
 # Quit the macOS way (#1136): ⌘Q asks about unsaved changes, and closing quits through `terminate:`.
-craft-quit = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "c9fa3bd9d44ac47abfd07cfe1b02338cbe7693c3" }
+craft-quit = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "cb4c39cce77443b347f48b83c68906bb2efb770a" }
 # One menu definition for the native macOS menu bar and the in-window bar elsewhere.
-craft-menu = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "c9fa3bd9d44ac47abfd07cfe1b02338cbe7693c3" }
-craft-keymap = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "c9fa3bd9d44ac47abfd07cfe1b02338cbe7693c3", default-features = false }
+craft-menu = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "cb4c39cce77443b347f48b83c68906bb2efb770a" }
+craft-keymap = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "cb4c39cce77443b347f48b83c68906bb2efb770a", default-features = false }
 # Desktop appearance (XDG portal) watcher and native window theme hint.
-craft-platform = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "c9fa3bd9d44ac47abfd07cfe1b02338cbe7693c3", features = ["appearance", "egui"] }
+craft-platform = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "cb4c39cce77443b347f48b83c68906bb2efb770a", features = ["appearance", "egui"] }
 # The suite-theme contract (ids, core roles, resolution) and the shared theme folder.
-craft-theme = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "c9fa3bd9d44ac47abfd07cfe1b02338cbe7693c3", features = ["serde"] }
-craft-theme-store = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "c9fa3bd9d44ac47abfd07cfe1b02338cbe7693c3", features = ["serde"] }
+craft-theme = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "cb4c39cce77443b347f48b83c68906bb2efb770a", features = ["serde"] }
+craft-theme-store = { git = "https://github.com/aiongg/craft-libs", version = "0.1.0", rev = "cb4c39cce77443b347f48b83c68906bb2efb770a", features = ["serde"] }
 # Shared system spooler; document composition remains in pdfcraft-print.
 craft-print = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "42e30cd5b3f4b114270dd053fccbc33bedc47f68" }
 # Whether a path stored in a document may be opened (GoToR link targets).
