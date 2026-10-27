@@ -65,6 +65,8 @@ impl PdfCraftApp {
             #[cfg(target_os = "linux")]
             appearance: None,
             #[cfg(target_os = "linux")]
+            appearance_started: false,
+            #[cfg(target_os = "linux")]
             appearance_factory: None,
             #[cfg(target_os = "linux")]
             desktop_theme_enabled: false,

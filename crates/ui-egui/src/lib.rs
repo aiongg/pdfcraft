@@ -284,6 +284,8 @@ pub struct PdfCraftApp {
     /// The Linux portal is enabled only by the native host, and starts on the first System choice.
     #[cfg(target_os = "linux")]
     appearance: Option<Box<dyn appearance_source::AppearanceSource>>,
+    #[cfg(target_os = "linux")]
+    appearance_started: bool,
     /// Replaces the portal watcher in tests.
     #[cfg(target_os = "linux")]
     appearance_factory: Option<appearance_source::AppearanceFactory>,

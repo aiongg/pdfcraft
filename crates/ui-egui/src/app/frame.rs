@@ -14,7 +14,9 @@ impl PdfCraftApp {
         #[cfg(target_os = "linux")]
         {
             let active = self.theme_preference == ThemePreference::System;
-            if self.desktop_theme_enabled && active && self.appearance.is_none() {
+            if self.desktop_theme_enabled && active && !self.appearance_started {
+                // One attempt: a failed start is not retried every frame.
+                self.appearance_started = true;
                 self.appearance = match &self.appearance_factory {
                     Some(factory) => factory(ctx),
                     None => crate::appearance_source::portal_source(ctx),

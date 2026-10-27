@@ -14,6 +14,23 @@ struct Fake {
     starts: Mutex<usize>,
 }
 
+/// Starts nothing, as when the portal is unavailable.
+fn failing_harness(fake: &Arc<Fake>) -> Harness<'static, crate::PdfCraftApp> {
+    let fake = fake.clone();
+    Harness::builder().with_size(egui::vec2(1100.0, 800.0)).build_eframe(move |_cc| {
+        let mut app = crate::PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.enable_desktop_theme();
+        app.set_appearance_factory(Box::new(move |_ctx| {
+            if let Ok(mut starts) = fake.starts.lock() {
+                *starts += 1;
+            }
+            None
+        }));
+        app
+    })
+}
+
 struct Source(Arc<Fake>);
 
 impl AppearanceSource for Source {
@@ -91,4 +108,15 @@ fn the_watcher_starts_only_when_enabled_and_following_the_system() {
     let mut fixed = harness(&fake, true, ThemePreference::Dark);
     step(&mut fixed);
     assert_eq!(starts(&fake), 0, "a fixed mode does not start it");
+}
+
+#[test]
+fn a_failed_watcher_start_is_not_retried_every_frame() {
+    let fake = Arc::new(Fake::default());
+    let mut h = failing_harness(&fake);
+    for _ in 0..4 {
+        step(&mut h);
+    }
+    assert_eq!(starts(&fake), 1);
+    assert_eq!(Tokens::get(&h.ctx).kind, ThemeKind::Light, "the Light fallback applies");
 }
