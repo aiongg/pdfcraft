@@ -1178,17 +1178,17 @@ dependencies = [
 [[package]]
 name = "craft-docpath"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5#6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5"
 
 [[package]]
 name = "craft-fonts-build"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5#6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5"
 
 [[package]]
 name = "craft-i18n"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5#6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5"
 dependencies = [
  "fixed_decimal",
  "icu_decimal",
@@ -1211,7 +1211,7 @@ dependencies = [
 [[package]]
 name = "craft-keymap"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5#6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5"
 dependencies = [
  "egui",
  "serde",
@@ -1221,7 +1221,7 @@ dependencies = [
 [[package]]
 name = "craft-menu"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5#6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5"
 dependencies = [
  "craft-keymap",
  "craft-quit",
@@ -1234,7 +1234,7 @@ dependencies = [
 [[package]]
 name = "craft-print"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5#6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5"
 dependencies = [
  "craft-winprint-gdi",
  "miniz_oxide 0.9.1",
@@ -1247,7 +1247,7 @@ dependencies = [
 [[package]]
 name = "craft-quit"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5#6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5"
 dependencies = [
  "dispatch2",
  "egui",
@@ -1258,7 +1258,7 @@ dependencies = [
 [[package]]
 name = "craft-ui"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5#6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5"
 dependencies = [
  "craft-fonts-build",
  "craft-i18n",
@@ -1279,7 +1279,7 @@ dependencies = [
 [[package]]
 name = "craft-update"
 version = "0.1.0"
-source = "git+https://github.com/aiongg/craft-libs?rev=60d60d484db91911c63534df66aecdee016007f0#60d60d484db91911c63534df66aecdee016007f0"
+source = "git+https://github.com/aiongg/craft-libs?rev=6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5#6af6348135c2ce1bc1118efe99f5d2f4d9ac07c5"
 dependencies = [
  "chrono",
  "dunce",
