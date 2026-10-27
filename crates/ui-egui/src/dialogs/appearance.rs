@@ -417,7 +417,7 @@ fn card(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, card: &Card, activ
     if let Some(warnings) = stamp_warnings.filter(|n| *n > 0) {
         let text = crate::i18n::trn(crate::i18n::current(), warnings as u64, "{n} warning", "{n} warnings");
         let details = warning_details(record.as_deref());
-        ui.label(RichText::new(text).color(t.warn).small()).on_hover_text(details);
+        theme::status_label(ui, t.warn, t.text, RichText::new(text).small()).on_hover_text(details);
     }
     clicked
 }
@@ -432,7 +432,7 @@ fn notice(ui: &mut egui::Ui, t: &Tokens, status: Color32, heading: &str, message
         .inner_margin(egui::Margin::same(8))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.label(RichText::new(heading).font(theme::semibold(12.5)).color(status));
+            theme::status_label(ui, status, t.text, RichText::new(heading).font(theme::semibold(12.5)));
             if !message.is_empty() {
                 ui.label(RichText::new(message).color(t.text));
             }

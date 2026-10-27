@@ -299,19 +299,19 @@ fn text_is_readable_on_every_surface() {
     }
 }
 
-/// Status colours (`bad`, `warn`, `good`) must read on every surface they are painted on, in every
-/// built-in suite theme and both variants. The suite contract (pilot plan §2.2) is 3:1; ArtCraft's
-/// bold values sit between 3:1 and 4.5:1 on some surfaces by the owner's decision, while Graphite
-/// and High contrast reach 4.5:1 everywhere. App default keeps PdfCraft's original status colours
-/// and is not part of the suite contract.
+/// Status colours (`bad`, `warn`, `good`) are marks (icons, dots, bars, outlines), never text
+/// colours: text in a status colour is drawn in ink instead. A mark must still be visible on every
+/// surface it is painted on, so each built-in suite theme and both variants keep the suite
+/// contract's 3:1 floor (pilot plan §2.2) on panel, card and pasteboard. App default keeps
+/// PdfCraft's original status colours and is not part of the suite contract.
 #[test]
-fn status_colours_read_on_panel_card_and_pasteboard_in_every_built_in_theme() {
+fn status_colours_read_as_marks_on_panel_card_and_pasteboard_in_every_built_in_theme() {
     let mut checked = 0;
     for theme in craft_theme::builtins() {
         if theme.id.as_str() == craft_theme::APP_DEFAULT {
             continue;
         }
-        let floor = if theme.id.as_str() == "craft.artcraft" { 3.0 } else { 4.5 };
+        let floor = 3.0;
         let selection = Selection { theme: theme.id.clone(), mode: Mode::System };
         let (slots, note) = slot_tokens(&selection, &craft_theme::lookup_builtin);
         assert!(note.is_none(), "{} resolved with a fallback", theme.id.as_str());

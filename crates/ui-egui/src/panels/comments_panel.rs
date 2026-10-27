@@ -394,7 +394,7 @@ fn card(
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
                         ui.add(icons::image(icon, 13.0, c));
-                        ui.label(egui::RichText::new(tl!(label)).font(theme::medium(11.5)).color(c));
+                        ui.label(egui::RichText::new(tl!(label)).font(theme::medium(11.5)).color(t.text));
                     });
                 }
             });

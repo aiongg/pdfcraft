@@ -171,14 +171,19 @@ impl Card {
         painter.galley(pos2(c.center().x - name_galley.size().x / 2.0, y - name_galley.size().y / 2.0), name_galley, colour);
         let note = if self.page.is_none() && !f.range.trim().is_empty() {
             match &self.check {
-                Ok(k) => Some((crate::i18n::fmt(tl!("Pages: {k} of {n}"), &[("k", &k.to_string()), ("n", &f.pages.to_string())]), t.text_muted)),
-                Err(_) => Some((tl!("Check the pages").to_owned(), t.bad)),
+                Ok(k) => {
+                    Some((crate::i18n::fmt(tl!("Pages: {k} of {n}"), &[("k", &k.to_string()), ("n", &f.pages.to_string())]), t.text_muted, None))
+                }
+                Err(_) => Some((tl!("Check the pages").to_owned(), t.text, Some(t.bad))),
             }
         } else {
             None
         };
-        if let Some((text, colour)) = note {
-            painter.text(pos2(c.center().x, name_y + 17.0), Align2::CENTER_CENTER, text, theme::regular(11.5), colour);
+        if let Some((text, colour, mark)) = note {
+            let drawn = painter.text(pos2(c.center().x, name_y + 17.0), Align2::CENTER_CENTER, text, theme::regular(11.5), colour);
+            if let Some(mark) = mark {
+                painter.circle_filled(pos2(drawn.left() - 7.0, drawn.center().y), 3.5, mark);
+            }
         }
 
         // On hover, the card's own actions along the top of the page (not while a card is

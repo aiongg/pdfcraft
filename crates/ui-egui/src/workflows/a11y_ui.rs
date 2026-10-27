@@ -244,8 +244,10 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, state: &mut A11yState, doc: D
                     if open { tl!("Collapse") } else { tl!("Expand") },
                 )
                 .clicked();
-                let color = if issues > 0 { t.bad } else { t.text };
-                let l = ui.add(egui::Label::new(egui::RichText::new(&head).font(theme::semibold(13.0)).color(color)).sense(egui::Sense::click()));
+                if issues > 0 {
+                    theme::status_dot(ui, t.bad);
+                }
+                let l = ui.add(egui::Label::new(egui::RichText::new(&head).font(theme::semibold(13.0)).color(t.text)).sense(egui::Sense::click()));
                 toggle || l.clicked()
             })
             .inner;

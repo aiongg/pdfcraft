@@ -295,7 +295,7 @@ fn body(ui: &mut egui::Ui, d: &mut FieldTableDraft, info: &PageInfo, form: &[For
         });
     }
     if let Err(e) = &laid.edit {
-        ui.add(egui::Label::new(RichText::new(e.said(&i18n::words)).color(t.bad).size(11.0)).wrap());
+        theme::status_label(ui, t.bad, t.text, RichText::new(e.said(&i18n::words)).size(11.0));
     }
 
     ui.add_space(14.0);

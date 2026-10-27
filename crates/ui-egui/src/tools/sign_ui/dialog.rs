@@ -19,7 +19,7 @@ pub(super) fn title(ui: &mut egui::Ui, text: &str) {
 
 fn error(ui: &mut egui::Ui, t: &Tokens, err: &Option<String>) {
     if let Some(e) = err.as_ref().filter(|e| !e.is_empty()) {
-        ui.colored_label(t.bad, tl!(e));
+        crate::theme::status_label(ui, t.bad, t.text, egui::RichText::new(tl!(e)));
         ui.add_space(4.0);
     }
 }

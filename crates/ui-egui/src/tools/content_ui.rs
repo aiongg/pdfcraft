@@ -659,7 +659,8 @@ pub(crate) fn editor(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, ad
             // Page text is drawn with the standard fonts; anything else would be saved as `?` (#125).
             undrawable = self::undrawable(t, memo);
             if let Some(c) = undrawable {
-                ui.label(egui::RichText::new(undrawable_message(c)).small().color(Tokens::get(ui.ctx()).bad));
+                let t = Tokens::get(ui.ctx());
+                crate::theme::status_label(ui, t.bad, t.text, egui::RichText::new(undrawable_message(c)).small());
             }
         });
     if cancel {

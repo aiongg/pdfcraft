@@ -171,7 +171,7 @@ pub(super) fn link_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
             ui.label(egui::RichText::new(&host.ascii).font(theme::semibold(14.0)));
             if host.mixed_scripts {
                 let warning = tl!("This web address mixes letters from different alphabets, a common way to imitate another site's name.");
-                ui.add(egui::Label::new(egui::RichText::new(warning).color(t.bad)).wrap());
+                theme::status_label(ui, t.bad, t.text, egui::RichText::new(warning));
             } else if host.international {
                 let note = tl!("This web address uses letters from another alphabet, which can look like familiar ones.");
                 ui.add(egui::Label::new(egui::RichText::new(note).color(t.text)).wrap());
@@ -330,7 +330,7 @@ fn password_modal(
         if let Some(e) = error {
             ui.add_space(4.0);
             // Known error text is translated; anything else passes through.
-            ui.label(egui::RichText::new(tl!(e)).color(t.bad));
+            theme::status_label(ui, t.bad, t.text, egui::RichText::new(tl!(e)));
         }
         ui.add_space(12.0);
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {

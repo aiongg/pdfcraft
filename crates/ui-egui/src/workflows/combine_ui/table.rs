@@ -254,7 +254,7 @@ fn table_body(
                                     (Ok(k), _) => crate::i18n::fmt(tl!("{k} of {n}"), &[("k", &k.to_string()), ("n", &f.pages.to_string())]),
                                     (Err(_), _) => crate::i18n::fmt(tl!("? of {n}"), &[("n", &f.pages.to_string())]),
                                 };
-                                ui.label(egui::RichText::new(count).small().color(if check.is_err() { t.bad } else { t.text_faint }));
+                                ui.label(egui::RichText::new(count).small().color(if check.is_err() { t.text } else { t.text_faint }));
                             }
                             SortKey::Size => {
                                 ui.label(egui::RichText::new(crate::panels::human_size(f.bytes.len())).color(t.text_muted));
@@ -307,12 +307,7 @@ fn table_body(
                                         events.action = Some(RowAction::Unlock(Some(i), link.rect.left_bottom() + vec2(0.0, 6.0)));
                                     }
                                 }
-                                ui.add(
-                                    egui::Label::new(egui::RichText::new(first).color(if colour == t.bad { t.bad } else { t.text }))
-                                        .truncate()
-                                        .selectable(false),
-                                )
-                                .on_hover_text(all);
+                                ui.add(egui::Label::new(egui::RichText::new(first).color(t.text)).truncate().selectable(false)).on_hover_text(all);
                             }
                         });
                     }

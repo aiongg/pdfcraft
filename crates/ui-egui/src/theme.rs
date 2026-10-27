@@ -297,6 +297,23 @@ impl Press {
     }
 }
 
+/// A small filled circle in a status colour. Status colours are marks (3:1 against surfaces),
+/// never text colours.
+pub fn status_dot(ui: &mut egui::Ui, mark: Color32) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::splat(8.0), egui::Sense::hover());
+    ui.painter().circle_filled(rect.center(), 4.0, mark);
+    resp
+}
+
+/// Status text: a dot in the status colour, then the text in `ink`.
+pub fn status_label(ui: &mut egui::Ui, mark: Color32, ink: Color32, text: egui::RichText) -> Response {
+    ui.horizontal(|ui| {
+        status_dot(ui, mark);
+        ui.add(egui::Label::new(text.color(ink)).wrap());
+    })
+    .response
+}
+
 /// Pointing hand, the cursor for a control that clicks.
 pub fn hand(resp: Response) -> Response {
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)

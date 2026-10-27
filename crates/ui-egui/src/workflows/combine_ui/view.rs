@@ -245,7 +245,7 @@ pub(crate) fn page(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         } else {
                             crate::i18n::fmt(tl!("{n} files need attention"), &[("n", &bad.to_string())])
                         };
-                        ui.label(egui::RichText::new(text).color(t.bad));
+                        crate::theme::status_label(ui, t.bad, t.text, egui::RichText::new(text));
                     });
                 }
             });
@@ -379,7 +379,7 @@ fn unlock_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 }
             });
             if let Some(e) = &prompt.error {
-                ui.label(egui::RichText::new(e).color(t.bad));
+                crate::theme::status_label(ui, t.bad, t.text, egui::RichText::new(e));
             }
             ui.add_space(6.0);
             ui.label(egui::RichText::new(tl!("The password is only used to read the file; it isn't saved.")).small().color(t.text_faint));

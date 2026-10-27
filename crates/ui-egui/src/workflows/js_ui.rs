@@ -620,20 +620,22 @@ fn date_format(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) {
         match app.date_text(Some(&text)) {
             Ok(today) => ui.label(egui::RichText::new(crate::i18n::fmt(tl!("Today: {date}"), &[("date", &today)])).color(t.text_muted)),
             // The engine's reason, in English.
-            Err(e) => ui.label(egui::RichText::new(e).color(t.bad)),
+            Err(e) => crate::theme::status_label(ui, t.bad, t.text, egui::RichText::new(e)),
         };
     });
     // Fill & Sign refuses a date it would save as "?"; say so before anyone tries.
     let bad = app.date_text(None).map(|today| pdfcraft_engine::dates::unwritable(&today)).unwrap_or_default();
     if !bad.is_empty() {
-        ui.label(
+        crate::theme::status_label(
+            ui,
+            t.bad,
+            t.text,
             egui::RichText::new(crate::i18n::fmt(
                 tl!(
                     "{chars} can't be written into the PDF yet: Fill & Sign text is Western European only. Pick a numeric format such as dd.mm.yyyy."
                 ),
                 &[("chars", &bad)],
-            ))
-            .color(t.bad),
+            )),
         );
     }
     ui.horizontal(|ui| {
