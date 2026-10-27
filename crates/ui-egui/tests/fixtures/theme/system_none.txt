@@ -465,27 +465,25 @@ style_of(Dark): Style {
         multi_widget_text_select: true,
     },
     visuals: Visuals {
-        dark_mode: false,
+        dark_mode: true,
         text_options: TextOptions {
             max_texture_side: 2048,
-            color_transfer_function: Gamma(
-                0.75,
-            ),
+            color_transfer_function: TwoCoverageMinusCoverageSq,
             font_hinting: true,
             subpixel_binning: false,
         },
         override_text_color: Some(
-            #22_22_26_FF,
+            #EC_EC_EF_FF,
         ),
         weak_text_alpha: 0.6,
         weak_text_color: None,
         widgets: Widgets {
             noninteractive: WidgetVisuals {
-                bg_fill: #F8_F8_F8_FF,
-                weak_bg_fill: #F8_F8_F8_FF,
+                bg_fill: #1B_1B_1B_FF,
+                weak_bg_fill: #1B_1B_1B_FF,
                 bg_stroke: Stroke {
                     width: 1.0,
-                    color: #E8_E8_EB_FF,
+                    color: #33_33_39_FF,
                 },
                 corner_radius: CornerRadius {
                     nw: 6,
@@ -495,12 +493,12 @@ style_of(Dark): Style {
                 },
                 fg_stroke: Stroke {
                     width: 1.0,
-                    color: #22_22_26_FF,
+                    color: #EC_EC_EF_FF,
                 },
                 expansion: 0.0,
             },
             inactive: WidgetVisuals {
-                bg_fill: #FF_FF_FF_FF,
+                bg_fill: #1E_1E_22_FF,
                 weak_bg_fill: #00_00_00_00,
                 bg_stroke: Stroke {
                     width: 0.0,
@@ -514,13 +512,13 @@ style_of(Dark): Style {
                 },
                 fg_stroke: Stroke {
                     width: 1.0,
-                    color: #22_22_26_FF,
+                    color: #EC_EC_EF_FF,
                 },
                 expansion: 0.0,
             },
             hovered: WidgetVisuals {
-                bg_fill: #F0_F0_F3_FF,
-                weak_bg_fill: #F0_F0_F3_FF,
+                bg_fill: #34_34_3A_FF,
+                weak_bg_fill: #34_34_3A_FF,
                 bg_stroke: Stroke {
                     width: 0.0,
                     color: #00_00_00_00,
@@ -533,16 +531,16 @@ style_of(Dark): Style {
                 },
                 fg_stroke: Stroke {
                     width: 1.5,
-                    color: #22_22_26_FF,
+                    color: #EC_EC_EF_FF,
                 },
                 expansion: 0.0,
             },
             active: WidgetVisuals {
-                bg_fill: #E4_E4_E9_FF,
-                weak_bg_fill: #E4_E4_E9_FF,
+                bg_fill: #3E_3E_45_FF,
+                weak_bg_fill: #3E_3E_45_FF,
                 bg_stroke: Stroke {
                     width: 1.0,
-                    color: #00_00_00_FF,
+                    color: #FF_FF_FF_FF,
                 },
                 corner_radius: CornerRadius {
                     nw: 6,
@@ -552,16 +550,16 @@ style_of(Dark): Style {
                 },
                 fg_stroke: Stroke {
                     width: 2.0,
-                    color: #22_22_26_FF,
+                    color: #EC_EC_EF_FF,
                 },
                 expansion: 0.0,
             },
             open: WidgetVisuals {
-                bg_fill: #DC_DC_DC_FF,
-                weak_bg_fill: #F0_F0_F3_FF,
+                bg_fill: #1B_1B_1B_FF,
+                weak_bg_fill: #34_34_3A_FF,
                 bg_stroke: Stroke {
                     width: 1.0,
-                    color: #A0_A0_A0_FF,
+                    color: #3C_3C_3C_FF,
                 },
                 corner_radius: CornerRadius {
                     nw: 6,
@@ -571,35 +569,35 @@ style_of(Dark): Style {
                 },
                 fg_stroke: Stroke {
                     width: 1.0,
-                    color: #22_22_26_FF,
+                    color: #EC_EC_EF_FF,
                 },
                 expansion: 0.0,
             },
         },
         selection: Selection {
-            bg_fill: #E3_EC_FD_FF,
+            bg_fill: #24_36_57_FF,
             stroke: Stroke {
                 width: 1.0,
-                color: #1B_63_E0_FF,
+                color: #4B_8B_F5_FF,
             },
         },
         ime_composition: ImeComposition {
             active_underline_stroke: Stroke {
                 width: 2.0,
-                color: #00_53_7D_FF,
+                color: #C0_DE_FF_FF,
             },
             inactive_underline_stroke: Stroke {
                 width: 2.0,
-                color: #00_2A_3F_80,
+                color: #60_6F_80_80,
             },
             legacy_visuals: false,
         },
-        hyperlink_color: #17_55_C4_FF,
-        faint_bg_color: #F0_F0_F3_FF,
-        extreme_bg_color: #FF_FF_FF_FF,
+        hyperlink_color: #8C_B6_FA_FF,
+        faint_bg_color: #34_34_3A_FF,
+        extreme_bg_color: #1E_1E_22_FF,
         text_edit_bg_color: None,
-        code_bg_color: #E6_E6_E6_FF,
-        warn_fg_color: #FF_64_00_FF,
+        code_bg_color: #40_40_40_FF,
+        warn_fg_color: #FF_8F_00_FF,
         error_fg_color: #FF_00_00_FF,
         window_corner_radius: CornerRadius {
             nw: 10,
@@ -614,12 +612,12 @@ style_of(Dark): Style {
             ],
             blur: 28,
             spread: 0,
-            color: #00_00_00_26,
+            color: #00_00_00_6E,
         },
-        window_fill: #FF_FF_FF_FF,
+        window_fill: #2E_2E_33_FF,
         window_stroke: Stroke {
             width: 1.0,
-            color: #DA_DA_DE_FF,
+            color: #3C_3C_43_FF,
         },
         window_highlight_topmost: true,
         menu_corner_radius: CornerRadius {
@@ -628,7 +626,7 @@ style_of(Dark): Style {
             sw: 8,
             se: 8,
         },
-        panel_fill: #FF_FF_FF_FF,
+        panel_fill: #26_26_2A_FF,
         popup_shadow: Shadow {
             offset: [
                 0,
@@ -636,13 +634,13 @@ style_of(Dark): Style {
             ],
             blur: 16,
             spread: 0,
-            color: #00_00_00_1E,
+            color: #00_00_00_5A,
         },
         resize_corner_size: 12.0,
         text_cursor: TextCursorStyle {
             stroke: Stroke {
                 width: 2.0,
-                color: #00_53_7D_FF,
+                color: #C0_DE_FF_FF,
             },
             preview: false,
             blink: true,

@@ -360,7 +360,7 @@ impl eframe::App for PdfCraftApp {
             egui_extras::install_image_loaders(ctx);
             theme::install_fonts_for(ctx, cjk);
             self.fonts_cjk = cjk;
-            theme::apply(ctx, self.theme);
+            theme::apply_preference(ctx, self.theme_preference);
             self.styled = true;
         } else {
             self.fonts_ready = true;

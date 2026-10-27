@@ -39,8 +39,8 @@ impl PdfCraftApp {
     pub fn set_theme_preference(&mut self, preference: ThemePreference) {
         self.theme_preference = preference;
         if let Some(ctx) = self.ctx.clone() {
+            theme::apply_preference(&ctx, preference);
             self.sync_theme(&ctx);
-            theme::apply(&ctx, self.theme);
         } else {
             self.theme = preference.resolve(None, ThemeKind::Light);
         }
