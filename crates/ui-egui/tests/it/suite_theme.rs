@@ -231,8 +231,177 @@ fn a_pick_another_app_beat_shows_the_suite_and_keeps_a_conflict() {
     let (_, mine) = app.suite().conflict().unwrap();
     assert_eq!(mine.theme.as_ref().map(ThemeId::as_str), Some("craft.high-contrast"));
 
-    app.suite_mut().apply_mine();
+    assert!(app.set_option("suite_notice", "retry").is_err(), "a conflict is no failure");
+    app.set_option("suite_notice", "apply_mine").unwrap();
     wait(&mut app, "apply mine", |a| a.suite().accepted().suite.theme.as_ref().map(ThemeId::as_str) == Some("craft.high-contrast"));
     assert!(app.suite().conflict().is_none());
     assert_eq!(shown(&app).0, "craft.high-contrast");
+}
+
+fn sample_id() -> ThemeId {
+    ThemeId::parse(SAMPLE_THEME_ID).unwrap()
+}
+
+/// Gives the suite watcher time to read the folder (and to write, were it going to), with frames.
+fn settle(h: &mut Harness<'static, PdfCraftApp>) {
+    for _ in 0..5 {
+        h.run_steps(2);
+        h.state_mut().suite_mut().sync();
+        std::thread::sleep(Duration::from_millis(40));
+    }
+}
+
+#[test]
+fn starting_up_writes_nothing_to_the_suite_folder() {
+    // A saved "follow the suite" whose last suite state the folder no longer has.
+    let elsewhere = tempfile::tempdir().unwrap();
+    let mut a = app_on(elsewhere.path());
+    a.set_follow_suite(true);
+    a.set_appearance_theme("craft.graphite").unwrap();
+    wait(&mut a, "the write", |a| a.suite().accepted().revision >= 1);
+    let following = a.persist();
+    drop(a);
+
+    for saved in [None, Some(r#"{"theme": "Dark"}"#), Some(following.as_str())] {
+        let dir = tempfile::tempdir().unwrap();
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        if let Some(saved) = saved {
+            app.restore(saved);
+        }
+        app.open_suite(&SuiteDir::at(dir.path()), || {});
+        if saved.is_none() {
+            app.start_fresh();
+        }
+        let mut h = harness_with(app);
+        settle(&mut h);
+        assert!(!dir.path().join("selection.json").exists(), "{saved:?}: starting up wrote the suite selection");
+        assert_eq!(h.state().suite().accepted().revision, 0, "{saved:?}");
+    }
+}
+
+#[test]
+fn a_theme_on_the_command_line_is_the_apps_own_and_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = app_on(dir.path());
+    app.start_fresh();
+    assert!(app.follows_suite());
+    assert!(app.set_launch_option("theme", "sepia").is_err());
+    assert!(app.follows_suite(), "a refused option changes nothing");
+    app.set_launch_option("theme", "light").unwrap();
+    assert_eq!(app.appearance(), &AppChoice::Own(Selection { theme: ThemeId::suite_default(), mode: Mode::Light }));
+    app.set_launch_option("theme_id", "craft.graphite").unwrap();
+    assert_eq!(shown(&app), ("craft.graphite".into(), Mode::Light));
+    let mut h = harness_with(app);
+    settle(&mut h);
+    assert!(!dir.path().join("selection.json").exists(), "--theme wrote the suite selection");
+    assert_eq!(h.state().suite().choice().theme, None, "the suite keeps no theme");
+}
+
+#[test]
+fn a_restarted_app_shows_its_own_library_theme_from_the_first_frame() {
+    let dir = tempfile::tempdir().unwrap();
+    store(dir.path()).import(SAMPLE_THEME_JSON.as_bytes(), false).unwrap();
+    let mut a = app_on(dir.path());
+    a.set_follow_suite(false);
+    a.set_theme_preference(ThemePreference::Dark);
+    wait(&mut a, "the library", |a| a.suite().snapshot().index.iter().any(|e| e.id == sample_id()));
+    a.set_appearance_theme(SAMPLE_THEME_ID).unwrap();
+    let saved = a.persist();
+    drop(a);
+
+    let mut b = PdfCraftApp::new();
+    b.restore(&saved);
+    b.open_suite(&SuiteDir::at(dir.path()), || {});
+    assert!(b.suite().lookup(&sample_id()).is_some(), "the first snapshot holds the app's own library theme");
+    let mut slot = Some(b);
+    let mut h = Harness::builder().with_size(egui::vec2(1100.0, 800.0)).build_eframe(move |_cc| slot.take().unwrap_or_else(PdfCraftApp::new));
+    h.run_steps(1);
+    assert!(h.state().theme_fallback().is_none(), "first frame: {:?}", h.state().theme_fallback());
+    assert_core(&Tokens::of(&h.ctx, egui::Theme::Dark), &sample_roles(Variant::Dark), "first frame");
+}
+
+#[test]
+fn a_library_theme_on_its_way_keeps_the_installed_look() {
+    let dir = tempfile::tempdir().unwrap();
+    store(dir.path()).import(SAMPLE_THEME_JSON.as_bytes(), false).unwrap();
+    let mut app = app_on(dir.path());
+    app.set_appearance_theme("craft.graphite").unwrap();
+    app.set_theme_preference(ThemePreference::Dark);
+    wait(&mut app, "the library", |a| a.suite().snapshot().index.iter().any(|e| e.id == sample_id()));
+    let mut h = harness_with(app);
+    let graphite = *craft_theme::builtin(&ThemeId::parse("craft.graphite").unwrap()).unwrap().variant(Variant::Dark).unwrap();
+    assert_core(&Tokens::of(&h.ctx, egui::Theme::Dark), &graphite, "graphite");
+
+    // The pick installs at once only if the theme happened to load already; until then the
+    // installed look stays and the app's own palette never shows.
+    h.state_mut().set_appearance_theme(SAMPLE_THEME_ID).unwrap();
+    let dark = format!("{:?}", Tokens::of(&h.ctx, egui::Theme::Dark));
+    assert_ne!(dark, format!("{:?}", Tokens::app_default(Variant::Dark)), "the app default flashed");
+    assert!(h.state().theme_fallback().is_none(), "{:?}", h.state().theme_fallback());
+    let until = Instant::now() + Duration::from_secs(10);
+    while h.state().theme_fallback().is_some()
+        || Tokens::of(&h.ctx, egui::Theme::Dark).text != craft_ui::theme::color32(sample_roles(Variant::Dark).text)
+    {
+        assert!(Instant::now() < until, "timed out waiting for the sample theme");
+        h.run_steps(1);
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_core(&Tokens::of(&h.ctx, egui::Theme::Dark), &sample_roles(Variant::Dark), "loaded");
+}
+
+#[test]
+fn the_app_default_as_the_suite_theme_shows_each_apps_own_palette() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut s = store(dir.path());
+    let base = s.accepted().clone();
+    s.update(&base, SelectionChange::theme(ThemeId::app_default())).unwrap();
+    let mut app = app_on(dir.path());
+    app.set_follow_suite(true);
+    wait(&mut app, "the suite", |a| a.suite().accepted().revision == 1);
+    assert_eq!(shown(&app), ("craft.app-default".into(), Mode::Dark));
+    let h = harness_with(app);
+    assert!(h.state().theme_fallback().is_none());
+    assert_eq!(format!("{:?}", Tokens::of(&h.ctx, egui::Theme::Dark)), format!("{:?}", Tokens::app_default(Variant::Dark)));
+    drop(h);
+    // And the other way: an app picks it for the suite.
+    let mut b = app_on(dir.path());
+    b.set_follow_suite(true);
+    wait(&mut b, "the folder", |b| b.suite().accepted().revision == 1);
+    b.set_appearance_theme("craft.graphite").unwrap();
+    wait(&mut b, "graphite", |b| b.suite().accepted().revision == 2);
+    b.set_appearance_theme("craft.app-default").unwrap();
+    wait(&mut b, "app default", |b| b.suite().accepted().revision == 3);
+    assert_eq!(store(dir.path()).accepted().suite.theme, Some(ThemeId::app_default()));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_failed_suite_write_shows_the_failure_until_dismissed_or_retried() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let dir = tempfile::tempdir().unwrap();
+    let mode = |m: u32| std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(m)).unwrap();
+    let mut app = app_on(dir.path());
+    app.start_fresh();
+    for action in ["apply_mine", "retry", "dismiss", "later"] {
+        assert!(app.set_option("suite_notice", action).is_err(), "{action} without a notice");
+    }
+
+    mode(0o555);
+    app.set_appearance_theme("craft.graphite").unwrap();
+    wait(&mut app, "the failure", |a| a.suite().failure().is_some());
+    assert_eq!(shown(&app).0, "craft.artcraft", "the accepted state shows again");
+    assert!(app.suite().notices()["failure"].is_string());
+    assert!(app.set_option("suite_notice", "apply_mine").is_err(), "a failure is no conflict");
+    app.set_option("suite_notice", "dismiss").unwrap();
+    assert!(app.suite().failure().is_none());
+
+    app.set_appearance_theme("craft.graphite").unwrap();
+    wait(&mut app, "the failure again", |a| a.suite().failure().is_some());
+    mode(0o755);
+    app.set_option("suite_notice", "retry").unwrap();
+    wait(&mut app, "the retry", |a| a.suite().accepted().suite.theme.as_ref().map(ThemeId::as_str) == Some("craft.graphite"));
+    assert!(app.suite().failure().is_none());
+    assert_eq!(shown(&app).0, "craft.graphite");
+    assert!(dir.path().join("selection.json").exists());
 }

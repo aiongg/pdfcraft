@@ -35,6 +35,18 @@ fn rgb_triple(v: &serde_json::Value) -> Option<[f64; 3]> {
     Some(out)
 }
 
+/// `ui.state.suite.fallback`: `kind` (`unknown_theme`, `only_variant`, `system_silent`), the
+/// theme `id` nothing has (`unknown_theme`) and the only `variant` the theme has (`only_variant`);
+/// the fields that don't apply are null.
+fn fallback_json(f: &craft_theme::Fallback) -> serde_json::Value {
+    let (kind, id, variant) = match f {
+        craft_theme::Fallback::UnknownTheme(id) => ("unknown_theme", Some(id.as_str()), None),
+        craft_theme::Fallback::OnlyVariant(v) => ("only_variant", None, Some(*v)),
+        craft_theme::Fallback::SystemSilent => ("system_silent", None, None),
+    };
+    serde_json::json!({ "kind": kind, "id": id, "variant": variant })
+}
+
 impl PdfCraftApp {
     /// The appearance mode shown now: the app's own, or the suite's while it follows the suite.
     pub fn theme_preference(&self) -> ThemePreference {
@@ -124,6 +136,25 @@ impl PdfCraftApp {
         };
         self.refresh_theme();
         true
+    }
+
+    /// Answers the suite's notice: `apply_mine` sends the change another Craft app's pick blocked
+    /// (a conflict), `retry` sends a change that failed to save again, `dismiss` clears either.
+    /// Refused when there is no such notice.
+    pub fn answer_suite_notice(&mut self, action: &str) -> Result<(), String> {
+        match action {
+            "apply_mine" if self.suite.conflict().is_none() => return Err("there is no suite conflict to apply your choice over".into()),
+            "apply_mine" => self.suite.apply_mine(),
+            "retry" if self.suite.failure().is_none() => return Err("there is no failed suite change to retry".into()),
+            "retry" => self.suite.retry(),
+            "dismiss" if self.suite.conflict().is_none() && self.suite.failure().is_none() => {
+                return Err("there is no suite notice to dismiss".into());
+            }
+            "dismiss" => self.suite.dismiss(),
+            _ => return Err("suite_notice must be apply_mine, retry or dismiss".into()),
+        }
+        self.refresh_theme();
+        Ok(())
     }
 
     /// Why the theme shown differs from the selection (an unknown theme, a single variant).
@@ -489,7 +520,7 @@ impl PdfCraftApp {
             "revision": self.suite.accepted().revision,
             "shared": self.suite.shared(),
             "notices": self.suite.notices(),
-            "fallback": self.theme_note.as_ref().map(|f| format!("{f:?}")),
+            "fallback": self.theme_note.as_ref().map(fallback_json),
         })
     }
 

@@ -491,7 +491,7 @@ fn app_creator<'a>(
             }
         }
         for (k, v) in options {
-            if let Err(e) = app.set_option(&k, &v) {
+            if let Err(e) = app.set_launch_option(&k, &v) {
                 log::warn!("--{k} {v}: {e}");
             }
         }

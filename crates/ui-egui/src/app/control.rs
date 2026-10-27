@@ -10,6 +10,23 @@ impl PdfCraftApp {
         client
     }
 
+    /// A command-line option at startup (`--theme dark`, `--page 3`, …): [`Self::set_option`],
+    /// except that `theme` and `theme_id` set the app's own choice. A launch option is a choice
+    /// for this app; it never writes the suite every Craft app shares.
+    pub fn set_launch_option(&mut self, key: &str, value: &str) -> Result<(), String> {
+        let following = self.follows_suite();
+        if following && matches!(key, "theme" | "theme_id") {
+            // Keeps the look shown now as the app's own, then changes it.
+            self.set_follow_suite(false);
+            let set = self.set_option(key, value);
+            if set.is_err() {
+                self.set_follow_suite(true);
+            }
+            return set;
+        }
+        self.set_option(key, value)
+    }
+
     /// Apply a named view option (`--page 3`, `--panel bookmarks`, `--theme dark`, …).
     ///
     /// This is the seed of the UI control channel (M3.9): the same verbs become `ui.set` calls.
@@ -43,6 +60,7 @@ impl PdfCraftApp {
                 }
                 _ => return Err("follow_suite must be true or false".into()),
             },
+            ("suite_notice", _) => self.answer_suite_notice(value)?,
             ("scroll_speed", _) => {
                 self.scroll_speed = scroll_speed::ScrollSpeed::parse(value).ok_or("scroll_speed must be slow, normal, or fast")?;
             }
