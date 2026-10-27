@@ -22,6 +22,9 @@ tokens: Tokens {
     field: #FF_FF_FF_FF,
     badge_new: #1B_63_E0_FF,
     page_shadow: #00_00_00_22,
+    bad: #D7_37_3F_FF,
+    warn: #E6_86_19_FF,
+    good: #2D_9D_78_FF,
     radius: 6,
 }
 
@@ -49,6 +52,9 @@ tokens_of(Light): Tokens {
     field: #FF_FF_FF_FF,
     badge_new: #1B_63_E0_FF,
     page_shadow: #00_00_00_22,
+    bad: #D7_37_3F_FF,
+    warn: #E6_86_19_FF,
+    good: #2D_9D_78_FF,
     radius: 6,
 }
 
@@ -76,6 +82,9 @@ tokens_of(Dark): Tokens {
     field: #FF_FF_FF_FF,
     badge_new: #1B_63_E0_FF,
     page_shadow: #00_00_00_22,
+    bad: #D7_37_3F_FF,
+    warn: #E6_86_19_FF,
+    good: #2D_9D_78_FF,
     radius: 6,
 }
 

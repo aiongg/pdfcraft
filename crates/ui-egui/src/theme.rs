@@ -110,6 +110,12 @@ pub struct Tokens {
     pub field: Color32,
     pub badge_new: Color32,
     pub page_shadow: Color32,
+    /// Error and failure text and icons.
+    pub bad: Color32,
+    /// Warning text and icons.
+    pub warn: Color32,
+    /// Success text and icons.
+    pub good: Color32,
     pub radius: u8,
 }
 
@@ -140,6 +146,9 @@ impl Tokens {
                 field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
                 badge_new: Color32::from_rgb(0x1B, 0x63, 0xE0),
                 page_shadow: Color32::from_black_alpha(34),
+                bad: Color32::from_rgb(0xD7, 0x37, 0x3F),
+                warn: Color32::from_rgb(0xE6, 0x86, 0x19),
+                good: Color32::from_rgb(0x2D, 0x9D, 0x78),
                 radius: 6,
             },
             ThemeKind::Dark => Self {
@@ -166,6 +175,9 @@ impl Tokens {
                 field: Color32::from_rgb(0x1E, 0x1E, 0x22),
                 badge_new: Color32::from_rgb(0x3D, 0x7D, 0xEE),
                 page_shadow: Color32::from_black_alpha(120),
+                bad: Color32::from_rgb(0xD7, 0x37, 0x3F),
+                warn: Color32::from_rgb(0xE6, 0x86, 0x19),
+                good: Color32::from_rgb(0x2D, 0x9D, 0x78),
                 radius: 6,
             },
         }
@@ -205,6 +217,9 @@ impl Tokens {
             field: color32(c.raised),
             badge_new: color32(c.accent),
             page_shadow: own.page_shadow,
+            bad: color32(c.bad),
+            warn: color32(c.warn),
+            good: color32(c.good),
             radius: own.radius,
         }
     }
