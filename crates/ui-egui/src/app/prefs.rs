@@ -474,7 +474,8 @@ impl PdfCraftApp {
     /// Restores the appearance choice, by the suite themes' migration rule:
     /// - `"appearance"` saved: that choice;
     /// - only `"theme"` (an older build): PdfCraft's own palette in that mode, which looks as before;
-    /// - neither: a fresh profile, which follows the suite.
+    /// - neither (settings saved before themes existed): PdfCraft's own palette in System mode.
+    ///   A missing settings file is a fresh profile instead, see [`Self::start_fresh`].
     ///
     /// An unreadable value keeps the current choice; settings are untrusted.
     fn restore_appearance(&mut self, v: &serde_json::Value) {
@@ -497,7 +498,9 @@ impl PdfCraftApp {
             }
             None => match legacy {
                 Some(preference) => Some(AppChoice::Own(Selection { theme: ThemeId::app_default(), mode: preference.into() })),
-                None if v.get("theme").is_none() && v.get("appearance").is_none() => Some(AppChoice::FollowSuite),
+                None if v.get("theme").is_none() && v.get("appearance").is_none() => {
+                    Some(AppChoice::Own(Selection { theme: ThemeId::app_default(), mode: craft_theme::Mode::System }))
+                }
                 None => None,
             },
         };
