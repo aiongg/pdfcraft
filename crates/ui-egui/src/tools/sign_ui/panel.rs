@@ -4,7 +4,7 @@ use super::*;
 /// The message bar for signed documents: (icon, colour, template, argument).
 /// The template renders through [`crate::i18n::tr_fmt`] at the call site, so the bar follows
 /// the UI language; names inside `argument` stay as they are.
-pub(crate) fn banner(sigs: &[SignatureInfo]) -> Option<(&'static str, Color32, &'static str, String)> {
+pub(crate) fn banner(t: &Tokens, sigs: &[SignatureInfo]) -> Option<(&'static str, Color32, &'static str, String)> {
     let signed: Vec<&SignatureInfo> = sigs.iter().filter(|s| s.signed).collect();
     if signed.is_empty() {
         return None;
@@ -26,28 +26,28 @@ pub(crate) fn banner(sigs: &[SignatureInfo]) -> Option<(&'static str, Color32, &
         return Some(("badge-check", Color32::from_rgb(0x14, 0x73, 0xE6), "Certified by {by}", by.unwrap_or_default()));
     }
     Some(if signed.iter().any(|s| s.status == SignatureStatus::Invalid) {
-        ("circle-x", Color32::from_rgb(0xD7, 0x37, 0x3F), "At least one signature is invalid.", String::new())
+        ("circle-x", t.bad, "At least one signature is invalid.", String::new())
     } else if signed.iter().all(|s| s.status == SignatureStatus::Valid) {
-        ("circle-check", Color32::from_rgb(0x2D, 0x9D, 0x78), "Signed and all signatures are valid.", String::new())
+        ("circle-check", t.good, "Signed and all signatures are valid.", String::new())
     } else {
-        ("triangle-alert", Color32::from_rgb(0xE6, 0x86, 0x19), "At least one signature has problems.", String::new())
+        ("triangle-alert", t.warn, "At least one signature has problems.", String::new())
     })
 }
 
-fn status_icon(s: &SignatureInfo) -> (&'static str, Color32) {
+fn status_icon(t: &Tokens, s: &SignatureInfo) -> (&'static str, Color32) {
     if !s.signed {
         return ("pen-line", Color32::from_gray(0x80));
     }
-    signature_status_style(s.status)
+    signature_status_style(t, s.status)
 }
 
 /// One look per signature verdict, shared by the Signatures panel and the page badges so
 /// the two can't drift apart.
-pub(crate) fn signature_status_style(status: SignatureStatus) -> (&'static str, Color32) {
+pub(crate) fn signature_status_style(t: &Tokens, status: SignatureStatus) -> (&'static str, Color32) {
     match status {
-        SignatureStatus::Valid => ("circle-check", Color32::from_rgb(0x2D, 0x9D, 0x78)),
-        SignatureStatus::Unknown => ("triangle-alert", Color32::from_rgb(0xE6, 0x86, 0x19)),
-        SignatureStatus::Invalid => ("circle-x", Color32::from_rgb(0xD7, 0x37, 0x3F)),
+        SignatureStatus::Valid => ("circle-check", t.good),
+        SignatureStatus::Unknown => ("triangle-alert", t.warn),
+        SignatureStatus::Invalid => ("circle-x", t.bad),
     }
 }
 
@@ -89,7 +89,7 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, sigs: &[SignatureInfo], expan
     ordered.sort_by_key(|s| (!s.signed, s.revision));
     for s in ordered {
         let open = expanded.contains(&s.field);
-        let (icon, color) = status_icon(s);
+        let (icon, color) = status_icon(t, s);
         let (template, name) = match (s.signed, s.certify.is_some(), s.signer.as_deref()) {
             (false, ..) => ("Unsigned signature field: {name}", s.field.as_str()),
             (true, true, Some(signer)) => ("Rev. {rev}: Certified by {name}", signer),

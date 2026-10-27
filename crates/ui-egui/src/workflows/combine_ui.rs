@@ -37,9 +37,6 @@ pub(crate) use parts::{Part, moved_order, moved_pages, removed_pages, step_to};
 use parts::{title_of, utc_stamp};
 pub(crate) use view::page;
 
-/// Same reds and ambers as the signature status (`sign_ui`).
-pub(crate) const ERROR: Color32 = Color32::from_rgb(0xD7, 0x37, 0x3F);
-pub(crate) const WARNING: Color32 = Color32::from_rgb(0xE6, 0x86, 0x19);
 /// Undo steps kept for the list (each holds the list itself; the files' bytes are shared).
 const HISTORY: usize = 100;
 

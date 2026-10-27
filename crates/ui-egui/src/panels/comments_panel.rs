@@ -390,7 +390,7 @@ fn card(
                         widgets::wrapped_text(ui, body, theme::regular(13.0), t.text, !selected);
                     }
                 }
-                if let Some((icon, label, c)) = status.and_then(status_badge) {
+                if let Some((icon, label, c)) = status.and_then(|s| status_badge(t, s)) {
                     ui.add_space(4.0);
                     ui.horizontal(|ui| {
                         ui.add(icons::image(icon, 13.0, c));
@@ -532,7 +532,7 @@ fn card(
 /// A 26 pt round badge: a type glyph (comments) or initials (replies). Returns where it was drawn.
 fn avatar(ui: &mut egui::Ui, t: &Tokens, icon: Option<&str>, text: Option<&str>, color: Color32) -> egui::Rect {
     let (r, _) = ui.allocate_exact_size(vec2(26.0, 26.0), Sense::hover());
-    let bg = if t.dark() { Color32::from_gray(0x55) } else { Color32::from_gray(0xD8) };
+    let bg = t.pressed;
     ui.painter().circle_filled(r.center(), 12.0, bg);
     if let Some(i) = icon {
         icons::paint(ui, r, i, 13.0, legible(color, t));

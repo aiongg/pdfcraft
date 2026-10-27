@@ -188,7 +188,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     Rect::from_min_size(body.min + vec2(10.0, 11.0), vec2(24.0, 24.0)),
                     "file-text",
                     22.0,
-                    egui::Color32::from_rgb(0xE0, 0x3E, 0x3E),
+                    t.bad,
                 );
                 // Room on the right for the remove button.
                 let detail = ui.painter().text(

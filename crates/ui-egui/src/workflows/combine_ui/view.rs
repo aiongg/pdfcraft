@@ -245,7 +245,7 @@ pub(crate) fn page(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         } else {
                             crate::i18n::fmt(tl!("{n} files need attention"), &[("n", &bad.to_string())])
                         };
-                        ui.label(egui::RichText::new(text).color(ERROR));
+                        ui.label(egui::RichText::new(text).color(t.bad));
                     });
                 }
             });
@@ -293,7 +293,7 @@ fn skip_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
     let modal = egui::Modal::new(egui::Id::unique("combine-skip")).show(ctx, |ui| {
         ui.set_width(460.0);
         ui.horizontal(|ui| {
-            ui.add(icons::image("triangle-alert", 22.0, ERROR));
+            ui.add(icons::image("triangle-alert", 22.0, t.bad));
             ui.add(egui::Label::new(egui::RichText::new(tl!("Leave out files that can't be read?")).font(theme::semibold(16.0))).wrap());
         });
         ui.add_space(6.0);
@@ -379,7 +379,7 @@ fn unlock_prompt(app: &mut PdfCraftApp, ctx: &egui::Context) {
                 }
             });
             if let Some(e) = &prompt.error {
-                ui.label(egui::RichText::new(e).color(ERROR));
+                ui.label(egui::RichText::new(e).color(t.bad));
             }
             ui.add_space(6.0);
             ui.label(egui::RichText::new(tl!("The password is only used to read the file; it isn't saved.")).small().color(t.text_faint));

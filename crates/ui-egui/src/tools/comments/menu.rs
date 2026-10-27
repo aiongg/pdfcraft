@@ -299,7 +299,7 @@ pub(crate) fn quick_bar_controls(ui: &mut egui::Ui, tool: CommentTool, prefs: &m
         }
     });
     if tool.has_fill() {
-        let resp = fill_button(ui, style.fill);
+        let resp = fill_button(ui, &Tokens::get(ui.ctx()), style.fill);
         egui::Popup::menu(&resp).align(egui::RectAlign::RIGHT_START).close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside).show(|ui| {
             ui.label(egui::RichText::new(tl!("Fill colour")).font(theme::semibold(12.0)));
             if let Some(f) = fill_picker(ui, style.fill) {
@@ -333,7 +333,7 @@ pub(crate) fn quick_bar_controls(ui: &mut egui::Ui, tool: CommentTool, prefs: &m
 
 /// The quick bar's fill button: a filled square in the fill colour, or a crossed-out outline
 /// for no fill.
-fn fill_button(ui: &mut egui::Ui, fill: Option<Rgb>) -> egui::Response {
+fn fill_button(ui: &mut egui::Ui, t: &Tokens, fill: Option<Rgb>) -> egui::Response {
     let (r, resp) = ui.allocate_exact_size(vec2(32.0, 32.0), Sense::click());
     let sq = Rect::from_center_size(r.center(), vec2(16.0, 16.0));
     let edge = Stroke::new(1.0, Color32::from_black_alpha(90));
@@ -342,7 +342,7 @@ fn fill_button(ui: &mut egui::Ui, fill: Option<Rgb>) -> egui::Response {
             ui.painter().rect_filled(sq, 2.0, color32(c));
         }
         None => {
-            ui.painter().line_segment([sq.left_bottom(), sq.right_top()], Stroke::new(1.5, Color32::from_rgb(0xD3, 0x2F, 0x2F)));
+            ui.painter().line_segment([sq.left_bottom(), sq.right_top()], Stroke::new(1.5, t.bad));
         }
     }
     ui.painter().rect_stroke(sq, 2.0, edge, egui::StrokeKind::Inside);
@@ -358,12 +358,12 @@ fn fill_button(ui: &mut egui::Ui, fill: Option<Rgb>) -> egui::Response {
 }
 
 /// Status badge icon and label for a review state name.
-pub fn status_badge(state: &str) -> Option<(&'static str, &'static str, Color32)> {
+pub fn status_badge(t: &Tokens, state: &str) -> Option<(&'static str, &'static str, Color32)> {
     match state {
-        "Accepted" => Some(("thumbs-up", "Accepted", Color32::from_rgb(0x2D, 0x9D, 0x5B))),
-        "Rejected" => Some(("thumbs-down", "Rejected", Color32::from_rgb(0xD3, 0x2F, 0x2F))),
+        "Accepted" => Some(("thumbs-up", "Accepted", t.good)),
+        "Rejected" => Some(("thumbs-down", "Rejected", t.bad)),
         "Cancelled" => Some(("circle-x", "Cancelled", Color32::from_rgb(0x8E, 0x8E, 0x8E))),
-        "Completed" => Some(("check", "Completed", Color32::from_rgb(0x2D, 0x9D, 0x5B))),
+        "Completed" => Some(("check", "Completed", t.good)),
         _ => None,
     }
 }

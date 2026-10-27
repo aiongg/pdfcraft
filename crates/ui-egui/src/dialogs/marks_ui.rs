@@ -490,7 +490,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
     let undrawable = undrawable(kind, d);
     if let Some(c) = undrawable {
         ui.add_space(6.0);
-        ui.label(egui::RichText::new(crate::content_ui::undrawable_message(c)).small().color(crate::content_ui::UNDRAWABLE));
+        ui.label(egui::RichText::new(crate::content_ui::undrawable_message(c)).small().color(t.bad));
     }
     ui.add_space(10.0);
     let (mut apply, mut cancel) = (false, false);

@@ -234,7 +234,7 @@ fn table_body(
                                     crate::widgets::line(&mut f.range).frame(egui::Frame::NONE).hint_text(tl!("All pages")).desired_width(88.0),
                                 );
                                 // A visible field on plain and striped rows alike; red when the range is wrong.
-                                let border = if check.is_err() { Stroke::new(1.5, ERROR) } else { Stroke::new(1.0, t.border) };
+                                let border = if check.is_err() { Stroke::new(1.5, t.bad) } else { Stroke::new(1.0, t.border) };
                                 ui.painter().rect_stroke(edit.rect, CornerRadius::same(4), border, egui::StrokeKind::Inside);
                                 if let Err(e) = &check {
                                     edit.clone().on_hover_text(e);
@@ -254,7 +254,7 @@ fn table_body(
                                     (Ok(k), _) => crate::i18n::fmt(tl!("{k} of {n}"), &[("k", &k.to_string()), ("n", &f.pages.to_string())]),
                                     (Err(_), _) => crate::i18n::fmt(tl!("? of {n}"), &[("n", &f.pages.to_string())]),
                                 };
-                                ui.label(egui::RichText::new(count).small().color(if check.is_err() { ERROR } else { t.text_faint }));
+                                ui.label(egui::RichText::new(count).small().color(if check.is_err() { t.bad } else { t.text_faint }));
                             }
                             SortKey::Size => {
                                 ui.label(egui::RichText::new(crate::panels::human_size(f.bytes.len())).color(t.text_muted));
@@ -291,8 +291,8 @@ fn table_body(
                                     ));
                                 }
                                 let (icon, colour, first) = match (errors.first(), warnings.first()) {
-                                    (Some(e), _) => ("circle-x", ERROR, e.clone()),
-                                    (None, Some(w)) => ("triangle-alert", WARNING, w.clone()),
+                                    (Some(e), _) => ("circle-x", t.bad, e.clone()),
+                                    (None, Some(w)) => ("triangle-alert", t.warn, w.clone()),
                                     (None, None) => return,
                                 };
                                 let all = errors.iter().chain(&warnings).cloned().collect::<Vec<_>>().join("\n");
@@ -308,7 +308,7 @@ fn table_body(
                                     }
                                 }
                                 ui.add(
-                                    egui::Label::new(egui::RichText::new(first).color(if colour == ERROR { ERROR } else { t.text }))
+                                    egui::Label::new(egui::RichText::new(first).color(if colour == t.bad { t.bad } else { t.text }))
                                         .truncate()
                                         .selectable(false),
                                 )

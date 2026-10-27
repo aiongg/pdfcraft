@@ -12,9 +12,6 @@ use crate::page_pointer::PagePointer;
 use crate::theme::Tokens;
 use crate::widgets;
 
-/// The colour of the warning under text the standard fonts can't draw.
-pub(crate) const UNDRAWABLE: Color32 = Color32::from_rgb(0xD7, 0x37, 0x3F);
-
 /// The first character of a draft that can't be drawn, as the engine decides it (it refuses
 /// such text, #125): outside the standard fonts and not shaped with the Arabic face.
 pub(crate) fn undrawable(d: &TextDraft, memo: &UndrawableMemo) -> Option<char> {
@@ -662,7 +659,7 @@ pub(crate) fn editor(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, ad
             // Page text is drawn with the standard fonts; anything else would be saved as `?` (#125).
             undrawable = self::undrawable(t, memo);
             if let Some(c) = undrawable {
-                ui.label(egui::RichText::new(undrawable_message(c)).small().color(UNDRAWABLE));
+                ui.label(egui::RichText::new(undrawable_message(c)).small().color(Tokens::get(ui.ctx()).bad));
             }
         });
     if cancel {

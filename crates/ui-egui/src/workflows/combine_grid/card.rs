@@ -89,10 +89,10 @@ impl Card {
             };
             why = Some(("lock", ON_PAPER, text.to_owned()));
         } else if let Some(p) = &f.problem {
-            why = Some(("circle-x", ERROR, p.clone()));
+            why = Some(("circle-x", t.bad, p.clone()));
         } else {
             match page {
-                Err(e) => why = Some(("circle-x", ERROR, e)),
+                Err(e) => why = Some(("circle-x", t.bad, e)),
                 // The pages couldn't be counted, or the page's size is unknown (some passwords
                 // open a file for combining but not for reading it here): nothing is drawn (the
                 // engine decides at Combine), and the card says so rather than look blank.
@@ -110,7 +110,7 @@ impl Card {
                         Look::Ready(tex) => {
                             painter.image(tex, paper, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
                         }
-                        Look::Failed(e) => why = Some(("triangle-alert", WARNING, crate::i18n::fmt(tl!("Preview unavailable: {e}"), &[("e", &e)]))),
+                        Look::Failed(e) => why = Some(("triangle-alert", t.warn, crate::i18n::fmt(tl!("Preview unavailable: {e}"), &[("e", &e)]))),
                         Look::Pending(stand_in) => {
                             if let Some(tex) = stand_in {
                                 painter.image(tex, paper, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
@@ -150,7 +150,7 @@ impl Card {
         if warned && why.as_ref().is_none_or(|(icon, ..)| *icon == "eye-off") {
             let r = Rect::from_center_size(paper.right_top() + vec2(-2.0, 2.0), Vec2::splat(18.0));
             painter.circle_filled(r.center(), 10.0, t.card);
-            icons::paint(ui, r, "triangle-alert", 15.0, WARNING);
+            icons::paint(ui, r, "triangle-alert", 15.0, t.warn);
         }
 
         // The name, shortened in the middle to fit, and the pages taken when a range is set; on a
@@ -172,7 +172,7 @@ impl Card {
         let note = if self.page.is_none() && !f.range.trim().is_empty() {
             match &self.check {
                 Ok(k) => Some((crate::i18n::fmt(tl!("Pages: {k} of {n}"), &[("k", &k.to_string()), ("n", &f.pages.to_string())]), t.text_muted)),
-                Err(_) => Some((tl!("Check the pages").to_owned(), ERROR)),
+                Err(_) => Some((tl!("Check the pages").to_owned(), t.bad)),
             }
         } else {
             None

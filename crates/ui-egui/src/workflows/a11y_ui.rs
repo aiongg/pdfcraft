@@ -147,14 +147,11 @@ pub(crate) fn options_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
     (start, cancel)
 }
 
-/// The red of failed checks (as for invalid signatures).
-const FAILED: egui::Color32 = egui::Color32::from_rgb(0xD7, 0x37, 0x3F);
-
 fn status_icon(t: &Tokens, s: Status) -> (&'static str, egui::Color32) {
     match s {
-        Status::Passed => ("circle-check", egui::Color32::from_rgb(0x2D, 0x9D, 0x4F)),
-        Status::Failed => ("circle-x", FAILED),
-        Status::Manual => ("circle-help", egui::Color32::from_rgb(0xD9, 0x8E, 0x04)),
+        Status::Passed => ("circle-check", t.good),
+        Status::Failed => ("circle-x", t.bad),
+        Status::Manual => ("circle-help", t.warn),
         Status::Skipped => ("circle-dashed", t.text_faint),
     }
 }
@@ -247,7 +244,7 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, state: &mut A11yState, doc: D
                     if open { tl!("Collapse") } else { tl!("Expand") },
                 )
                 .clicked();
-                let color = if issues > 0 { FAILED } else { t.text };
+                let color = if issues > 0 { t.bad } else { t.text };
                 let l = ui.add(egui::Label::new(egui::RichText::new(&head).font(theme::semibold(13.0)).color(color)).sense(egui::Sense::click()));
                 toggle || l.clicked()
             })

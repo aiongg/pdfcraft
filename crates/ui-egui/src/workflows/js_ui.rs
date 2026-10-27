@@ -620,7 +620,7 @@ fn date_format(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) {
         match app.date_text(Some(&text)) {
             Ok(today) => ui.label(egui::RichText::new(crate::i18n::fmt(tl!("Today: {date}"), &[("date", &today)])).color(t.text_muted)),
             // The engine's reason, in English.
-            Err(e) => ui.label(egui::RichText::new(e).color(egui::Color32::from_rgb(0xD1, 0x3B, 0x3B))),
+            Err(e) => ui.label(egui::RichText::new(e).color(t.bad)),
         };
     });
     // Fill & Sign refuses a date it would save as "?"; say so before anyone tries.
@@ -633,7 +633,7 @@ fn date_format(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) {
                 ),
                 &[("chars", &bad)],
             ))
-            .color(egui::Color32::from_rgb(0xD1, 0x3B, 0x3B)),
+            .color(t.bad),
         );
     }
     ui.horizontal(|ui| {

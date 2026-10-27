@@ -21,7 +21,7 @@ use egui::{Align2, Color32, CornerRadius, Rect, Sense, Stroke, TextureHandle, Ve
 use pdfcraft_render::{RenderConfig, RenderPool, RenderRequest, Retiring};
 
 use crate::PdfCraftApp;
-use crate::combine_ui::{CombineFile, ERROR, Lock, RowAction, WARNING};
+use crate::combine_ui::{CombineFile, Lock, RowAction};
 use crate::icons;
 use crate::theme::{self, Tokens};
 

@@ -712,9 +712,9 @@ mod tests {
 
     #[test]
     fn signature_status_style_gives_each_verdict_its_panel_icon() {
-        assert_eq!(signature_status_style(SignatureStatus::Valid).0, "circle-check");
-        assert_eq!(signature_status_style(SignatureStatus::Unknown).0, "triangle-alert");
-        assert_eq!(signature_status_style(SignatureStatus::Invalid).0, "circle-x");
+        assert_eq!(signature_status_style(&Tokens::for_kind(crate::theme::ThemeKind::Light), SignatureStatus::Valid).0, "circle-check");
+        assert_eq!(signature_status_style(&Tokens::for_kind(crate::theme::ThemeKind::Light), SignatureStatus::Unknown).0, "triangle-alert");
+        assert_eq!(signature_status_style(&Tokens::for_kind(crate::theme::ThemeKind::Light), SignatureStatus::Invalid).0, "circle-x");
     }
 
     #[test]
@@ -886,7 +886,7 @@ mod tests {
     #[test]
     fn the_message_bar_puts_a_signature_problem_before_the_certification() {
         use SignatureStatus::{Invalid, Unknown, Valid};
-        let bar = |sigs: &[SignatureInfo]| banner(sigs).map(|b| (b.0, b.2));
+        let bar = |sigs: &[SignatureInfo]| banner(&Tokens::for_kind(crate::theme::ThemeKind::Light), sigs).map(|b| (b.0, b.2));
         let certified = signature(Some(2), Valid);
         assert_eq!(bar(std::slice::from_ref(&certified)), Some(("badge-check", "Certified by {by}")));
         assert_eq!(bar(&[certified.clone(), signature(None, Valid)]), Some(("badge-check", "Certified by {by}")));
