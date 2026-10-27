@@ -149,6 +149,11 @@ fn every_registered_command_is_implemented() {
         if spec.id == "view.layout.cover" {
             app.set_option("layout", "two-up").unwrap();
         }
+        // Follow suite needs a suite to follow (a temporary folder, never the shared one).
+        let suite_dir = tempfile::tempdir().unwrap();
+        if spec.id == "view.theme.follow_suite" {
+            app.open_suite(&pdfcraft_ui_egui::suite_theme::SuiteDir::at(suite_dir.path()), || {});
+        }
         // History commands need a real jump (and Back first to make Forward available).
         if matches!(spec.id, "view.previous_view" | "view.next_view") {
             app.views[0].go_to_page(1);
