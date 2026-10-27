@@ -16,8 +16,10 @@ fn dump(preference: ThemePreference, system: Option<egui::Theme>) -> String {
     h.input_mut().system_theme = system;
     h.run_steps(4);
     format!(
-        "tokens: {:#?}\n\nstyle_of(Light): {:#?}\n\nstyle_of(Dark): {:#?}\n",
+        "tokens: {:#?}\n\ntokens_of(Light): {:#?}\n\ntokens_of(Dark): {:#?}\n\nstyle_of(Light): {:#?}\n\nstyle_of(Dark): {:#?}\n",
         Tokens::get(&h.ctx),
+        Tokens::of(&h.ctx, egui::Theme::Light),
+        Tokens::of(&h.ctx, egui::Theme::Dark),
         h.ctx.style_of(egui::Theme::Light),
         h.ctx.style_of(egui::Theme::Dark)
     )

@@ -124,7 +124,13 @@ impl Tokens {
 
     /// Return the cached tokens of the egui theme slot in use, falling back to the light palette before the first apply.
     pub fn get(ctx: &egui::Context) -> Self {
-        ctx.data(|d| d.get_temp::<Tokens>(tokens_key(ctx.theme()))).unwrap_or_else(|| Self::for_kind(ThemeKind::Light))
+        Self::of(ctx, ctx.theme())
+    }
+
+    /// The cached tokens of one egui theme slot (golden tests compare both slots).
+    #[doc(hidden)]
+    pub fn of(ctx: &egui::Context, slot: egui::Theme) -> Self {
+        ctx.data(|d| d.get_temp::<Tokens>(tokens_key(slot))).unwrap_or_else(|| Self::for_kind(ThemeKind::Light))
     }
 
     pub fn dark(&self) -> bool {
