@@ -15,8 +15,10 @@ pub enum ThemeKind {
     Dark,
 }
 
-/// The saved user choice, independent of the light/dark colours currently displayed. A fresh
-/// install follows the system (#1248); a desktop that says nothing gets Light.
+/// The appearance mode of the theme shown, independent of the light/dark colours currently
+/// displayed. System is the default of `PdfCraftApp::new` (#1248), which shows PdfCraft's own
+/// palette; a desktop that says nothing gets Light. A fresh install of the desktop app follows
+/// the suite instead (`PdfCraftApp::start_fresh`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum ThemePreference {
     #[default]

@@ -52,8 +52,10 @@ fn open_view_menu(h: &mut Harness<'static, PdfCraftApp>) {
     }
 }
 
-/// A fresh install follows the desktop's appearance (#1248): dark on a dark desktop, light where
-/// the desktop says nothing; a saved choice still wins.
+/// The app constructor's default, `Own(craft.app-default, System)`, follows the desktop's
+/// appearance (#1248): dark on a dark desktop, light where the desktop says nothing; a saved
+/// choice still wins. (A fresh install of the desktop app follows the suite instead; see
+/// `suite_theme.rs`.)
 #[test]
 fn a_fresh_install_follows_the_system_theme() {
     let h = harness();
