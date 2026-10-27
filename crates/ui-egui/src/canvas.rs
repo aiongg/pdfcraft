@@ -2077,7 +2077,8 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
             for badge in signature_badges(&doc.signatures, i) {
                 let [x0, y0, x1, y1] = badge.rect;
                 let sr = xf.user_rect(info, i, [x0 as f32, y0 as f32, x1 as f32, y1 as f32]);
-                let (icon, color) = crate::sign_ui::signature_status_style(&crate::theme::Tokens::for_kind(crate::theme::ThemeKind::Light), badge.status);
+                let (icon, color) =
+                    crate::sign_ui::signature_status_style(&crate::theme::Tokens::for_kind(crate::theme::ThemeKind::Light), badge.status);
                 painter.rect_stroke(sr, CornerRadius::same(2), Stroke::new(1.5, color), egui::StrokeKind::Outside);
                 // A widget too small for the mark keeps its outline: the verdict still shows.
                 if sr.width() < 4.0 || sr.height() < 4.0 {

@@ -358,13 +358,7 @@ pub(crate) fn section(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             if resp.hovered() {
                 ui.painter().rect_filled(rect, CornerRadius::same(8), t.hover);
             }
-            icons::paint(
-                ui,
-                Rect::from_min_size(rect.min + vec2(32.0, 9.0), vec2(20.0, 20.0)),
-                "file-text",
-                18.0,
-                t.bad,
-            );
+            icons::paint(ui, Rect::from_min_size(rect.min + vec2(32.0, 9.0), vec2(20.0, 20.0)), "file-text", 18.0, t.bad);
             let size = crate::panels::human_size(usize::try_from(f.size).unwrap_or(usize::MAX));
             let when = f.modified.map(crate::combine_ui::ago).unwrap_or_default();
             let detail = if when.is_empty() { size } else { format!("{when}  ·  {size}") };
