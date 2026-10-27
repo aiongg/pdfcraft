@@ -71,6 +71,7 @@ mod reload;
 mod side_panels;
 mod signing;
 mod stamps;
+mod suite_theme;
 mod text_select;
 mod theme;
 mod theme_button;

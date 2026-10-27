@@ -1686,6 +1686,18 @@ evidence = ["crates/ui-egui/tests/it/theme.rs::a_fresh_install_follows_the_syste
 notes = "Toolbar, Display theme and --theme system share a persisted System preference that follows OS changes without losing the selected mode; ui.state reports preference and resolved colours separately. System is the default on a fresh install (#1248), Light where the desktop says nothing; a saved choice wins."
 
 [[feature]]
+id = "view.suite-theme"
+title = "Suite theme shared with the other Craft apps"
+area = "B"
+tier = "P2"
+milestone = "M3"
+status = "partial"
+commands = ["view.theme.follow_suite", "view.theme.this_app"]
+tools = ["suite_get", "suite_set", "theme_list", "theme_import", "theme_export"]
+evidence = ["crates/ui-egui/tests/it/suite_theme.rs::the_sample_theme_and_every_built_in_give_the_shared_core_colours", "crates/ui-egui/tests/it/suite_theme.rs::saved_choices_migrate_as_the_pilot_plan_says", "crates/ui-egui/tests/it/suite_theme.rs::an_own_theme_ignores_suite_changes_until_follow_suite_is_back_on", "crates/ui-egui/tests/it/suite_theme.rs::a_pick_another_app_beat_shows_the_suite_and_keeps_a_conflict", "crates/automation/tests/it/suite.rs::a_theme_imports_lists_activates_and_exports_byte_for_byte"]
+notes = "Not an Acrobat feature: the Craft suite theme (ArtCraft, Graphite, High contrast, library themes) in the machine-local ArtCraft/themes folder, followed by default on a fresh install, or a different theme in PdfCraft alone (View ▸ Display theme, control keys theme_id= and follow_suite=, the suite_* and theme_* tools). Existing preferences keep PdfCraft's own palette. Not yet: the Appearance dialog's theme cards, import/export and conflict notices (the state is in ui.state.suite)."
+
+[[feature]]
 id = "view.home-view"
 title = "Home view with recommended tools and recent files"
 area = "B"
