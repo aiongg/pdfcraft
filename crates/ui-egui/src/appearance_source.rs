@@ -28,5 +28,8 @@ pub(crate) type AppearanceFactory = Box<dyn Fn(&egui::Context) -> Option<Box<dyn
 pub(crate) fn portal_source(ctx: &egui::Context) -> Option<Box<dyn AppearanceSource>> {
     let ctx = ctx.clone();
     let watcher = Watcher::start_active(true, move || ctx.request_repaint())?;
+    // Settle the first answer before the first frame is drawn, so a light desktop does not
+    // flash dark. Without one the app's Light fallback applies.
+    let _ = watcher.wait_first(std::time::Duration::from_millis(250));
     Some(Box::new(watcher))
 }
