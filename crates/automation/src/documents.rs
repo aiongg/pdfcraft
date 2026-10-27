@@ -539,11 +539,23 @@ impl Automation {
         };
         let mut files = Vec::new();
         let mut lowered = Vec::new();
-        for p in pages {
-            let img = ex.image(p, dpi, format).map_err(failed)?;
+        // A write error stops the export as it is, not as a page error.
+        let mut write_error = None;
+        let exported = ex.images(&pages, dpi, format, |p, img| {
             let path = child(&folder, &format!("{stem}_page_{}.{}", p + 1, format.extension()));
-            write_atomic(&path, &img)?;
+            write_atomic(&path, &img).map_err(|e| {
+                let message = e.to_string();
+                write_error = Some(e);
+                message
+            })?;
             files.push(path.to_string_lossy().into_owned());
+            Ok(())
+        });
+        if let Some(e) = write_error {
+            return Err(e);
+        }
+        exported.map_err(failed)?;
+        for &p in &pages {
             // A page too large for the renderer at `dpi` is drawn at the most it allows.
             let used = ex.dpi_used(p, dpi);
             if used < dpi.clamp(18.0, 1200.0) - 0.5 {

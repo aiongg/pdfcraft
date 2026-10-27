@@ -176,12 +176,18 @@ fn run(
         // Handled above.
         ExportKind::AllImages => String::new(),
         ExportKind::Image => {
-            for (k, p) in pages.iter().enumerate() {
-                set(k, None);
-                let result = ex.image(*p, dpi, format).and_then(|img| sink(&format!("{stem}_page_{}.{}", p + 1, format.extension()), img));
-                if let Err(e) = result {
-                    return crate::i18n::fmt(tl!("Export stopped: {e}"), &[("e", &e.to_string())]);
-                }
+            set(0, None);
+            // Pages are drawn several at once and handed over in order: the progress counts the
+            // pages written so far.
+            let mut done = 0;
+            let result = ex.images(&pages, dpi, format, |p, img| {
+                sink(&format!("{stem}_page_{}.{}", p + 1, format.extension()), img)?;
+                done += 1;
+                set(done, None);
+                Ok(())
+            });
+            if let Err(e) = result {
+                return crate::i18n::fmt(tl!("Export stopped: {e}"), &[("e", &e.to_string())]);
             }
             let mut msg = if total == 1 {
                 crate::i18n::fmt(tl!("Exported 1 image"), &[])
