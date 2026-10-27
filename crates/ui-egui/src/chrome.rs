@@ -283,12 +283,12 @@ pub fn tab_strip(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         });
                         ui.add_space(window_controls::SIDE_GAP - 4.0);
                     }
-                    let (icon, label) = match app.theme_preference() {
-                        ThemePreference::System => ("monitor", tl!("Use system setting")),
-                        ThemePreference::Light => ("sun", tl!("Light gray")),
-                        ThemePreference::Dark => ("moon", tl!("Dark gray")),
+                    let icon = match app.theme_preference() {
+                        ThemePreference::System => "monitor",
+                        ThemePreference::Light => "sun",
+                        ThemePreference::Dark => "moon",
                     };
-                    let tip = format!("{}: {label}", tl!("Display theme"));
+                    let tip = app.theme_tooltip();
                     let response = icons::button(ui, icon, button, false, &tip);
                     // A click cycles System, Light, Dark; a right-click opens the menu.
                     if response.clicked() {

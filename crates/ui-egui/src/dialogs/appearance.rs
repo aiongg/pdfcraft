@@ -236,7 +236,7 @@ impl PdfCraftApp {
     }
 
     /// A theme's name as the cards show it.
-    fn theme_name(&self, id: &ThemeId) -> String {
+    pub(crate) fn theme_name(&self, id: &ThemeId) -> String {
         if id.is_app_default() {
             return tl!("App default").to_owned();
         }
@@ -500,10 +500,12 @@ fn library_row(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) {
     #[cfg(not(target_arch = "wasm32"))]
     ui.horizontal(|ui| {
         let busy = app.theme_library.op.is_some();
-        if ui
-            .add_enabled(!busy, egui::Button::new(tl!("Import…")))
-            .on_hover_text(tl!("Add a theme file to the themes every Craft app can use"))
-            .clicked()
+        // Importing installs into the shared suite, so without one there is nothing to import into.
+        if app.suite_available()
+            && ui
+                .add_enabled(!busy, egui::Button::new(tl!("Import…")))
+                .on_hover_text(tl!("Add a theme file to the themes every Craft app can use"))
+                .clicked()
         {
             let dialog = rfd::AsyncFileDialog::new().set_title(tl!("Import a theme")).add_filter(tl!("Craft theme"), &["json"]);
             app.ask_one(crate::pickers::Ask::File(dialog), None, |app, path| app.import_theme_file(&path));

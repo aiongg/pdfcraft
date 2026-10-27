@@ -107,6 +107,8 @@ fn without_a_suite_follow_suite_is_hidden_and_a_card_is_the_apps_own_theme() {
     assert!(!h.state().suite_available());
     assert!(h.query_by_label("Follow suite").is_none());
     assert!(h.query_by_label("Use a different theme in this app").is_none());
+    assert!(h.query_by_label("Import…").is_none(), "nothing to import into");
+    assert!(h.query_by_label("Export…").is_some());
     // The card's name is not a widget of its own: the click lands on the card.
     h.get_by_label("Graphite").click();
     h.run_steps(2);
@@ -121,6 +123,7 @@ fn a_card_writes_the_suite_when_following_and_the_apps_own_choice_otherwise() {
     let dir = tempfile::tempdir().unwrap();
     let mut h = harness(following(dir.path()));
     assert!(h.query_by_label("Changes here apply to every Craft app that follows the suite").is_some());
+    assert!(h.query_by_label("Import…").is_some());
     h.get_by_label("Graphite").click();
     h.run_steps(2);
     wait(&mut h, "the suite write", |_| disk_theme(dir.path()).as_deref() == Some("craft.graphite"));
@@ -215,8 +218,9 @@ fn a_low_contrast_import_shows_warnings_and_keeps_its_colours() {
     let files = tempfile::tempdir().unwrap();
     let path = files.path().join("low.json");
     std::fs::write(&path, LOW_CONTRAST).unwrap();
-    // The whole app with Preferences open, so the pick installs its styles.
-    let mut app = app();
+    // The whole app with Preferences open, so the pick installs its styles. Import needs a suite.
+    let suite = tempfile::tempdir().unwrap();
+    let mut app = following(suite.path());
     app.dialog = Some(crate::Dialog::Preferences);
     app.pick_override = Some(vec![path.to_string_lossy().into_owned()]);
     let mut slot = Some(app);

@@ -53,6 +53,22 @@ impl PdfCraftApp {
         self.effective_selection().mode.into()
     }
 
+    /// The title-bar theme button's tooltip: the effective theme and the mode it shows now, e.g.
+    /// "Display theme: ArtCraft, dark (system)" (the suffix when the mode follows the desktop).
+    pub fn theme_tooltip(&self) -> String {
+        let name = self.theme_name(&self.effective_selection().theme);
+        let mode = match self.theme {
+            ThemeKind::Light => tl!("light"),
+            ThemeKind::Dark => tl!("dark"),
+        };
+        let template = if self.theme_preference() == ThemePreference::System {
+            tl!("Display theme: {theme}, {mode} (system)")
+        } else {
+            tl!("Display theme: {theme}, {mode}")
+        };
+        crate::i18n::fmt(template, &[("theme", &name), ("mode", mode)])
+    }
+
     /// Sets the appearance mode of the active scope (see [`Self::set_appearance`]).
     pub fn set_theme_preference(&mut self, preference: ThemePreference) {
         self.set_appearance(SelectionChange::mode(preference.into()));
