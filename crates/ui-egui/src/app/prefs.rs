@@ -129,13 +129,14 @@ impl PdfCraftApp {
             options = options.last_accepted(last);
         }
         self.suite = suite_theme::Suite::new(craft_theme_store::SuiteWatch::open(dir, options, wake), true);
+        // A new watch counts its generations from the start again.
+        self.theme_key = None;
         self.refresh_theme();
     }
 
-    /// Re-installs the styles when a ctx exists; before the first frame, only the light/dark
-    /// state the styles will have.
+    /// Installs the styles for a changed selection when a ctx exists; before the first frame,
+    /// only the light/dark state the styles will have.
     fn refresh_theme(&mut self) {
-        self.theme_key = None;
         if let Some(ctx) = self.ctx.clone() {
             self.sync_theme(&ctx);
         } else {

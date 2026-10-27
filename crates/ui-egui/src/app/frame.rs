@@ -21,7 +21,8 @@ impl PdfCraftApp {
         self.suite.set_app_theme(own_theme);
         self.suite.sync();
         // A library theme of the app's own choice that hasn't loaded yet keeps the current look.
-        let loading = own_theme.is_some_and(|id| self.suite.is_loading(id));
+        // Before anything is installed there is no look to keep.
+        let loading = self.theme_key.is_some() && own_theme.is_some_and(|id| self.suite.is_loading(id));
         let selection = self.effective_selection();
         if !loading && self.theme_key.as_ref().is_none_or(|(generation, shown)| *generation != self.suite.generation() || *shown != selection) {
             let suite = &self.suite;
