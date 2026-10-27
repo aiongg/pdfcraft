@@ -256,6 +256,7 @@ fn a_low_contrast_import_shows_warnings_and_keeps_its_colours() {
     h.get_by_label("Low contrast").scroll_to_me();
     h.run_steps(8);
     h.get_by_label("Low contrast").click();
+    wait(&mut h, "the pick to show", |h| h.state().effective_selection().theme == id);
     h.run_steps(6);
     assert_eq!(h.state().effective_selection().theme, id);
     let t = Tokens::get(&h.ctx);

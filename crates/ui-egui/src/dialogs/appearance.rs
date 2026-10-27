@@ -21,12 +21,8 @@ use crate::PdfCraftApp;
 use crate::theme::{self, ThemePreference, Tokens};
 use crate::widgets;
 
-/// At most this many card themes are read at once, so the library's result list (which keeps
-/// [`craft_theme_store::RESULTS_KEPT`]) never drops the answer to an import or export.
-const READS_IN_FLIGHT: usize = 4;
-
 /// What the Appearance section keeps between frames: the import or export on its way, how the
-/// last one ended, and the library themes read for their cards.
+/// last one ended, and the library themes read for their warning details.
 #[derive(Default)]
 pub struct Library {
     op: Option<LibraryOp>,
@@ -206,10 +202,10 @@ impl PdfCraftApp {
         }
     }
 
-    /// The library theme `id` as read for its card, asking for it when its file is new or
-    /// changed. Reads only cards on screen and a few at a time, and none while an import or
-    /// export waits for its answer.
-    fn card_record(&mut self, id: &ThemeId, stamp: FileStamp, visible: bool) -> Option<Arc<ThemeRecord>> {
+    /// The library theme `id` as read for its warning details, asking for it when `wanted` (the
+    /// warnings line is hovered) and its file is new or changed. Not while an import or export
+    /// waits for its answer.
+    fn card_record(&mut self, id: &ThemeId, stamp: FileStamp, wanted: bool) -> Option<Arc<ThemeRecord>> {
         let slot = self.theme_library.cards.iter().position(|(card, _)| card == id);
         if let Some(i) = slot
             && let Some((_, card)) = self.theme_library.cards.get(i)
@@ -220,8 +216,7 @@ impl PdfCraftApp {
                 CardTheme::Reading { .. } => None,
             };
         }
-        let reading = self.theme_library.cards.iter().filter(|(_, c)| matches!(c, CardTheme::Reading { .. })).count();
-        if !visible || reading >= READS_IN_FLIGHT || self.theme_library.op.is_some() {
+        if !wanted || self.theme_library.op.is_some() {
             return None;
         }
         let request = self.suite.request(Op::Export(id.clone()));
@@ -378,16 +373,8 @@ fn warning_details(record: Option<&ThemeRecord>) -> String {
 /// One theme card: a picture of PdfCraft in the theme, its name, Active when it is the theme
 /// shown, and for a library theme its warnings. Returns true when the card was clicked.
 fn card(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, card: &Card, active: bool, variant: Variant) -> bool {
-    let width = ui.available_width();
-    // The picture: the theme as this app would show it, read from the library if need be.
-    let (stamp_warnings, record) = match card.library {
-        Some((stamp, warnings)) => {
-            let visible = ui.is_rect_visible(Rect::from_min_size(ui.cursor().min, vec2(width, 120.0)));
-            (Some(warnings), app.card_record(&card.id, stamp, visible))
-        }
-        None => (None, None),
-    };
-    let theme = app.suite.lookup(&card.id).or_else(|| record.as_ref().map(|r| r.theme.clone()));
+    // The picture: the theme as this app would show it, from the suite's snapshot.
+    let theme = app.suite.snapshot().preview(&card.id);
     let tokens = preview_tokens(&card.id, theme.as_ref(), variant);
     let inner = egui::Frame::new()
         .fill(t.card)
@@ -414,10 +401,12 @@ fn card(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, card: &Card, activ
         });
     // The whole card picks its theme, not just its name.
     let clicked = inner.response.interact(egui::Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand).clicked();
-    if let Some(warnings) = stamp_warnings.filter(|n| *n > 0) {
+    if let Some((stamp, warnings)) = card.library.filter(|(_, n)| *n > 0) {
         let text = crate::i18n::trn(crate::i18n::current(), warnings as u64, "{n} warning", "{n} warnings");
-        let details = warning_details(record.as_deref());
-        theme::status_label(ui, t.warn, t.text, RichText::new(text).small()).on_hover_text(details);
+        let line = theme::status_label(ui, t.warn, t.text, RichText::new(text).small());
+        // The file is read for the details only when someone asks for them.
+        let record = app.card_record(&card.id, stamp, line.hovered());
+        line.on_hover_text(warning_details(record.as_deref()));
     }
     clicked
 }
