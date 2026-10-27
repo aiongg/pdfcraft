@@ -232,8 +232,9 @@ fn native_appearance_remains_inherited_for_every_saved_choice() {
     }
 }
 
-/// Preferences ▸ Appearance: a theme card is a manual choice that the mode combo box shows and
-/// OS changes leave alone; Use system setting afterwards follows the OS again.
+/// Preferences ▸ Appearance: a theme card picks the theme and leaves the mode alone; the mode
+/// combo box picks the mode, which OS changes leave alone, and Use system setting follows the OS
+/// again.
 #[test]
 fn preferences_theme_cards_and_use_system_setting_stay_in_sync() {
     use egui::accesskit::Role;
@@ -241,6 +242,22 @@ fn preferences_theme_cards_and_use_system_setting_stay_in_sync() {
         let combo =
             h.get_by(|n| n.role() == Role::ComboBox && n.value().is_some_and(|v| ["Use system setting", "Light", "Dark"].contains(&v.as_str())));
         combo.value().unwrap_or_default()
+    }
+    fn pick(h: &mut Harness<'static, PdfCraftApp>, card: &str) {
+        // The cards sit below the fold of the Preferences scroll area at this window size.
+        h.get_by_label(card).scroll_to_me();
+        h.run_steps(3);
+        h.get_by_label(card).click();
+        h.run_steps(3);
+    }
+    fn choose_mode(h: &mut Harness<'static, PdfCraftApp>, shown: &str, mode: &str) {
+        h.get_by(|n| n.role() == Role::ComboBox && n.value().as_deref() == Some(shown)).scroll_to_me();
+        h.run_steps(3);
+        h.get_by(|n| n.role() == Role::ComboBox && n.value().as_deref() == Some(shown)).click();
+        h.run_steps(3);
+        // Motion has a "Use system setting" radio of its own; this is the combo box's item.
+        h.get_by_role_and_label(Role::Button, mode).click();
+        h.run_steps(3);
     }
     let mut h = harness();
     h.get_by_label("Display theme: Use system setting").click_secondary();
@@ -251,17 +268,16 @@ fn preferences_theme_cards_and_use_system_setting_stay_in_sync() {
     assert_theme(&h, ThemePreference::System, ThemeKind::Dark);
     assert_eq!(mode_shown(&h), "Use system setting");
 
-    // The OS is dark: the Dark card's radio row picks Dark, and the combo box says so.
-    // The cards sit below the fold of the Preferences scroll area at this window size.
-    h.get_by_label("Dark gray").scroll_to_me();
-    h.run_steps(3);
-    h.get_by_label("Dark gray").click();
-    h.run_steps(3);
-    assert_theme(&h, ThemePreference::Dark, ThemeKind::Dark);
-    assert_eq!(mode_shown(&h), "Dark");
-    // The Light card itself, not its radio row, picks Light, and a dark OS doesn't undo it.
-    h.get_by_label("Light theme").click();
-    h.run_steps(3);
+    // A card is a theme: the mode and the OS's answer stay.
+    pick(&mut h, "High contrast");
+    assert_eq!(h.state().effective_selection().theme.as_str(), "craft.high-contrast");
+    assert_eq!((h.state().theme_preference(), h.state().theme), (ThemePreference::System, ThemeKind::Dark));
+    assert_eq!(mode_shown(&h), "Use system setting");
+    pick(&mut h, "App default");
+    assert_theme(&h, ThemePreference::System, ThemeKind::Dark);
+
+    // The combo box's Light is a manual choice a dark OS doesn't undo.
+    choose_mode(&mut h, "Use system setting", "Light");
     h.input_mut().system_theme = Some(egui::Theme::Light);
     h.run_steps(2);
     h.input_mut().system_theme = Some(egui::Theme::Dark);
@@ -269,27 +285,13 @@ fn preferences_theme_cards_and_use_system_setting_stay_in_sync() {
     assert_theme(&h, ThemePreference::Light, ThemeKind::Light);
     assert_eq!(mode_shown(&h), "Light");
 
-    // Use system setting follows the OS both ways after a card choice.
-    h.get_by(|n| n.role() == Role::ComboBox && n.value().as_deref() == Some("Light")).scroll_to_me();
-    h.run_steps(3);
-    h.get_by(|n| n.role() == Role::ComboBox && n.value().as_deref() == Some("Light")).click();
-    h.run_steps(3);
-    // Motion has a "Use system setting" radio of its own; this is the combo box's item.
-    h.get_by_role_and_label(Role::Button, "Use system setting").click();
-    h.run_steps(3);
+    // Use system setting follows the OS both ways after a manual choice.
+    choose_mode(&mut h, "Light", "Use system setting");
     assert_theme(&h, ThemePreference::System, ThemeKind::Dark);
     assert_eq!(mode_shown(&h), "Use system setting");
     h.input_mut().system_theme = Some(egui::Theme::Light);
     h.run_steps(3);
     assert_theme(&h, ThemePreference::System, ThemeKind::Light);
-    // Only the Light card is marked Active while the OS is light.
+    // Only the card shown is marked Active.
     assert_eq!(h.query_all_by_label("Active").count(), 1);
-
-    // A card click leaves system mode again.
-    h.get_by_label("Dark theme").scroll_to_me();
-    h.run_steps(3);
-    h.get_by_label("Dark theme").click();
-    h.run_steps(3);
-    assert_theme(&h, ThemePreference::Dark, ThemeKind::Dark);
-    assert_eq!(mode_shown(&h), "Dark");
 }

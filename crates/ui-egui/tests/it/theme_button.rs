@@ -37,5 +37,5 @@ fn a_click_cycles_the_theme_and_a_right_click_opens_the_menu() {
     h.get_by_label("Appearance settings…").click();
     h.run_steps(4);
     h.run_steps(10);
-    assert!(h.query_by_label("Light theme").is_some(), "Preferences opens on Appearance");
+    assert!(h.query_by_label("App default").is_some(), "Preferences opens on Appearance");
 }

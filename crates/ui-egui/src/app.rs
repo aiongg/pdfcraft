@@ -66,6 +66,7 @@ impl PdfCraftApp {
             suite_last: None,
             theme_key: None,
             theme_note: None,
+            theme_library: Default::default(),
             reading_colors: Default::default(),
             #[cfg(target_os = "linux")]
             appearance: None,

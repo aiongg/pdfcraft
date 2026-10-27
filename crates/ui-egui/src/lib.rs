@@ -292,6 +292,9 @@ pub struct PdfCraftApp {
     theme_key: Option<(u64, Selection)>,
     /// Why the theme shown differs from the selection (an unknown theme, a single variant).
     theme_note: Option<Fallback>,
+    /// Preferences › Appearance: an import or export on its way, how the last one ended, and the
+    /// library themes read for their cards.
+    theme_library: appearance::Library,
     /// The reading-colours preference (Preferences ▸ Reading colours): applied to every open
     /// document, and documents open with it (Acrobat's Replace Document Colors).
     pub reading_colors: pdfcraft_render::ReadingColors,
