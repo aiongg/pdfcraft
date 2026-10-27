@@ -18,6 +18,7 @@ mod run_root;
 mod split;
 mod stderr;
 mod stdout;
+mod suite_dir;
 mod text;
 mod ui_control;
 mod version_resource;

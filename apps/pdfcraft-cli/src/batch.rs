@@ -53,7 +53,7 @@ pub(super) fn run(args: &[String]) -> Result<(), CliError> {
     if seen.contains("--ocr-all-pages") {
         params["skip_text_pages"] = json!(false);
     }
-    let mut auto = automation(args)?;
+    let mut auto = automation(args, false)?;
     let content = auto.call("doc_batch", &params).map_err(|e| e.to_string())?;
     let failed = content.iter().any(|c| matches!(c, pdfcraft_automation::Content::Json(v) if v["failed"].as_u64().is_some_and(|n| n > 0)));
     print_output(&auto, content, None)?;

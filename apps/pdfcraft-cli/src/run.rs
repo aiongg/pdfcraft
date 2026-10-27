@@ -5,10 +5,30 @@ use super::*;
 
 // ---- automation --------------------------------------------------------------------------------
 
-pub(crate) fn automation(args: &[String]) -> Result<pdfcraft_automation::Automation, String> {
-    // The suite theme tools use the folder every Craft app shares (`CRAFT_SUITE_DIR`, empty for
-    // none, overrides it).
-    let a = pdfcraft_automation::Automation::new().with_suite_dir(pdfcraft_automation::SuiteDir::resolve(false));
+/// The suite folder the suite and theme tools use: in memory unless `--suite-dir` or
+/// `CRAFT_SUITE_DIR` names one (`CRAFT_SUITE_DIR` empty: in memory), and always in memory when
+/// the run is confined (`--root`, automation roots), so a script or MCP client never changes the
+/// theme every Craft app shares by accident.
+fn suite_dir(args: &[String], confined: bool) -> Result<pdfcraft_automation::SuiteDir, String> {
+    let explicit = flag(args, "--suite-dir");
+    if confined {
+        return match explicit {
+            Some(_) => Err("--suite-dir can't be used with --root or automation roots: a confined run keeps the suite theme in memory".into()),
+            None => Ok(pdfcraft_automation::SuiteDir::memory()),
+        };
+    }
+    Ok(match explicit {
+        Some(dir) => pdfcraft_automation::SuiteDir::at(dir),
+        None if std::env::var_os(pdfcraft_automation::SUITE_DIR_ENV).is_some() => pdfcraft_automation::SuiteDir::resolve(false),
+        None => pdfcraft_automation::SuiteDir::memory(),
+    })
+}
+
+/// `confined`: automation roots confine the run (`mcp`), which keeps the suite in memory as
+/// `--root` does.
+pub(crate) fn automation(args: &[String], confined: bool) -> Result<pdfcraft_automation::Automation, String> {
+    let dir = suite_dir(args, confined || flag(args, "--root").is_some())?;
+    let a = pdfcraft_automation::Automation::new().with_suite_dir(dir);
     match flag(args, "--root") {
         Some(root) => a.with_root(root).map_err(|e| format!("--root {root}: {e}")),
         None => Ok(a),
@@ -114,7 +134,7 @@ pub(crate) fn run(args: &[String]) -> Result<(), CliError> {
     if report && flag(args, "--script").is_none() {
         return Err("run: --report needs --script".to_string().into());
     }
-    let mut auto = automation(args)?;
+    let mut auto = automation(args, false)?;
     if let Some(script) = flag(args, "--script") {
         let text = std::fs::read_to_string(script).map_err(|e| format!("{script}: {e}"))?;
         let steps: Vec<serde_json::Value> = serde_json::from_str(&text).map_err(|e| format!("{script}: {e}"))?;
@@ -166,7 +186,7 @@ pub(crate) fn mcp(args: &[String]) -> Result<(), CliError> {
     let args = args.as_slice();
     validate_options("mcp", args, MCP_OPTIONS)?;
     let compact = args.iter().any(|a| a == "--compact");
-    let mut auto = automation(args)?;
+    let mut auto = automation(args, roots.is_some())?;
     if let Some(roots) = roots {
         let show = |root: Option<&Path>| root.map_or_else(|| "none".to_string(), |r| r.display().to_string());
         let _ = writeln!(

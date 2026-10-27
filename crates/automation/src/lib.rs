@@ -43,7 +43,7 @@ use pdfcraft_platform::staging::{StagingName, staging_suffixes};
 use pdfcraft_render::{PageRenderer, PageText, RenderConfig, RenderRequest, RequestKind};
 use serde_json::{Value, json};
 
-pub use craft_theme_store::SuiteDir;
+pub use craft_theme_store::{SUITE_DIR_ENV, SuiteDir};
 pub use pdfcraft_render::Pixels;
 pub use tools::{ToolDef, tools};
 

@@ -1,10 +1,11 @@
 //! The suite theme tools: the selection every Craft app shares and the theme library.
 //!
 //! [`Automation::new`] keeps the suite in memory, so tests and agents never touch the shared
-//! folder; `pdfcraft-cli` passes [`SuiteDir::resolve`] (the folder, or `CRAFT_SUITE_DIR`).
+//! folder. `pdfcraft-cli` opens a folder only when `CRAFT_SUITE_DIR` or `--suite-dir` names one,
+//! and never under `--root`.
 
 use craft_theme::{AppDefaults, Mode, ThemeId};
-use craft_theme_store::{Accepted, SelectionChange, Store, StoreError, StoreOptions, SuiteDir, ThemeRecord};
+use craft_theme_store::{Accepted, MAX_THEME_BYTES, SelectionChange, Store, StoreError, StoreOptions, SuiteDir, ThemeRecord};
 
 use super::error::{Result, failed};
 use super::*;
@@ -43,6 +44,23 @@ fn warnings(record: &ThemeRecord) -> Value {
             .map(|d| json!({ "variant": format!("{:?}", d.variant).to_lowercase(), "fg": format!("{:?}", d.fg), "bg": format!("{:?}", d.bg), "ratio": (d.ratio * 100.0).round() / 100.0 }))
             .collect::<Vec<_>>(),
     })
+}
+
+/// Reads a theme file for import, at most [`MAX_THEME_BYTES`] of it: a larger file is refused
+/// before the store sees it.
+fn read_theme_file(path: &std::path::Path) -> Result<Vec<u8>> {
+    use std::io::Read as _;
+    let too_big = || failed(format!("{}: a theme file is at most {} KiB", path.display(), MAX_THEME_BYTES / 1024));
+    let file = std::fs::File::open(path).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+    if file.metadata().is_ok_and(|m| m.len() > MAX_THEME_BYTES as u64) {
+        return Err(too_big());
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_THEME_BYTES as u64 + 1).read_to_end(&mut bytes).map_err(|e| failed(format!("{}: {e}", path.display())))?;
+    if bytes.len() > MAX_THEME_BYTES {
+        return Err(too_big());
+    }
+    Ok(bytes)
 }
 
 impl Automation {
@@ -87,11 +105,8 @@ impl Automation {
     pub(crate) fn suite_set(&mut self, a: &Args) -> Result<Value> {
         let mut change = SelectionChange::default();
         if let Some(id) = a.opt_str("theme")? {
-            let id = ThemeId::parse(id).map_err(|e| ToolError::InvalidArgs(format!("theme {id:?}: {e}")))?;
-            if id.is_app_default() {
-                return Err(ToolError::InvalidArgs("craft.app-default is each app's own palette, not a suite theme".into()));
-            }
-            change.theme = Some(id);
+            // craft.app-default is a suite theme too: every following app shows its own palette.
+            change.theme = Some(ThemeId::parse(id).map_err(|e| ToolError::InvalidArgs(format!("theme {id:?}: {e}")))?);
         }
         if let Some(mode) = a.opt_str("mode")? {
             change.mode = Some(match mode {
@@ -107,6 +122,7 @@ impl Automation {
         let (store, _) = self.suite_store();
         if let Some(id) = &change.theme
             && id.is_builtin()
+            && !id.is_app_default()
             && craft_theme::builtin(id).is_none()
         {
             return Err(failed(format!("no built-in theme has the id {id}")));
@@ -116,13 +132,14 @@ impl Automation {
         Ok(self.suite_json(&accepted, None))
     }
 
-    /// `theme_list`: App default, the built-ins and the library, with the suite's theme marked.
+    /// `theme_list`: App default (each app's own palette), the built-ins and the library, with
+    /// the suite's theme marked.
     pub(crate) fn theme_list(&mut self) -> Result<Value> {
         let (store, problem) = self.suite_store();
         let active = store.accepted().suite.with_defaults(&app_defaults()).theme;
         let library = store.library();
         let mut themes = vec![
-            json!({ "id": craft_theme::APP_DEFAULT, "name": "App default", "origin": "built-in", "variants": ["light", "dark"], "warnings": 0, "suite": false }),
+            json!({ "id": craft_theme::APP_DEFAULT, "name": "App default", "origin": "built-in", "variants": ["light", "dark"], "warnings": 0, "suite": active.is_app_default() }),
         ];
         for t in craft_theme::builtins() {
             let variants: Vec<&str> = t.variants().map(|(v, _)| if v == craft_theme::Variant::Light { "light" } else { "dark" }).collect();
@@ -142,7 +159,7 @@ impl Automation {
     /// warnings never block it.
     pub(crate) fn theme_import(&mut self, a: &Args) -> Result<Value> {
         let path = self.resolve(a.str("path")?, false)?;
-        let bytes = read_input(&path)?;
+        let bytes = read_theme_file(&path)?;
         let as_copy = a.opt_bool("as_copy")?.unwrap_or(false);
         let (store, _) = self.suite_store();
         let imported = store.import(&bytes, as_copy).map_err(|e| match e {

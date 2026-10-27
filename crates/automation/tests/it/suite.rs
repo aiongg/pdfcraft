@@ -35,13 +35,7 @@ fn suite_get_and_suite_set_share_the_selection_through_the_folder() {
     let both = ok(&mut a, "suite_get", json!({}));
     assert_eq!((both["theme"].as_str(), both["mode"].as_str(), both["revision"].as_u64()), (Some("craft.graphite"), Some("light"), Some(2)));
 
-    for bad in [
-        json!({}),
-        json!({ "theme": "craft.nope" }),
-        json!({ "theme": "craft.app-default" }),
-        json!({ "mode": "sepia" }),
-        json!({ "theme": "Bad Id" }),
-    ] {
+    for bad in [json!({}), json!({ "theme": "craft.nope" }), json!({ "mode": "sepia" }), json!({ "theme": "Bad Id" })] {
         assert!(call(&mut a, "suite_set", bad.clone()).is_err(), "{bad} is refused");
     }
     assert_eq!(ok(&mut a, "suite_get", json!({}))["revision"], 2, "refused calls write nothing");
@@ -94,4 +88,29 @@ fn a_new_session_keeps_the_suite_in_memory() {
     let got = ok(&mut a, "suite_get", json!({}));
     assert_eq!((got["theme"].as_str(), got["mode"].as_str()), (Some("craft.high-contrast"), Some("light")));
     assert_eq!(ok(&mut Automation::new(), "suite_get", json!({}))["theme"], Value::Null, "each session has its own");
+}
+
+#[test]
+fn the_app_default_is_a_suite_theme() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = Automation::new().with_suite_dir(SuiteDir::at(dir.path()));
+    let set = ok(&mut a, "suite_set", json!({ "theme": "craft.app-default" }));
+    assert_eq!((set["theme"].as_str(), set["effective"]["theme"].as_str()), (Some("craft.app-default"), Some("craft.app-default")));
+    let list = ok(&mut a, "theme_list", json!({}));
+    let marked: Vec<&str> = list["themes"].as_array().unwrap().iter().filter(|t| t["suite"] == true).filter_map(|t| t["id"].as_str()).collect();
+    assert_eq!(marked, ["craft.app-default"]);
+    let mut b = Automation::new().with_suite_dir(SuiteDir::at(dir.path()));
+    assert_eq!(ok(&mut b, "suite_get", json!({}))["theme"], "craft.app-default", "it round-trips through the folder");
+}
+
+#[test]
+fn an_oversized_theme_file_is_refused_before_the_store_reads_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let work = tempfile::tempdir().unwrap();
+    let big = format!(r#"{{"pad":"{}"}}"#, "x".repeat(craft_theme_store::MAX_THEME_BYTES));
+    std::fs::write(work.path().join("big.json"), big).unwrap();
+    let mut a = Automation::new().with_root(work.path()).unwrap().with_suite_dir(SuiteDir::at(dir.path()));
+    let e = call(&mut a, "theme_import", json!({ "path": "big.json" })).unwrap_err();
+    assert!(e.contains("big.json: a theme file is at most 256 KiB"), "refused by the tool's bounded read: {e}");
+    assert_eq!(ok(&mut a, "suite_get", json!({}))["library_revision"], 0);
 }
