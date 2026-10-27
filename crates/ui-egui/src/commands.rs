@@ -93,6 +93,7 @@ impl PdfCraftApp {
             && match spec.id {
                 "view.previous_view" => self.active.and_then(|i| self.views.get(i)).is_some_and(|v| !v.back.is_empty()),
                 "view.next_view" => self.active.and_then(|i| self.views.get(i)).is_some_and(|v| !v.forward.is_empty()),
+                "view.theme.follow_suite" => self.suite_available(),
                 _ => true,
             }
     }
@@ -300,8 +301,8 @@ impl PdfCraftApp {
             "view.theme.system" => self.set_theme_preference(ThemePreference::System),
             "view.theme.light" => self.set_theme_preference(ThemePreference::Light),
             "view.theme.dark" => self.set_theme_preference(ThemePreference::Dark),
-            "view.theme.follow_suite" => self.set_follow_suite(true),
-            "view.theme.this_app" => self.set_follow_suite(false),
+            "view.theme.follow_suite" => drop(self.set_follow_suite(true)),
+            "view.theme.this_app" => drop(self.set_follow_suite(false)),
             "comment.list" => self.choose_right_panel(Some(RightPanel::Comments)),
             tool if crate::comments::CommentTool::from_command(tool).is_some() => {
                 let Some(tool) = crate::comments::CommentTool::from_command(tool) else { return false };

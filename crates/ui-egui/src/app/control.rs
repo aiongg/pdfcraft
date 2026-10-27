@@ -34,8 +34,13 @@ impl PdfCraftApp {
             }
             ("theme_id", _) => self.set_appearance_theme(value)?,
             ("follow_suite", _) => match value {
-                "true" => self.set_follow_suite(true),
-                "false" => self.set_follow_suite(false),
+                "true" if !self.suite_available() => return Err("there is no shared suite to follow".into()),
+                "true" => {
+                    self.set_follow_suite(true);
+                }
+                "false" => {
+                    self.set_follow_suite(false);
+                }
                 _ => return Err("follow_suite must be true or false".into()),
             },
             ("scroll_speed", _) => {

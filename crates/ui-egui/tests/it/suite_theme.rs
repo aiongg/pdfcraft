@@ -85,14 +85,25 @@ fn the_sample_theme_and_every_built_in_give_the_shared_core_colours() {
         }
     }
 
-    // A fresh profile follows the suite and, with nothing chosen, shows ArtCraft dark.
-    let mut fresh = PdfCraftApp::new();
-    fresh.restore("{}");
-    assert!(fresh.follows_suite());
-    let h = harness_with(fresh);
+    // A fresh profile without a suite folder is ArtCraft dark as the app's own theme.
     let artcraft = craft_theme::builtin(&ThemeId::suite_default()).unwrap();
+    let mut fresh = PdfCraftApp::new();
+    fresh.start_fresh();
+    assert_eq!(fresh.appearance(), &AppChoice::Own(Selection { theme: ThemeId::suite_default(), mode: Mode::Dark }));
+    assert!(!fresh.suite_available());
+    let h = harness_with(fresh);
     assert_eq!(h.state().theme, ThemeKind::Dark);
-    assert_core(&Tokens::get(&h.ctx), artcraft.variant(Variant::Dark).unwrap(), "fresh profile");
+    assert_core(&Tokens::get(&h.ctx), artcraft.variant(Variant::Dark).unwrap(), "fresh profile, no suite");
+    drop(h);
+
+    // With a suite folder (a temporary one) a fresh profile follows it; nothing chosen shows ArtCraft dark.
+    let dir = tempfile::tempdir().unwrap();
+    let mut fresh = app_on(dir.path());
+    fresh.start_fresh();
+    assert!(fresh.suite_available() && fresh.follows_suite());
+    let h = harness_with(fresh);
+    assert_eq!(h.state().theme, ThemeKind::Dark);
+    assert_core(&Tokens::get(&h.ctx), artcraft.variant(Variant::Dark).unwrap(), "fresh profile, suite");
 }
 
 #[test]
@@ -101,8 +112,10 @@ fn saved_choices_migrate_as_the_pilot_plan_says() {
     for (saved, expected) in [
         (r#"{"theme": "Dark"}"#, own("craft.app-default", Mode::Dark)),
         (r#"{"theme": "System"}"#, own("craft.app-default", Mode::System)),
-        ("{}", AppChoice::FollowSuite),
-        (r#"{"recent": []}"#, AppChoice::FollowSuite),
+        // Settings saved before themes existed keep the app's own look.
+        ("{}", own("craft.app-default", Mode::System)),
+        (r#"{"recent": []}"#, own("craft.app-default", Mode::System)),
+        (r#"{"default_mode":"edit"}"#, own("craft.app-default", Mode::System)),
         (
             r#"{"theme": "Dark", "appearance": {"follow_suite": false, "theme_id": "craft.graphite", "mode": "light"}}"#,
             own("craft.graphite", Mode::Light),
@@ -188,11 +201,19 @@ fn an_own_theme_ignores_suite_changes_until_follow_suite_is_back_on() {
 
     b.set_option("follow_suite", "true").unwrap();
     assert_eq!(shown(&b).0, "craft.high-contrast");
-    // In memory there is no suite to share: a pick while following goes to the app's own choice.
+    // In memory there is no suite to follow: turning it on is refused and a pick is the app's own.
     let mut alone = PdfCraftApp::new();
-    alone.set_follow_suite(true);
+    alone.start_fresh();
+    assert!(!alone.set_follow_suite(true));
+    assert!(alone.set_option("follow_suite", "true").is_err());
+    assert!(!alone.follows_suite());
     alone.set_appearance_theme("craft.graphite").unwrap();
     assert_eq!(alone.appearance(), &AppChoice::Own(Selection { theme: ThemeId::parse("craft.graphite").unwrap(), mode: Mode::Dark }));
+    // A restored "follow the suite" without a suite folder becomes the fresh-install look.
+    let mut portable = PdfCraftApp::new();
+    portable.restore(&b.persist());
+    portable.open_suite(&SuiteDir::memory(), || {});
+    assert_eq!(portable.appearance(), &AppChoice::Own(Selection { theme: ThemeId::suite_default(), mode: Mode::Dark }));
 }
 
 #[test]

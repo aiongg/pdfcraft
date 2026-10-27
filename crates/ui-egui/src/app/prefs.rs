@@ -51,10 +51,28 @@ impl PdfCraftApp {
         &self.app_choice
     }
 
-    /// Whether the app follows the suite theme. In memory (tests, the web build, portable copies)
-    /// it shows its fresh-install defaults while it does.
+    /// Whether the app follows the suite theme.
     pub fn follows_suite(&self) -> bool {
         self.app_choice == AppChoice::FollowSuite
+    }
+
+    /// Whether there is a shared suite to follow. False in memory (tests, the web build,
+    /// portable copies and an empty `CRAFT_SUITE_DIR`), where the theme is the app's own and
+    /// "Follow suite" is unavailable.
+    pub fn suite_available(&self) -> bool {
+        self.suite.shared()
+    }
+
+    /// The theme choice of a profile with no stored settings: follow the suite when there is
+    /// one, else ArtCraft in dark mode as the app's own. Call after [`Self::open_suite`].
+    pub fn start_fresh(&mut self) {
+        self.app_choice = if self.suite_available() {
+            AppChoice::FollowSuite
+        } else {
+            let defaults = suite_theme::app_defaults();
+            AppChoice::Own(Selection { theme: defaults.theme, mode: defaults.mode })
+        };
+        self.refresh_theme();
     }
 
     /// The theme and mode to show: the app's own, else the suite's, with PdfCraft's
@@ -66,11 +84,11 @@ impl PdfCraftApp {
         }
     }
 
-    /// Changes the theme or mode of the active scope: the suite while the app follows it and the
-    /// suite is shared, otherwise the app's own choice. Shows at once; a suite write that
+    /// Changes the theme or mode of the active scope: the suite while the app follows it,
+    /// otherwise the app's own choice. Shows at once; a suite write that
     /// conflicts or fails returns to the accepted state and is kept in [`Self::suite`].
     pub fn set_appearance(&mut self, change: SelectionChange) {
-        if self.follows_suite() && self.suite.shared() {
+        if self.follows_suite() {
             self.suite.change(change);
         } else {
             let mut own = self.effective_selection();
@@ -93,14 +111,19 @@ impl PdfCraftApp {
     }
 
     /// "Follow suite" on, or off ("Use a different theme in this app"), which keeps the theme and
-    /// mode shown now as the app's own.
-    pub fn set_follow_suite(&mut self, follow: bool) {
+    /// mode shown now as the app's own. Refused (false) when turning it on without a shared
+    /// suite ([`Self::suite_available`]).
+    pub fn set_follow_suite(&mut self, follow: bool) -> bool {
+        if follow && !self.suite_available() {
+            return false;
+        }
         self.app_choice = match (follow, &self.app_choice) {
             (true, _) => AppChoice::FollowSuite,
             (false, AppChoice::FollowSuite) => AppChoice::Own(self.effective_selection()),
             (false, own) => own.clone(),
         };
         self.refresh_theme();
+        true
     }
 
     /// Why the theme shown differs from the selection (an unknown theme, a single variant).
@@ -119,9 +142,14 @@ impl PdfCraftApp {
     }
 
     /// Follows the shared suite folder `dir` (the desktop shell, and tests with a temporary
-    /// folder); `wake` repaints when another app changes it. In memory, nothing changes.
+    /// folder); `wake` repaints when another app changes it. In memory the suite stays
+    /// unavailable.
     pub fn open_suite(&mut self, dir: &craft_theme_store::SuiteDir, wake: impl Fn() + Send + Sync + 'static) {
         if dir.is_memory() {
+            // Nothing to follow: a restored "follow the suite" becomes the fresh-install look.
+            if self.follows_suite() {
+                self.start_fresh();
+            }
             return;
         }
         let mut options = craft_theme_store::StoreOptions::new(concat!("pdfcraft ", env!("CARGO_PKG_VERSION")));

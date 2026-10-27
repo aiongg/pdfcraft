@@ -5,7 +5,7 @@
 //! "Apply mine", Retry or the next pick, and no flash of the app's own palette while a picked
 //! library theme loads. Only the desktop shell opens the shared folder; everything else (the app
 //! constructor, tests, the web build, portable copies) keeps the suite in memory, where it isn't
-//! shared and the app's changes go to its own choice instead.
+//! shared, "Follow suite" is unavailable and the theme is the app's own.
 
 use std::sync::Arc;
 
@@ -43,8 +43,7 @@ impl Suite {
         Self { client, shared }
     }
 
-    /// Whether other Craft apps see this suite. In memory "Follow suite" has nothing to follow,
-    /// so the app's changes go to its own choice.
+    /// Whether other Craft apps see this suite. In memory "Follow suite" has nothing to follow.
     pub fn shared(&self) -> bool {
         self.shared
     }
