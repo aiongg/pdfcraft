@@ -298,3 +298,32 @@ fn text_is_readable_on_every_surface() {
         }
     }
 }
+
+/// Status colours (`bad`, `warn`, `good`) must read on every surface they are painted on, in every
+/// built-in suite theme and both variants. The suite contract (pilot plan §2.2) is 3:1; ArtCraft's
+/// bold values sit between 3:1 and 4.5:1 on some surfaces by the owner's decision, while Graphite
+/// and High contrast reach 4.5:1 everywhere. App default keeps PdfCraft's original status colours
+/// and is not part of the suite contract.
+#[test]
+fn status_colours_read_on_panel_card_and_pasteboard_in_every_built_in_theme() {
+    let mut checked = 0;
+    for theme in craft_theme::builtins() {
+        if theme.id.as_str() == craft_theme::APP_DEFAULT {
+            continue;
+        }
+        let floor = if theme.id.as_str() == "craft.artcraft" { 3.0 } else { 4.5 };
+        let selection = Selection { theme: theme.id.clone(), mode: Mode::System };
+        let (slots, note) = slot_tokens(&selection, &craft_theme::lookup_builtin);
+        assert!(note.is_none(), "{} resolved with a fallback", theme.id.as_str());
+        for (slot, t) in [("light", &slots.light), ("dark", &slots.dark)] {
+            for (role, ink) in [("bad", t.bad), ("warn", t.warn), ("good", t.good)] {
+                for (surface, bg) in [("panel", t.panel), ("card", t.card), ("pasteboard", t.pasteboard)] {
+                    let ratio = contrast(ink, bg);
+                    assert!(ratio >= floor, "{} {slot}: {role} on {surface} is {ratio:.2}:1, below {floor}:1", theme.id.as_str());
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(checked >= 3 * 3 * 2 * 3, "only {checked} pairs checked");
+}
